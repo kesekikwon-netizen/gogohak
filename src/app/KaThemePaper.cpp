@@ -33,11 +33,12 @@ void applyPaperLook(Tokens& t, bool highContrast) {
   t.rail = QColor(0xF0, 0xEE, 0xE6);         // the home hero is a paper band with slate text
   t.railText = t.ink;
   t.railMuted = t.inkMuted;
-  t.progressFill = QColor(0xD9, 0x77, 0x57);  // clay: ink 5.9:1 on it, 3.1:1 against white
+  t.progressFill = t.ink;                    // ink on the track: clay is the one filled button
   t.focusRing = t.ink;
   t.primaryFocus = t.ink;
   t.tabInk = t.ink;  // the current tab is marked in ink, clay stays the one filled button
   t.tabMark = t.ink;
+  t.chosenFill = QColor(0xE3, 0xDA, 0xCC);  // the chosen segment: oat with an ink edge
   t.ribbonLabelInk = t.ink;
   t.ribbonActiveInk = t.ink;                 // the chosen label and text links read in ink
   t.ribbonGroupInk = t.inkMuted;
@@ -61,6 +62,9 @@ void applyPaperLook(Tokens& t, bool highContrast) {
   t.tileStrong = t.accent;
   t.glyph = QColor(0x30, 0x30, 0x2E);
   t.glyphOn = QColor(0xFA, 0xF9, 0xF5);
+  t.tileShown = QColor(0xE3, 0xDA, 0xCC);   // a layer switched on: oat with a grey edge, ink glyph
+  t.tileShownBorder = QColor(0xB0, 0xAE, 0xA5);
+  t.glyphShown = t.ink;
   if (!highContrast)
     return;
   // Glare profile on paper: edges reach 3:1 on white, secondary text 7:1, washes step further apart.

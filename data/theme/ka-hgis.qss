@@ -1310,7 +1310,7 @@ QPushButton#kaFeatureCardOpenForm:enabled:focus { border-color: @focusRing@; }
 QFrame#basemapQuickCard { background: @altRow@; border: 1px solid @border@; border-radius: 8px; }
 QFrame#basemapQuickCard QToolButton { min-width: 72px; min-height: 34px; padding: 0 10px; border: 1px solid @border@;
   border-radius: 6px; background: @surface@; font-size: 12px; }
-QFrame#basemapQuickCard QToolButton:checked { background: @accentWash@; color: @accentDeep@; border-color: @accent@; }
+QFrame#basemapQuickCard QToolButton:checked { background: @chosenFill@; color: @tabInk@; border-color: @tabMark@; }
 QFrame#basemapQuickCard QToolButton:enabled:focus { border-color: @focusRing@; }
 QLabel#basemapQuickTitle { font-size: 14px; font-weight: 700; color: @ink@; }
 QLabel#basemapQuickNote { color: @inkMuted@; font-size: 12px; }

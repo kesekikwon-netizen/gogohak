@@ -4,6 +4,7 @@
 #include "KaIconsMockup.h"
 #include "KaTheme.h"
 
+#include <QSet>
 #include <QFile>
 #include <QHash>
 #include <QIconEngine>
@@ -94,7 +95,8 @@ void drawDot(QPainter& p, qreal px) {
 
 class MockupIconEngine : public QIconEngine {
  public:
-  MockupIconEngine(QString svgPath, bool strong) : m_svgPath(std::move(svgPath)), m_strong(strong) {}
+  MockupIconEngine(QString svgPath, bool strong, bool shown = false)
+      : m_svgPath(std::move(svgPath)), m_strong(strong), m_shown(shown) {}
 
   void paint(QPainter* painter, const QRect& rect, QIcon::Mode mode, QIcon::State state) override {
     const qreal dpr = painter->device()->devicePixelRatio();
@@ -113,7 +115,7 @@ class MockupIconEngine : public QIconEngine {
     // The tile colour is part of the key: a look chosen in 「화면 보기」 repaints the icon.
     const QString key = QString::number(px) + QLatin1Char('/') + QString::number(int(mode)) + QLatin1Char('/') +
                         QString::number(int(state)) + QLatin1Char('/') +
-                        QString::number(lookFor(mode, state, m_strong).tile.rgb(), 16);
+                        QString::number(lookFor(mode, state, m_strong, m_shown).tile.rgb(), 16);
     const auto found = m_cache.constFind(key);
     if (found != m_cache.constEnd()) return *found;
     const QPixmap pm = QPixmap::fromImage(render(px, mode, state));
@@ -125,11 +127,11 @@ class MockupIconEngine : public QIconEngine {
     return {QSize(16, 16), QSize(20, 20), QSize(24, 24), QSize(32, 32), QSize(48, 48), QSize(64, 64), QSize(128, 128)};
   }
   QString key() const override { return QStringLiteral("KaIconsMockup"); }
-  QIconEngine* clone() const override { return new MockupIconEngine(m_svgPath, m_strong); }
+  QIconEngine* clone() const override { return new MockupIconEngine(m_svgPath, m_strong, m_shown); }
 
  private:
   QImage render(int px, QIcon::Mode mode, QIcon::State state) const {
-    const Look look = lookFor(mode, state, m_strong);
+    const Look look = lookFor(mode, state, m_strong, m_shown);
     QImage image(px, px, QImage::Format_ARGB32_Premultiplied);
     image.fill(Qt::transparent);
     QPainter p(&image);
@@ -143,12 +145,13 @@ class MockupIconEngine : public QIconEngine {
 
   QString m_svgPath;
   bool m_strong;
+  bool m_shown;
   mutable QHash<QString, QPixmap> m_cache;
 };
 
 }  // namespace
 
-Look lookFor(QIcon::Mode mode, QIcon::State state, bool strong) {
+Look lookFor(QIcon::Mode mode, QIcon::State state, bool strong, bool shown) {
   // The measured mockup colours live in the theme tokens (KaTheme.cpp), so a look can restate them.
   const KaTheme::Tokens& t = KaTheme::tokens();
   Look look;
@@ -162,9 +165,9 @@ Look lookFor(QIcon::Mode mode, QIcon::State state, bool strong) {
     look.glyph = Qt::white;
     look.dot = true;
   } else if (state == QIcon::On) {
-    look.tile = t.tileOn;
-    look.tileBorder = t.tileOnBorder;
-    look.glyph = t.glyphOn;
+    look.tile = shown ? t.tileShown : t.tileOn;
+    look.tileBorder = shown ? t.tileShownBorder : t.tileOnBorder;
+    look.glyph = shown ? t.glyphShown : t.glyphOn;
   } else if (mode == QIcon::Active) {
     look.tile = t.tileHover;
   }
@@ -174,7 +177,9 @@ Look lookFor(QIcon::Mode mode, QIcon::State state, bool strong) {
 QIcon mockupIcon(const QString& id, bool strong) {
   const QString path = svgPathFor(id);
   if (path.isEmpty()) return QIcon();
-  return QIcon(new MockupIconEngine(path, strong));
+  // The layers a user switches on, as the ribbon holds them (지형 DEM 토양 지질 수계 and the contour maps).
+  static const QSet<QString> shownIds = {QStringLiteral("contour"), QStringLiteral("dem"), QStringLiteral("soil"), QStringLiteral("geology"), QStringLiteral("river")};
+  return QIcon(new MockupIconEngine(path, strong, shownIds.contains(id)));
 }
 
 }  // namespace KaIconsMockup

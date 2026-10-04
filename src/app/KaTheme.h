@@ -34,13 +34,13 @@ struct Tokens {
   QColor ribbonLabelInk, ribbonActiveInk, ribbonGroupInk;
   // The main (default) button, and chrome: the face of the window, toolbars, tab row and status bar.
   // Stock: the accent steps and the surface, so nothing moves until a look changes them.
-  QColor primary, primaryHover, primaryPressed, primaryText, primaryFocus, tabInk, tabMark, chrome;
+  QColor primary, primaryHover, primaryPressed, primaryText, primaryFocus, tabInk, tabMark, chosenFill, chrome;
   // Home hero: the filled 「새 조사」 button and the outline button's hover and pressed fills; band is
   // the header strip of the download windows.
   QColor heroButton, heroButtonText, heroButtonHover, heroButtonPressed, heroGhostHover, heroGhostPressed, band;
   // Ribbon icon tiles (KaIconsMockupEngine): plain, hovered, chosen (+ its border), disabled, and the
   // solid 저장-unsaved tile; glyph inks for a plain and a chosen tile.
-  QColor tile, tileHover, tileOn, tileOnBorder, tileDisabled, tileStrong, glyph, glyphOn;
+  QColor tile, tileHover, tileOn, tileOnBorder, tileDisabled, tileStrong, glyph, glyphOn, tileShown, tileShownBorder, glyphShown;
 
   // Legacy aliases (same values as above). Do not use in new code.
   QColor sky0, sky1, sky2, sky3, sky4, sky5, sky6;

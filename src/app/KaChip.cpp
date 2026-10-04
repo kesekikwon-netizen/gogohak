@@ -97,7 +97,11 @@ void KaChip::setGlyph(const QString& iconId) {
   syncProperties();
 }
 
-bool KaChip::hasGlyph() const { return !resolvedGlyph(m_tone, m_glyph).isEmpty(); }
+bool KaChip::hasGlyph() const {
+  if (KaTheme::displayOptions().paperLook && m_glyph.isEmpty() && (m_tone == Tone::Ok || m_tone == Tone::Accent))
+    return m_tone == Tone::Accent;  // 새 모양: a clay dot, but a saved/set chip is words only
+  return !resolvedGlyph(m_tone, m_glyph).isEmpty();
+}
 
 QSize KaChip::sizeHint() const { return sizeForText(QFontMetrics(chipFont(font())), text(), hasGlyph()); }
 
@@ -120,7 +124,39 @@ void KaChip::syncProperties() {
   update();
 }
 
+// 「조용한 도판」: no pill and no edge. Saved / set / neutral are plain muted words; needs-you is a 6 px clay
+// dot plus words; caution and blocking keep their glyph with the words in ink / the blocking red.
+void KaChip::paintPlate(QPainter& p, const QRect& rect, const QString& text, Tone tone, const QString& glyphId) {
+  const auto& t = KaTheme::tokens();
+  const bool dot = tone == Tone::Accent && glyphId.isEmpty();
+  const QString glyph = dot ? QString() : tone == Tone::Ok && glyphId.isEmpty() ? QString() : resolvedGlyph(tone, glyphId);
+  const bool next = text == QStringLiteral("다음") || text == QStringLiteral("추천");
+  const QColor words = tone == Tone::Danger ? t.danger : tone == Tone::Accent ? (next ? QColor(0x9C, 0x4A, 0x2F) : t.ink) : tone == Tone::Warn ? t.ink : t.inkMuted;
+  p.save();
+  p.setRenderHint(QPainter::Antialiasing, true);
+  int x = rect.left();
+  if (dot) {
+    p.setPen(Qt::NoPen);
+    p.setBrush(QColor(0xD9, 0x77, 0x57));  // the attention clay
+    p.drawEllipse(QRectF(x, rect.center().y() - 2.5, 6, 6));
+    x += kGlyphPx + kGlyphGap;  // the dot takes a glyph's room, so sizeForText stays one rule
+  } else if (!glyph.isEmpty()) {
+    drawGlyph(p, QRect(x, rect.center().y() - kGlyphPx / 2 + 1, kGlyphPx, kGlyphPx), glyph, tone == Tone::Warn ? t.warn : words);
+    x += kGlyphPx + kGlyphGap;
+  }
+  QFont font = chipFont(p.font());
+  font.setWeight(QFont::Normal);
+  p.setFont(font);
+  p.setPen(words);
+  p.drawText(QRect(x, rect.top(), rect.right() - x + 1, rect.height()), Qt::AlignLeft | Qt::AlignVCenter | Qt::TextSingleLine, text);
+  p.restore();
+}
+
 void KaChip::paintChip(QPainter& p, const QRect& rect, const QString& text, Tone tone, const QString& glyphId) {
+  if (KaTheme::displayOptions().paperLook) {
+    paintPlate(p, rect, text, tone, glyphId);
+    return;
+  }
   const auto& metrics = KaTheme::buttonMetrics();
   const int height = metrics.chipHeight;
   const QRect pill(rect.left(), rect.top() + (rect.height() - height) / 2, rect.width(), height);
@@ -153,6 +189,8 @@ void KaChip::paintChip(QPainter& p, const QRect& rect, const QString& text, Tone
 }
 
 QSize KaChip::sizeForText(const QFontMetrics& fm, const QString& text, bool hasGlyph) {
+  if (KaTheme::displayOptions().paperLook)
+    return QSize((hasGlyph ? kGlyphPx + kGlyphGap : 0) + fm.horizontalAdvance(text), KaTheme::buttonMetrics().chipHeight);
   const int lead = hasGlyph ? kPadSide + kGlyphPx + kGlyphGap : kPadSide;
   return QSize(lead + fm.horizontalAdvance(text) + kPadSide, KaTheme::buttonMetrics().chipHeight);
 }

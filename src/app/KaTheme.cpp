@@ -92,7 +92,7 @@ Tokens strataTokens() {
   t.primaryText = t.surface;
   t.primaryFocus = t.ink;
   t.tabInk = t.accentDeep;
-  t.tabMark = t.accent;
+  t.tabMark = t.accent; t.chosenFill = t.accentWash;
   t.chrome = t.surface;
   t.heroButton = t.surface;
   t.heroButtonText = t.rail;
@@ -109,6 +109,7 @@ Tokens strataTokens() {
   t.tileStrong = QColor(0x20, 0x6C, 0xB0);
   t.glyph = QColor(0x2B, 0x48, 0x58);
   t.glyphOn = QColor(0x10, 0x50, 0x88);
+  t.tileShown = t.tileOn; t.tileShownBorder = t.tileOnBorder; t.glyphShown = t.glyphOn;  // stock: one "on" tile
   fillLegacyAliases(t);
   return t;
 }

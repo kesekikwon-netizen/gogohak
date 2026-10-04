@@ -35,6 +35,7 @@ class KaChip : public QLabel {
 
   // Paints a chip into rect (vertically centred, chipHeight tall, full width).
   static void paintChip(QPainter& p, const QRect& rect, const QString& text, Tone tone, const QString& glyphId);
+  static void paintPlate(QPainter& p, const QRect& rect, const QString& text, Tone tone, const QString& glyphId);
   // Width and height a chip needs; fm must measure chipFont().
   static QSize sizeForText(const QFontMetrics& fm, const QString& text, bool hasGlyph);
   // The chip type: base at 11 px, bold.

@@ -92,6 +92,7 @@ private slots:
   void pixmapHonoursDevicePixelRatio();
   void paperLook_tilesFollowTokens();
   void paperLook_appIconKeepsItsShape();
+  void paperLook_shownLayerTileIsOatNotSlate();
   void mockupIconIsCrispAtDpr150();
   void paintIsCrispAtDpr150();
   void kaIconsUsesMockupAndFallsBackToOutline();
@@ -273,6 +274,21 @@ void TestIconsMockup::paperLook_appIconKeepsItsShape() {
   const QImage stock(QStringLiteral(":/ka-hgis/app-icon.png")), recoloured(QStringLiteral(":/ka-hgis/app-icon-paper.png"));
   QVERIFY(!stock.isNull() && !recoloured.isNull());
   QCOMPARE(recoloured.convertToFormat(QImage::Format_Alpha8), stock.convertToFormat(QImage::Format_Alpha8));
+}
+
+// 「조용한 도판」: a layer switched on (지형·DEM·토양·지질·수계) is oat with a grey edge; a tool in hand stays slate.
+void TestIconsMockup::paperLook_shownLayerTileIsOatNotSlate() {
+  KaTheme::DisplayOptions paper;
+  paper.paperLook = true;
+  KaTheme::setDisplayOptions(nullptr, paper);
+  const auto on = [](const char* id) {
+    return KaIconsMockup::mockupIcon(QString::fromLatin1(id), false).pixmap(QSize(32, 32), 1.0, QIcon::Normal, QIcon::On).toImage().convertToFormat(QImage::Format_ARGB32);
+  };
+  const QImage shown = on("contour"), tool = on("select");
+  KaTheme::setDisplayOptions(nullptr, KaTheme::DisplayOptions());
+  VERIFY_NEAR(shown, 4, 16, QColor(0xE3, 0xDA, 0xCC), 6);
+  VERIFY_NEAR(shown, 1, 16, QColor(0xB0, 0xAE, 0xA5), 10);
+  VERIFY_NEAR(tool, 4, 16, QColor(0x30, 0x30, 0x2E), 6);
 }
 
 QTEST_MAIN(TestIconsMockup)

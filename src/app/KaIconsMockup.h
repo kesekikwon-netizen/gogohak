@@ -25,6 +25,7 @@ struct Look {
   qreal glyphOpacity = 1.0;
   bool dot = false;
 };
-Look lookFor(QIcon::Mode mode, QIcon::State state, bool strong);
+// shown: a map layer switched on (지형·DEM·…) rather than a tool in hand; only 새 모양 tells them apart.
+Look lookFor(QIcon::Mode mode, QIcon::State state, bool strong, bool shown = false);
 
 }  // namespace KaIconsMockup

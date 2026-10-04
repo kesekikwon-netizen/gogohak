@@ -60,6 +60,7 @@ private slots:
   void paperLook_mainButtonIsClayAndBandIsPaper();
   void paperLook_currentTabUnderlineIsInk();
   void paperLook_checkedBoxIsInk();
+  void paperLook_chosenSegmentIsOatWithInkEdge();
   void paperLook_drawingRowToolsAreButtons();
 };
 
@@ -186,6 +187,22 @@ void TestThemeRender::paperLook_currentTabUnderlineIsInk() {
   const QString ink = KaTheme::tokens().ink.name();
   KaTheme::setDisplayOptions(qApp, KaTheme::DisplayOptions());
   QCOMPARE(mark, ink);
+}
+
+// 「조용한 도판」: the chosen segment of a choice (e.g. 위성 | 지형) is oat with an ink edge, not a clay wash.
+void TestThemeRender::paperLook_chosenSegmentIsOatWithInkEdge() {
+  const auto rule = []() {
+    const QRegularExpression re(QStringLiteral("QToolButton:checked \{ background: (#[0-9a-fA-F]{6}); color: (#[0-9a-fA-F]{6}); border-color: (#[0-9a-fA-F]{6});"));
+    return re.match(qApp->styleSheet());
+  };
+  QCOMPARE(rule().captured(1), KaTheme::tokens().accentWash.name());
+  KaTheme::DisplayOptions paper;
+  paper.paperLook = true;
+  KaTheme::setDisplayOptions(qApp, paper);
+  const auto now = rule();
+  const QStringList got = {now.captured(1), now.captured(3)};
+  KaTheme::setDisplayOptions(qApp, KaTheme::DisplayOptions());
+  QCOMPARE(got, (QStringList{QStringLiteral("#e3dacc"), QStringLiteral("#141413")}));
 }
 
 // 「조용한 도판」: a ticked check box is filled in ink, not clay; stock keeps its accent.

@@ -59,6 +59,8 @@ void KaSurveyBadge::paintEvent(QPaintEvent* event) {
   p.setFont(font());
   const QRect pill = rect().adjusted(0, 0, -kRightGap, 0);
   paintChip(p, pill, text(), tone(), glyph());
+  if (KaTheme::displayOptions().paperLook)
+    return;  // 새 모양: mark and words, no edge
   // 목업의 조사 칩은 톤 색 테두리가 또렷한 알약이다(공용 칩의 옅은 가장자리 위에 한 번 더).
   const int h = KaTheme::buttonMetrics().chipHeight, radius = KaTheme::buttonMetrics().chipRadius;
   QColor edge = toneInk(tone());

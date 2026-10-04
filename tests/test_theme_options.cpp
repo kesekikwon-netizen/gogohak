@@ -250,7 +250,7 @@ void TestThemeOptions::paperLook_inksStayReadable() {
     QVERIFY(contrast(t.warn, t.warnSurface) >= 4.5);
     QVERIFY(contrast(t.danger, t.dangerSurface) >= 4.5);
     QVERIFY2(contrast(t.railText, t.rail) >= 4.5 && contrast(t.railMuted, t.rail) >= 4.5, "home hero text");
-    QVERIFY2(contrast(t.ink, t.progressFill) >= 4.5 && contrast(t.progressFill, t.surface) >= 3.0, "progress");
+    QVERIFY2(contrast(t.progressFill, t.surface) >= 3.0 && contrast(t.progressFill, t.pressed) >= 3.0, "progress");
     if (high) QVERIFY(contrast(t.border, t.surface) >= 3.0);
   }
 }
