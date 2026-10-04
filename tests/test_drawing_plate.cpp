@@ -162,6 +162,42 @@ private slots:
     QCOMPARE(column->itemAt(2)->spacerItem()->sizeHint().height(), 0);   // none between its rows
   }
 
+  // 「축척 글자 · 좌표계 · 좌표 격자」 (보드 판 4): words without icons sharing the row, 32 px high.
+  void sheetMarksAreWordsSharingTheRowInPaper() {
+    const auto build = [](QWidget& content) {
+      auto* row = new QHBoxLayout(&content);
+      for (const QString& word : {QStringLiteral("축척 글자"), QStringLiteral("좌표계"), QStringLiteral("좌표 격자")}) {
+        auto* tile = new QToolButton(&content);
+        tile->setText(word);
+        tile->setToolTip(word);
+        if (word == QStringLiteral("좌표 격자")) {  // its tooltip changes with the grid; it is known by name
+          tile->setObjectName(QStringLiteral("btnGridSettings"));
+          tile->setToolTip(QStringLiteral("좌표 격자를 켭니다"));
+        }
+        tile->setToolButtonStyle(Qt::ToolButtonTextUnderIcon);
+        tile->setFixedHeight(64);
+        row->addWidget(tile);
+      }
+      row->addStretch(1);
+      return row;
+    };
+    qApp->setProperty("kaPaperLook", true);
+    QWidget content;
+    QHBoxLayout* row = build(content);
+    KaDrawingStudioPlate::wordTiles(&content);
+    for (QToolButton* tile : content.findChildren<QToolButton*>()) {
+      QCOMPARE(tile->toolButtonStyle(), Qt::ToolButtonTextOnly);
+      QCOMPARE(tile->maximumHeight(), 32);
+      QCOMPARE(row->stretch(row->indexOf(tile)), 1);
+    }
+    QCOMPARE(row->itemAt(3)->spacerItem()->sizeHint().width(), 0);
+    qApp->setProperty("kaPaperLook", QVariant());
+    QWidget stock;
+    build(stock);
+    KaDrawingStudioPlate::wordTiles(&stock);
+    QCOMPARE(stock.findChildren<QToolButton*>().first()->toolButtonStyle(), Qt::ToolButtonTextUnderIcon);
+  }
+
   void stockKeepsTheButtonsInTheirCard() {
     QToolButton* pdf = nullptr;
     QToolButton* print = nullptr;

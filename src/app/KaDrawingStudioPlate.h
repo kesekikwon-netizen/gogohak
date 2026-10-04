@@ -21,4 +21,7 @@ int chipGap(int stockGap);
 // In 새 모양 marks the scaleChip rows and columns under content (kaRow/kaCol, first or rest) so the QSS shares their
 // inner edges, and closes the gaps between the chip rows; the gap above the table stays. Nothing in stock.
 void joinScaleTable(QWidget* content);
+// In 새 모양 「축척 글자 · 좌표계 · 좌표 격자」 (by their tooltip word; the grid button by its name) become words
+// without icons, 32 px high, sharing their row (the board's bottom of the panel). Nothing in stock.
+void wordTiles(QWidget* content);
 }  // namespace KaDrawingStudioPlate

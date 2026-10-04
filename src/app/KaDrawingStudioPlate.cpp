@@ -3,6 +3,7 @@
 #include <QApplication>
 #include <QEvent>
 #include <QHBoxLayout>
+#include <QBoxLayout>
 #include <QLayout>
 #include <QScrollArea>
 #include <QSpacerItem>
@@ -31,6 +32,7 @@ QWidget* inspectorColumn(QScrollArea* scroll) {
   if (!qApp || !qApp->property("kaPaperLook").toBool()) return scroll;
   QWidget* content = scroll->widget();
   if (content) joinScaleTable(content);  // the panel is built: share the scale presets' edges
+  if (content) wordTiles(content);
   auto* pdf = content ? content->findChild<QToolButton*>(QStringLiteral("btnPrimary")) : nullptr;
   auto* print = content ? content->findChild<QToolButton*>(QStringLiteral("btnPrint")) : nullptr;
   if (!pdf || !print) return scroll;
@@ -100,6 +102,29 @@ void joinScaleTable(QWidget* content) {
       if (QSpacerItem* gap = column->itemAt(i - 1)->spacerItem()) gap->changeSize(0, 0, QSizePolicy::Minimum, QSizePolicy::Fixed);
   }
   column->invalidate();
+}
+
+void wordTiles(QWidget* content) {
+  if (!paperLook()) return;
+  const QStringList words{QStringLiteral("축척 글자"), QStringLiteral("좌표계"), QStringLiteral("좌표 격자")};
+  for (QToolButton* tile : content->findChildren<QToolButton*>()) {
+    // 축척 글자 · 좌표계 by their tooltip word; 좌표 격자 by name, its tooltip follows the grid's state
+    if (!words.contains(tile->toolTip()) && tile->objectName() != QLatin1String("btnGridSettings")) continue;
+    tile->setToolButtonStyle(Qt::ToolButtonTextOnly);
+    tile->setMinimumWidth(0);
+    tile->setFixedHeight(32);
+    auto* row = qobject_cast<QBoxLayout*>(tile->parentWidget() ? tile->parentWidget()->layout() : nullptr);
+    for (int i = 0; row && i < row->count(); ++i) {  // the row the tile sits in, inside its parent's layout
+      QBoxLayout* line = qobject_cast<QBoxLayout*>(row->itemAt(i)->layout());
+      QBoxLayout* holder = row->indexOf(tile) >= 0 ? row : (line && line->indexOf(tile) >= 0 ? line : nullptr);
+      if (!holder) continue;
+      holder->setStretchFactor(tile, 1);
+      for (int at = 0; at < holder->count(); ++at)  // the trailing stretch gives the room back to the words
+        if (QSpacerItem* gap = holder->itemAt(at)->spacerItem()) gap->changeSize(0, 0, QSizePolicy::Fixed, QSizePolicy::Minimum);
+      holder->invalidate();
+      break;
+    }
+  }
 }
 
 void setWord(QToolButton* button) {
