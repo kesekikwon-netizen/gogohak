@@ -12,7 +12,7 @@ namespace {
 using Tone = KaChip::Tone;
 
 QImage renderChip(const QString& text, Tone tone) {
-  const bool hasGlyph = !KaChip::defaultGlyph(tone).isEmpty() || tone == Tone::Accent;
+  const bool hasGlyph = !KaChip::defaultGlyph(tone).isEmpty() || tone == Tone::Accent;  // Warn has a glyph too
   const QSize size = KaChip::sizeForText(QFontMetrics(KaChip::chipFont(qApp->font())), text, hasGlyph) + QSize(0, 8);
   QImage image(size, QImage::Format_ARGB32);
   image.fill(Qt::transparent);
@@ -42,6 +42,18 @@ private slots:
     const QColor dot = needs.pixelColor(3, needs.height() / 2);
     QVERIFY2(dot.alpha() == 255 && qAbs(dot.red() - 0xD9) < 8 && qAbs(dot.green() - 0x77) < 8 && qAbs(dot.blue() - 0x57) < 8,
              qPrintable(dot.name()));  // a 6 px clay dot where the pill used to start
+  }
+
+  // 「저장 안 됨」 and 「설정 필요」 need the user's hand: a clay dot with ink words, even on a caution-toned chip.
+  void unsavedAndUnsetChipsAreClayDots() {
+    KaTheme::DisplayOptions paper;
+    paper.paperLook = true;
+    KaTheme::setDisplayOptions(qApp, paper);
+    for (const QString& words : {QStringLiteral("저장 안 됨 3건"), QStringLiteral("설정 필요")}) {
+      const QImage chip = renderChip(words, Tone::Warn);
+      const QColor dot = chip.pixelColor(3, chip.height() / 2);
+      QVERIFY2(dot.alpha() == 255 && qAbs(dot.red() - 0xD9) < 8 && qAbs(dot.green() - 0x77) < 8, qPrintable(words + dot.name()));
+    }
   }
 
   void paperSizeFollowsTheMark() {

@@ -128,10 +128,12 @@ void KaChip::syncProperties() {
 // dot plus words; caution and blocking keep their glyph with the words in ink / the blocking red.
 void KaChip::paintPlate(QPainter& p, const QRect& rect, const QString& text, Tone tone, const QString& glyphId) {
   const auto& t = KaTheme::tokens();
-  const bool dot = tone == Tone::Accent && glyphId.isEmpty();
+  // The words that ask for the user's hand are a clay dot with ink words whatever the chip's tone is.
+  const bool needsYou = text.contains(QStringLiteral("저장 안 됨")) || text.contains(QStringLiteral("설정 필요"));
+  const bool dot = (tone == Tone::Accent || needsYou) && glyphId.isEmpty();
   const QString glyph = dot ? QString() : tone == Tone::Ok && glyphId.isEmpty() ? QString() : resolvedGlyph(tone, glyphId);
   const bool next = text == QStringLiteral("다음") || text == QStringLiteral("추천");
-  const QColor words = tone == Tone::Danger ? t.danger : tone == Tone::Accent ? (next ? QColor(0x9C, 0x4A, 0x2F) : t.ink) : tone == Tone::Warn ? t.ink : t.inkMuted;
+  const QColor words = tone == Tone::Danger ? t.danger : tone == Tone::Accent || needsYou ? (next ? QColor(0x9C, 0x4A, 0x2F) : t.ink) : tone == Tone::Warn ? t.ink : t.inkMuted;
   p.save();
   p.setRenderHint(QPainter::Antialiasing, true);
   int x = rect.left();
