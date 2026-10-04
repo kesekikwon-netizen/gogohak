@@ -11,6 +11,7 @@
 
 #include "app/KaClosePrompt.h"
 #include "app/KaTheme.h"
+#include "app/KaUserError.h"
 
 namespace {
 void paper(bool on) {
@@ -62,6 +63,30 @@ class TestWindowPlate : public QObject {
     KaTheme::setDisplayOptions(qApp, KaTheme::DisplayOptions());
     QCOMPARE(questionPx, 20);
     QCOMPARE(sentencePx, 12);
+  }
+
+  // 오류 알림 (보드 판 5): what failed as the serif heading, why and how as plain sentences under it, no icon;
+  // stock keeps the three bold-headed parts.
+  void errorAlertSaysWhatThenWhyAndHowInPaper() {
+    KaUserError::Spec spec;
+    spec.title = QStringLiteral("지적도 받기");
+    spec.what = QStringLiteral("지적도를 받지 못했습니다.");
+    spec.why = QStringLiteral("아이디나 비밀번호가 맞지 않습니다.");
+    spec.how = QStringLiteral("아이디·비밀번호를 다시 입력한 뒤 받기를 누르세요.");
+    spec.actionLabel = QStringLiteral("아이디·비밀번호 다시 입력");
+    paper(true);
+    QMessageBox box;
+    KaUserError::dress(box, QMessageBox::Warning, spec);
+    QCOMPARE(box.text(), spec.what);
+    QCOMPARE(box.informativeText(), spec.why + QLatin1Char(0x0A) + spec.how);
+    QCOMPARE(box.icon(), QMessageBox::NoIcon);
+    QVERIFY(box.property("kaPlate").toBool());
+    QCOMPARE(box.windowTitle(), spec.title);
+    paper(false);
+    QMessageBox stock;
+    KaUserError::dress(stock, QMessageBox::Warning, spec);
+    QVERIFY(stock.text().contains(QStringLiteral("무엇이 안 됐나")));
+    QCOMPARE(stock.icon(), QMessageBox::Warning);
   }
 
   // 「광령리1을」 · 「테스트를」 · 「광령리2를」: the object particle follows how the name ends.

@@ -2106,7 +2106,8 @@ if(KA_HGIS_BUILD_TESTS)
     "GDAL_DATA=${OSGEO4W_ROOT}/apps/gdal-dev/share/gdal;PATH=${_ka_path_esc};QGIS_PREFIX_PATH=${QGIS_PREFIX_PATH};QT_QPA_PLATFORM=offscreen" TIMEOUT 90)
   # 「조용한 도판」 windows (board 5): message boxes with a serif question and no icon disc (no QGIS).
   add_executable(ka_window_plate_tests tests/test_window_plate.cpp
-    src/app/KaClosePrompt.cpp src/app/KaClosePrompt.h src/app/KaHomeText.cpp src/app/KaHomeText.h ${_ka_p5_theme_sources})
+    src/app/KaClosePrompt.cpp src/app/KaClosePrompt.h src/app/KaHomeText.cpp src/app/KaHomeText.h
+    src/app/KaUserError.cpp src/app/KaUserError.h ${_ka_p5_theme_sources})
   set_target_properties(ka_window_plate_tests PROPERTIES WIN32_EXECUTABLE FALSE)
   target_link_libraries(ka_window_plate_tests PRIVATE Qt6::Test Qt6::Core Qt6::Gui Qt6::Widgets)
   target_include_directories(ka_window_plate_tests PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_BINARY_DIR}/generated)

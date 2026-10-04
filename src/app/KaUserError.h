@@ -1,4 +1,5 @@
 #pragma once
+#include <QMessageBox>
 #include <QString>
 
 #include <functional>
@@ -24,6 +25,9 @@ enum class Result { Dismissed, ActionChosen };
 QString formatBody(const Spec& spec);
 // The same three parts with bold subheadings; spec text is HTML-escaped.
 QString formatBodyHtml(const Spec& spec);
+// Fills the box warn() and critical() show (title, words, buttons, log-folder button). 새 모양 (2차 보드 판 5):
+// what failed as the serif heading, why and how as plain sentences, no icon; stock: the three bold-headed parts.
+void dress(QMessageBox& box, QMessageBox::Icon icon, const Spec& spec);
 Result warn(QWidget* parent, const Spec& spec);
 Result critical(QWidget* parent, const Spec& spec);
 
