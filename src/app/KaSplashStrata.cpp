@@ -10,51 +10,58 @@
 
 #include <algorithm>
 #include <array>
+#include <initializer_list>
+#include <iterator>
 
 namespace KaSplashStrata {
 namespace {
 
-// Everything is laid out on the notice's 700 x 400 card and scaled with it.
-constexpr double kWidth = 700.0, kHeight = 400.0;
-// A notice shrunk for a small screen has a card wider than 700:400; the strata run on past the edge.
-constexpr double kOverhang = 120.0;
-// A stacking stratum starts this far down, hidden behind the stratum below it.
-constexpr double kRise = 44.0;
+// Everything is laid out on the notice's 700 x 400 card (2차 보드 「시작 화면 5초」) and scaled with it.
+constexpr double kHeight = 400.0;
+constexpr double kStaffX = 632.0;  // the levelling staff; the section ends at it
+constexpr double kStringY = 204.5;  // the level string, which is also the progress line
 
 const QColor kPaper(0xFA, 0xF9, 0xF5);
-const QColor kSlate(0x14, 0x14, 0x13);
+const QColor kInk(0x14, 0x14, 0x13);
 const QColor kInk2(0x3D, 0x3D, 0x3A);
 const QColor kMuted(0x5E, 0x5D, 0x59);
+const QColor kHair(0x87, 0x86, 0x7F);
+const QColor kRing(0xB0, 0xAE, 0xA5);
 const QColor kClay(0xD9, 0x77, 0x57);
 const QColor kBedrock(0x26, 0x26, 0x24);
-const QColor kOat(0xE3, 0xDA, 0xCC);
 
-// The top edge of one stratum: a start point, one full cubic, then two more whose first control
-// mirrors the control before it (so the edge stays smooth): x0 y0, c1 c2 p1, c2 p2, c2 p3.
-struct Stratum {
-  QColor fill;
-  std::array<double, 16> edge;
-};
-// Bedrock first, topsoil last (the ground line is the topsoil's edge).
-const std::array<Stratum, 5> kStrata = {{
-    {kBedrock, {0, 344, 120, 338, 200, 350, 290, 342, 460, 332, 550, 338, 650, 330, 700, 334}},
-    {QColor(0xB5, 0x57, 0x3A), {0, 316, 110, 308, 190, 322, 280, 312, 450, 300, 540, 306, 650, 298, 700, 302}},
-    {kClay, {0, 286, 100, 276, 180, 294, 270, 282, 440, 268, 530, 276, 650, 266, 700, 268}},
-    {kOat, {0, 256, 90, 248, 170, 262, 262, 252, 432, 236, 522, 244, 642, 232, 700, 236}},
-    {QColor(0x78, 0x8C, 0x5D), {0, 240, 90, 232, 170, 246, 262, 236, 432, 220, 522, 228, 642, 216, 700, 220}},
-}};
-
-double ease(double x) {
+double ease(double x) {  // OutCubic
   x = std::clamp(x, 0.0, 1.0);
   return 1.0 - (1.0 - x) * (1.0 - x) * (1.0 - x);
 }
 
-QPainterPath edgePath(const std::array<double, 16>& p) {
-  QPainterPath path(QPointF(p[0], p[1]));
-  path.cubicTo(p[2], p[3], p[4], p[5], p[6], p[7]);
-  path.cubicTo(2 * p[6] - p[4], 2 * p[7] - p[5], p[8], p[9], p[10], p[11]);
-  path.cubicTo(2 * p[10] - p[8], 2 * p[11] - p[9], p[12], p[13], p[14], p[15]);
+// A boundary: a start point and two cubics, as drawn on the board.
+QPainterPath line(std::initializer_list<double> p) {
+  const auto v = std::data(p);
+  QPainterPath path(QPointF(v[0], v[1]));
+  path.cubicTo(v[2], v[3], v[4], v[5], v[6], v[7]);
+  path.cubicTo(v[8], v[9], v[10], v[11], v[12], v[13]);
   return path;
+}
+// Lowest first: Ⅳ|Ⅴ, Ⅲ|Ⅳ, Ⅱ|Ⅲ, Ⅰ|Ⅱ. The ground line (topsoil) comes with the pit.
+const std::array<QPainterPath, 4>& boundaries() {
+  static const std::array<QPainterPath, 4> paths = {
+      line({0, 324, 100, 318, 220, 328, 330, 320, 440, 312, 520, 312, 632, 316}),
+      line({0, 300, 120, 292, 210, 306, 310, 297, 410, 288, 480, 286, 632, 291}),
+      line({0, 277, 110, 270, 190, 283, 290, 274, 390, 265, 490, 262, 632, 267}),
+      line({0, 258, 100, 252, 200, 262, 300, 254, 400, 246, 480, 243, 632, 246})};
+  return paths;
+}
+QPainterPath groundLine() { return line({0, 243, 90, 237, 170, 247, 262, 238, 354, 229, 450, 227, 632, 229}); }
+QPainterPath pitOutline() {
+  QPainterPath pit(QPointF(384, 248.3));
+  pit.cubicTo(386, 276, 388, 293, 396, 302);
+  pit.cubicTo(402, 310, 414, 313, 428, 313);
+  pit.cubicTo(442, 313, 452, 309, 456, 300);
+  pit.cubicTo(458, 294, 459, 289, 460, 284);
+  pit.lineTo(468, 282);
+  pit.cubicTo(471, 272, 474, 260, 476, 245.3);
+  return pit;
 }
 
 QFont serifFont(double pixels) {
@@ -62,6 +69,13 @@ QFont serifFont(double pixels) {
   font.setFamilies({QStringLiteral("Noto Serif KR"), QStringLiteral("Batang"), QStringLiteral("Malgun Gothic")});
   font.setPixelSize(int(pixels + 0.5));
   font.setWeight(QFont::Medium);
+  return font;
+}
+QFont monoFont(double pixels) {
+  QFont font;
+  font.setFamilies({QStringLiteral("Consolas"), QStringLiteral("Cascadia Mono")});
+  font.setStyleHint(QFont::Monospace);
+  font.setPixelSize(int(pixels + 0.5));
   return font;
 }
 
@@ -73,83 +87,144 @@ void drawFitted(QPainter& painter, QFont font, const QString& text, const QPoint
   painter.drawText(baseline, text);
 }
 
-void paintSection(QPainter& painter, double seconds) {
-  // Topsoil first, so each lower stratum covers the foot of the one above it. A stratum that is
-  // still stacking rises from behind the one below it.
-  for (int i = int(kStrata.size()) - 1; i >= 0; --i) {
-    const double risen = stratumReveal(i, seconds);
-    if (risen <= 0.0) continue;
-    QPainterPath body = edgePath(kStrata[size_t(i)].edge);
-    body.lineTo(kWidth + kOverhang, body.currentPosition().y());
-    body.lineTo(kWidth + kOverhang, kHeight);
-    body.lineTo(0, kHeight);
-    body.closeSubpath();
-    painter.fillPath(body.translated(0, kRise * (1.0 - risen)), kStrata[size_t(i)].fill);
-  }
-  if (const double shown = pitReveal(seconds); shown > 0.0) {
-    QPainterPath cut(QPointF(452, 231));
-    cut.cubicTo(456, 266, 470, 298, 500, 302);
-    cut.cubicTo(530, 306, 544, 268, 548, 226);
-    QPainterPath fill = cut;
-    fill.cubicTo(520, 226, 480, 230, 452, 231);
-    painter.setOpacity(shown);
-    painter.fillPath(fill, QColor(0x4D, 0x4C, 0x48));
-    painter.setPen(QPen(KaSplashPalette::withAlpha(kOat, 0.45), 1.2));
-    QPainterPath lens(QPointF(462, 262));
-    lens.cubicTo(482, 270, 520, 268, 540, 258);
-    lens.moveTo(472, 284);
-    lens.cubicTo(490, 290, 514, 288, 530, 280);
-    painter.drawPath(lens);
-    painter.strokePath(cut, QPen(kSlate, 1.8, Qt::SolidLine, Qt::RoundCap));
-    painter.setOpacity(1.0);
-  }
-  if (const double drawn = groundLineReveal(seconds); drawn > 0.0) {
-    QPainterPath ground = edgePath(kStrata.back().edge);
-    ground.lineTo(kWidth + kOverhang, ground.currentPosition().y());
-    QPen pen(kSlate, 1.8, Qt::SolidLine, Qt::RoundCap);
-    const double length = ground.length() / pen.widthF();  // dash lengths are in pen widths
-    pen.setDashPattern({length * drawn, length * 4.0});
-    painter.strokePath(ground, pen);
-    // The level string above the section, with its two pegs and the reading.
-    painter.setOpacity(std::clamp((drawn - 0.35) / 0.4, 0.0, 1.0));
-    painter.setPen(QPen(kSlate, 1.0, Qt::DashLine));
-    painter.drawLine(QPointF(396, 204), QPointF(664, 204));
-    painter.setPen(QPen(kSlate, 1.2));
-    painter.drawLine(QPointF(396, 198), QPointF(396, 228));
-    painter.drawLine(QPointF(664, 198), QPointF(664, 222));
-    QFont reading(QStringLiteral("Consolas"));
-    reading.setPixelSize(10);
-    painter.setFont(reading);
-    painter.setPen(kMuted);
-    painter.drawText(QRectF(430, 184, 200, 14), Qt::AlignHCenter | Qt::AlignVCenter, QStringLiteral("EL 62.0 m"));
-    painter.setOpacity(1.0);
-  }
-  if (const double landed = markerReveal(seconds); landed > 0.0) {
+// Strokes a path from its left end up to share 0..1 of the section's width.
+void strokeLeftPart(QPainter& painter, const QPainterPath& path, const QPen& pen, double share) {
+  if (share <= 0.0) return;
+  painter.save();
+  painter.setClipRect(QRectF(-4, 0, (kStaffX + 8) * share, kHeight), Qt::IntersectClip);
+  painter.strokePath(path, pen);
+  painter.restore();
+}
+
+void paintSection(QPainter& painter, double s, double progress) {
+  // Ⅲ is the one colour on the card: it fills from the left once the section stands.
+  if (const double clay = clayReveal(s); clay > 0.0) {
+    QPainterPath fill = boundaries()[2];
+    fill.lineTo(632, 291);
+    fill.cubicTo(480, 286, 410, 288, 310, 297);
+    fill.cubicTo(210, 306, 120, 292, 0, 300);
+    fill.closeSubpath();
     painter.save();
-    painter.translate(610, 214);
-    painter.scale(0.3 + 0.7 * landed, 0.3 + 0.7 * landed);
+    painter.setClipRect(QRectF(0, 240, kStaffX * clay, 80), Qt::IntersectClip);
+    painter.fillPath(fill, kClay);
+    painter.restore();
+  }
+  for (int i = 0; i < 3; ++i) strokeLeftPart(painter, boundaries()[size_t(i)], QPen(kInk, 1), boundaryReveal(i, s));
+  const double pit = pitReveal(s);
+  if (pit > 0.0) {
+    painter.save();
+    painter.setOpacity(pit);
+    // Small stones in Ⅴ.
+    painter.setPen(QPen(kHair, 1));
+    for (const QPointF& stone : {QPointF(58, 330), QPointF(74.5, 328.2), QPointF(94.7, 328.8), QPointF(168.5, 331.6),
+                                 QPointF(282, 331), QPointF(299.5, 328.6), QPointF(317.6, 327.3), QPointF(338.6, 326.6),
+                                 QPointF(511.8, 320.2), QPointF(530.5, 329.9), QPointF(552.7, 320.4), QPointF(570.9, 326.7)})
+      painter.drawEllipse(stone, 3.0, 2.0);
+    const QPainterPath cut = pitOutline();
+    QPainterPath body = cut;
+    body.closeSubpath();
+    painter.fillPath(body, kPaper);
+    painter.setClipPath(body, Qt::IntersectClip);
+    painter.setPen(QPen(kMuted, 1));
+    QPainterPath lens(QPointF(378, 264));
+    lens.cubicTo(404, 279, 440, 277, 482, 259);
+    lens.moveTo(386, 288);
+    lens.cubicTo(410, 300, 438, 298, 470, 281);
+    painter.drawPath(lens);
+    painter.restore();
+    painter.save();
+    painter.setOpacity(pit);
+    painter.strokePath(cut, QPen(kInk, 2, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+    painter.restore();
+  }
+  strokeLeftPart(painter, boundaries()[3], QPen(kInk, 1), boundaryReveal(3, s));
+  strokeLeftPart(painter, groundLine(), QPen(kInk, 2, Qt::SolidLine, Qt::RoundCap), pit);
+  if (pit > 0.0) {
+    painter.save();
+    painter.setOpacity(pit);
+    painter.setPen(QPen(kInk, 1.5));
+    painter.drawLine(QPointF(32.5, 200.5), QPointF(32.5, 247.5));  // the peg the string is tied to
+    painter.setFont(serifFont(11));
+    painter.setPen(kInk);
+    const std::array<std::pair<const char*, double>, 5> numerals = {
+        {{"Ⅰ", 241.2}, {"Ⅱ", 259.9}, {"Ⅲ", 282.2}, {"Ⅳ", 306.7}, {"Ⅴ", 333.6}}};
+    for (const auto& [numeral, baseline] : numerals)
+      painter.drawText(QRectF(598, baseline - 12, 20, 14), Qt::AlignHCenter | Qt::AlignBottom, QString::fromUtf8(numeral));
+    painter.restore();
+  }
+  // The levelling staff grows from the bedrock; a long tick every metre (60 px), mid ticks between.
+  if (const double staff = staffReveal(s); staff > 0.0) {
+    const double top = 344.0 - (344.0 - 196.0) * staff;
+    painter.setPen(QPen(kInk, 1));
+    painter.drawLine(QPointF(kStaffX + 0.5, top), QPointF(kStaffX + 0.5, 344));
+    for (int k = 0; k < 24; ++k) {
+      const double y = 204.5 + 6.0 * k;
+      if (y < top) continue;
+      const double length = k % 10 == 0 ? 8 : k % 5 == 0 ? 5 : 3;
+      painter.drawLine(QPointF(kStaffX, y), QPointF(kStaffX + length, y));
+    }
+    painter.setFont(monoFont(10));
+    painter.setPen(kMuted);
+    for (const auto& [label, y] : {std::pair{"154", 204.5}, std::pair{"153", 264.5}, std::pair{"152", 324.5}})
+      if (y >= top) painter.drawText(QPointF(645, y + 3.5), QString::fromLatin1(label));
+  }
+  // The level string: dashed until it is pulled from the peg to the staff; it is the progress line.
+  QPen dashed(kRing, 1);
+  dashed.setDashPattern({8, 6});
+  painter.setPen(dashed);
+  painter.drawLine(QPointF(32, kStringY), QPointF(kStaffX, kStringY));
+  const double pulled = 32 + (kStaffX - 32) * std::clamp(progress, 0.0, 1.0);
+  painter.setPen(QPen(kInk, 1));
+  painter.drawLine(QPointF(32, kStringY), QPointF(pulled, kStringY));
+  if (progress >= 0.999) {
+    painter.setFont(monoFont(10));
+    painter.setPen(kMuted);
+    painter.drawText(QRectF(424, 186, 200, 14), Qt::AlignRight | Qt::AlignVCenter, QStringLiteral("EL. 154.00 m"));
+  }
+  // Two hairlines slide in from the top and the left, cross where the 기준점 lands, then fade.
+  if (const double cross = crossVisibility(s); cross > 0.0) {
+    const double in = ease((s - 3.2) / 0.4);
+    painter.save();
+    painter.setOpacity(cross);
+    painter.setPen(QPen(kHair, 1));
+    painter.drawLine(QPointF(236.5, kStringY), QPointF(236.5, kStringY + 47.6 * in));
+    painter.drawLine(QPointF(0, 234.6), QPointF(266 * in, 234.6));
+    painter.restore();
+  }
+  if (const double landed = markerReveal(s); landed > 0.0) {
+    painter.save();
     painter.setOpacity(landed);
-    QPainterPath mark(QPointF(0, -9));
-    mark.lineTo(8, 5);
-    mark.lineTo(-8, 5);
+    painter.translate(0, -18 * (1.0 - landed));
+    QPainterPath mark(QPointF(236, 225.6));
+    mark.lineTo(244, 238.6);
+    mark.lineTo(228, 238.6);
     mark.closeSubpath();
     painter.fillPath(mark, kPaper);
-    painter.strokePath(mark, QPen(kSlate, 1.6, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+    painter.strokePath(mark, QPen(kInk, 1.5, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
     painter.setPen(Qt::NoPen);
-    painter.setBrush(kSlate);
-    painter.drawEllipse(QPointF(0, 0.5), 1.6, 1.6);
+    painter.setBrush(kInk);
+    painter.drawEllipse(QPointF(236, 234.6), 1.5, 1.5);
+    painter.restore();
+    painter.save();
+    painter.setOpacity(ease((s - 3.6) / 0.4));
+    painter.setPen(kMuted);
+    painter.setFont(KaSplashPalette::uiFont(10));
+    painter.drawText(QPointF(249, 233.1), QStringLiteral("기준점"));
     painter.restore();
   }
 }
 
 }  // namespace
 
-double stratumReveal(int index, double seconds) {
-  return index <= 0 ? 1.0 : ease((seconds - 0.35 * (index - 1)) / 0.8);
-}
+double boundaryReveal(int index, double seconds) { return ease((seconds - 0.4 - 0.35 * index) / 0.35); }
+double staffReveal(double seconds) { return ease((seconds - 0.4) / 1.4); }
 double pitReveal(double seconds) { return ease((seconds - 1.9) / 0.5); }
-double groundLineReveal(double seconds) { return ease((seconds - 2.2) / 0.8); }
-double markerReveal(double seconds) { return ease((seconds - 3.0) / 0.4); }
+double clayReveal(double seconds) { return ease((seconds - 2.6) / 0.6); }
+double markerReveal(double seconds) { return ease((seconds - 3.2) / 0.4); }
+double crossVisibility(double seconds) {
+  if (seconds < 3.2) return 0.0;
+  return 1.0 - ease((seconds - 3.6) / 1.2);
+}
 
 QColor paper() { return kPaper; }
 QColor bedrock() { return kBedrock; }
@@ -165,29 +240,28 @@ void paint(QPainter& painter, const QRectF& card, double radius, const QPixmap& 
   painter.translate(card.topLeft());
   const double unit = card.height() / kHeight;
   painter.scale(unit, unit);
+  const double width = card.width() / unit;  // a shrunk notice can be wider than 700:400
 
-  paintSection(painter, frame.still ? 10.0 : frame.seconds);
+  paintSection(painter, frame.still ? 10.0 : frame.seconds, frame.still ? 1.0 : frame.progress);
 
   if (!icon.isNull())
-    painter.drawPixmap(QRectF(44, 38, 44, 44), icon, QRectF(icon.rect()));
-  painter.setPen(kSlate);
+    painter.drawPixmap(QRectF(32, 32, 44, 44), icon, QRectF(icon.rect()));
+  painter.setPen(kInk);
   painter.setFont(serifFont(60));
-  painter.drawText(QPointF(42, 142), KaSplashCredits::productName());
+  painter.drawText(QPointF(29, 140), KaSplashCredits::productName());
   painter.setPen(kMuted);
   painter.setFont(KaSplashPalette::uiFont(14));
-  painter.drawText(QPointF(44, 176), KaSplashCredits::productSubtitle(frame.version));
+  painter.drawText(QPointF(32, 167), KaSplashCredits::productSubtitle(frame.version));
   painter.setPen(kInk2);
-  painter.setFont(KaSplashPalette::uiFont(12.5));
-  painter.drawText(QPointF(44, 210), frame.status);
-  // A hairline that fills as the reading interval passes.
-  painter.fillRect(QRectF(44, 221, 200, 2), QColor(0xE8, 0xE6, 0xDC));
-  painter.fillRect(QRectF(44, 221, 200 * std::clamp(frame.progress, 0.0, 1.0), 2), kSlate);  // ink, as the spec's progress line
+  painter.setFont(KaSplashPalette::uiFont(13));
+  painter.drawText(QPointF(32, 192), frame.status);
 
-  // The two notice lines sit on the bedrock in paper ink, worded exactly as on the stock card.
+  // The bedrock band carries the two notice lines, worded exactly as on the stock card.
+  painter.fillRect(QRectF(0, 344, width, 56), kBedrock);
   painter.setPen(noticeInk());
-  drawFitted(painter, KaSplashPalette::uiFont(11.5), KaSplashCredits::copyrightLine(), QPointF(44, 372), kWidth - 88);
+  drawFitted(painter, KaSplashPalette::uiFont(12), KaSplashCredits::copyrightLine(), QPointF(32, 367), width - 64);
   painter.setPen(KaSplashPalette::withAlpha(kPaper, 0.86));
-  drawFitted(painter, KaSplashPalette::lightFont(11), KaSplashCredits::dataLine(), QPointF(44, 389), kWidth - 88);
+  drawFitted(painter, KaSplashPalette::lightFont(11), KaSplashCredits::dataLine(), QPointF(32, 385), width - 64);
   painter.restore();
   // A hairline edge so the paper card reads against a light desktop.
   painter.save();

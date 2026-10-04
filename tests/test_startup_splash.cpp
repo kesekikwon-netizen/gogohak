@@ -226,20 +226,23 @@ private slots:
     QCOMPARE(at(350, 300), KaSplashStrata::paper());  // the strata have not stacked yet
   }
 
-  // Once the app is ready the strata stack from the bedrock up, then the pit, the ground line and
-  // the control point come in that order and stay; reduced motion shows the finished picture at once.
+  // 2차 보드 시작 화면: once the app is ready four boundaries are inked bottom up, the staff grows, the pit,
+  // ground line, peg and Ⅰ–Ⅴ come in, stratum Ⅲ fills with clay, hairlines cross where the 기준점 lands
+  // and fade to the triangle alone. Reduced motion shows the finished picture at once.
   void strataTimelineRunsInOrderAndReducedMotionSkipsIt() {
-    QCOMPARE(KaSplashStrata::stratumReveal(0, 0.0), 1.0);  // the bedrock carries the notices
-    for (int i = 1; i < 5; ++i) {
-      QCOMPARE(KaSplashStrata::stratumReveal(i, 0.0), 0.0);
-      QVERIFY(KaSplashStrata::stratumReveal(i, 1.0) <= KaSplashStrata::stratumReveal(i - 1, 1.0));
+    for (int i = 0; i < 4; ++i) {
+      QCOMPARE(KaSplashStrata::boundaryReveal(i, 0.4 + 0.35 * i), 0.0);
+      QCOMPARE(KaSplashStrata::boundaryReveal(i, 0.75 + 0.35 * i), 1.0);
     }
-    QVERIFY(KaSplashStrata::stratumReveal(4, 1.0) < 1.0 && KaSplashStrata::stratumReveal(4, 1.9) == 1.0);
     QCOMPARE(KaSplashStrata::pitReveal(1.9), 0.0);
-    QVERIFY(KaSplashStrata::pitReveal(2.4) == 1.0 && KaSplashStrata::groundLineReveal(2.2) == 0.0);
-    QVERIFY(KaSplashStrata::groundLineReveal(3.0) == 1.0 && KaSplashStrata::markerReveal(3.0) == 0.0);
-    QCOMPARE(KaSplashStrata::markerReveal(KaSplashStrata::kTimelineSeconds), 1.0);
-    // The control point's lower edge at (610, 219) is slate once it has landed, paper before.
+    QCOMPARE(KaSplashStrata::pitReveal(2.4), 1.0);
+    QCOMPARE(KaSplashStrata::clayReveal(2.6), 0.0);
+    QCOMPARE(KaSplashStrata::clayReveal(3.2), 1.0);
+    QCOMPARE(KaSplashStrata::markerReveal(3.2), 0.0);
+    QCOMPARE(KaSplashStrata::markerReveal(3.6), 1.0);
+    QVERIFY(KaSplashStrata::crossVisibility(3.6) > 0.9);
+    QCOMPARE(KaSplashStrata::crossVisibility(KaSplashStrata::kTimelineSeconds), 0.0);
+    // The 기준점's lower edge at (236, 238.6) is ink once it has landed, paper before.
     const auto markerEdge = [](const char* reduced) {
       qputenv("KA_HGIS_REDUCED_MOTION", reduced);
       KaStartupSplash splash(nullptr, 3000, true);
@@ -249,13 +252,26 @@ private slots:
       const QRectF card = splash.cardRect();
       const double unit = card.height() / 400.0;
       const QImage frame = splash.grab().toImage();
-      return frame.pixelColor(int((card.left() + 610 * unit) * frame.devicePixelRatio()), int((card.top() + 219 * unit) * frame.devicePixelRatio()));
+      return frame.pixelColor(int((card.left() + 236 * unit) * frame.devicePixelRatio()), int((card.top() + 238.6 * unit) * frame.devicePixelRatio()));
     };
     const QColor waiting = markerEdge("0");
     const QColor finished = markerEdge("1");
     qunsetenv("KA_HGIS_REDUCED_MOTION");
     QCOMPARE(waiting, KaSplashStrata::paper());
     QVERIFY2(finished.isValid() && finished.lightness() < 110, qPrintable(finished.name()));
+  }
+
+  // The app is usually ready only near the end of the reading time; the drawing still gets its time
+  // (user 2026-10-04 「모션그래픽이 안나와」): the home screen waits for it.
+  void motionGetsItsTimeWhenTheAppIsReadyLate() {
+    KaStartupSplash splash(nullptr, 300, true);
+    QSignalSpy ready(&splash, &KaStartupSplash::readyToShow);
+    splash.show();
+    QTest::qWait(400);  // the reading time is already over when the app becomes ready
+    splash.markReady();
+    QTest::qWait(1000);
+    QCOMPARE(ready.count(), 0);
+    QTRY_COMPARE_WITH_TIMEOUT(ready.count(), 1, 5000);
   }
 
   void strataCardHasTwelvePixelCorners() {  // 12 px corners (blue card: 16): (4,4) is inside a 12 px arc, outside a 16 px one

@@ -62,6 +62,7 @@ private:
   int m_progress = 0;
   bool m_ready = false;
   qint64 m_readyAtMs = 0;
+  qint64 m_doneAtMs = 0;  // when the notice closes: the reading time, or later so the strata can draw
   bool m_completed = false;
   bool m_reducedMotion = false;
   bool m_strata = false;

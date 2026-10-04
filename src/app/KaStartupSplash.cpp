@@ -32,6 +32,7 @@ constexpr double kCardWidth = 700, kCardHeight = 400, kRadius = 16;
 
 const QString kPreparing = QStringLiteral("앱을 준비하고 있습니다");
 const QString kOpening = QStringLiteral("잠시 후 홈 화면이 열립니다");
+constexpr qint64 kMinMotionMs = 3000;  // the 새 모양 section always gets this long to draw
 
 // Honors Windows "애니메이션 효과 표시". KA_HGIS_REDUCED_MOTION=1 or 0 forces it
 // on or off for QA.
@@ -160,13 +161,17 @@ void KaStartupSplash::markReady() {
     return;
   m_ready = true;
   m_readyAtMs = m_readingClock.elapsed();
+  // 새 모양: the section is drawn only once the app is ready, and the app is usually ready only near the
+  // end of the reading time; the drawing still gets kMinMotionMs (user 2026-10-04 「모션그래픽이 안나와」).
+  m_doneAtMs = m_strata && !m_reducedMotion ? std::max<qint64>(m_readingDurationMs, m_readyAtMs + kMinMotionMs)
+                                            : m_readingDurationMs;
   update();  // the status line changes
   m_timer->start();
 }
 
 QString KaStartupSplash::statusText() const {
   if (!m_ready) return kPreparing;
-  if (m_completed) return QStringLiteral("준비 완료");
+  if (m_completed || (m_strata && m_progress >= 1000)) return QStringLiteral("준비 완료");
   return kOpening;
 }
 
@@ -174,14 +179,16 @@ void KaStartupSplash::tick() {
   if (!m_ready || m_completed)
     return;
   const qint64 elapsed = m_readingClock.elapsed();
-  m_progress = int(qMin<qint64>(1000, elapsed * 1000 / m_readingDurationMs));
+  // The level string reaches the staff a little before the notice closes (2차 보드: 4.6 of 5.0 s).
+  const double pulledBy = m_strata ? m_doneAtMs * 0.92 : double(m_doneAtMs);
+  m_progress = int(std::min(1000.0, elapsed * 1000.0 / std::max(1.0, pulledBy)));
   if (!m_reducedMotion && m_strata) {
     update();  // the section draws itself in, then the progress line fills
   } else if (!m_reducedMotion) {
     const Layout l = layoutFor(QRectF(rect()));
     update(l.dots.toAlignedRect().adjusted(-4, -4, 4, 4));
   }
-  if (elapsed < m_readingDurationMs)
+  if (elapsed < m_doneAtMs)
     return;
   m_completed = true;
   m_timer->stop();
@@ -218,7 +225,7 @@ void KaStartupSplash::paintStrata() {
   KaSplashArt::paintShadow(painter, l.card, kPlateRadius);
   KaSplashStrata::Frame frame;
   // The stacking timeline is stretched or squeezed to end just before the home screen opens.
-  const double left = (m_readingDurationMs - m_readyAtMs) / 1000.0 * 0.92;
+  const double left = (m_doneAtMs - m_readyAtMs) / 1000.0 * 0.92;
   frame.seconds = flowSeconds() * KaSplashStrata::kTimelineSeconds / std::max(1.0, left);
   frame.still = m_reducedMotion;
   frame.progress = m_progress / 1000.0;
