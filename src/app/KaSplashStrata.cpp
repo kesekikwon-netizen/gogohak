@@ -181,7 +181,7 @@ void paint(QPainter& painter, const QRectF& card, double radius, const QPixmap& 
   painter.drawText(QPointF(44, 210), frame.status);
   // A hairline that fills as the reading interval passes.
   painter.fillRect(QRectF(44, 221, 200, 2), QColor(0xE8, 0xE6, 0xDC));
-  painter.fillRect(QRectF(44, 221, 200 * std::clamp(frame.progress, 0.0, 1.0), 2), kClay);
+  painter.fillRect(QRectF(44, 221, 200 * std::clamp(frame.progress, 0.0, 1.0), 2), kSlate);  // ink, as the spec's progress line
 
   // The two notice lines sit on the bedrock in paper ink, worded exactly as on the stock card.
   painter.setPen(noticeInk());

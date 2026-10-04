@@ -214,7 +214,8 @@ void KaStartupSplash::paintStrata() {
   painter.fillRect(rect(), Qt::transparent);
   painter.setCompositionMode(QPainter::CompositionMode_SourceOver);
   painter.setRenderHint(QPainter::Antialiasing);
-  KaSplashArt::paintShadow(painter, l.card, kRadius);
+  constexpr double kPlateRadius = 12;  // the paper card: 12 px corners
+  KaSplashArt::paintShadow(painter, l.card, kPlateRadius);
   KaSplashStrata::Frame frame;
   // The stacking timeline is stretched or squeezed to end just before the home screen opens.
   const double left = (m_readingDurationMs - m_readyAtMs) / 1000.0 * 0.92;
@@ -223,7 +224,7 @@ void KaStartupSplash::paintStrata() {
   frame.progress = m_progress / 1000.0;
   frame.status = statusText();
   frame.version = QCoreApplication::applicationVersion();
-  KaSplashStrata::paint(painter, l.card, kRadius, m_icon, frame);
+  KaSplashStrata::paint(painter, l.card, kPlateRadius, m_icon, frame);
 }
 
 void KaStartupSplash::paintEvent(QPaintEvent*) {

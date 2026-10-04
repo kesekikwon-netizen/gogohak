@@ -258,6 +258,13 @@ private slots:
     QVERIFY2(finished.isValid() && finished.lightness() < 110, qPrintable(finished.name()));
   }
 
+  void strataCardHasTwelvePixelCorners() {  // 12 px corners (blue card: 16): (4,4) is inside a 12 px arc, outside a 16 px one
+    KaStartupSplash splash(nullptr, 3000, true); splash.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&splash));
+    const QImage frame = splash.grab().toImage();
+    QVERIFY(frame.pixelColor(int((splash.cardRect().left() + 4) * frame.devicePixelRatio()), int((splash.cardRect().top() + 4) * frame.devicePixelRatio())).alpha() > 200);
+  }
+
   // A small screen shrinks the notice and its card becomes wider than 700:400: the strata still reach
   // the right edge (no stripe of paper beside the bedrock).
   void strataReachTheRightEdgeOfAWiderCard() {
