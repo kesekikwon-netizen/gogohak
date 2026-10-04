@@ -99,6 +99,30 @@ class TestFeatureCardFields : public QObject {
     }
   }
 
+  // 시대 띠: under 시대 the card shows the ten period cells with the recorded one marked (새 모양 only).
+  void periodBandMarksTheRecordedPeriodInPaper() {
+    auto layer = recordedFeature();
+    const int period = layer->fields().indexOf(QStringLiteral("period"));
+    QVERIFY(layer->dataProvider()->changeAttributeValues({{firstId(layer.get()), {{period, QStringLiteral("청동기")}}}}));
+    {
+      KaFeatureCard stock;
+      stock.setFeature(layer.get(), firstId(layer.get()));
+      QVERIFY(!stock.findChild<QWidget*>(QStringLiteral("kaPeriodBand")));
+    }
+    KaTheme::DisplayOptions paper;
+    paper.paperLook = true;
+    KaTheme::setDisplayOptions(qApp, paper);
+    KaFeatureCard card;
+    card.show();
+    card.setFeature(layer.get(), firstId(layer.get()));
+    QCoreApplication::processEvents();  // a row added to a shown card appears on the next event turn
+    auto* band = card.findChild<QWidget*>(QStringLiteral("kaPeriodBand"));
+    KaTheme::setDisplayOptions(qApp, KaTheme::DisplayOptions());
+    QVERIFY2(band, "no 시대 띠 widget");
+    QVERIFY(band->isVisibleTo(&card));
+    QCOMPARE(band->property("periodIndex").toInt(), FeaturePresets::instance().periodOrder(QStringLiteral("청동기")));
+  }
+
   // Text still being typed when the card shows another record goes to its own record, never to
   // the next one and never lost (code review: the card is no longer locked while drawing).
   void typedTextStaysWithItsRecord() {

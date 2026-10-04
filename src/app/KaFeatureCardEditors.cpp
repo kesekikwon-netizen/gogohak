@@ -6,6 +6,7 @@
 #include "KaIcons.h"
 #include "KaTheme.h"
 #include "core/FeatureNumbering.h"
+#include "core/FeaturePresets.h"
 #include "core/LayerOps.h"
 
 #include <QComboBox>
@@ -15,6 +16,7 @@
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QLineEdit>
+#include <QPainter>
 #include <QPlainTextEdit>
 #include <QToolButton>
 #include <QVBoxLayout>
@@ -26,6 +28,47 @@ namespace {
 constexpr int kBodyIndex = 3;  // title, header line, empty sentence, then the editors
 constexpr int kNoteMinHeight = 56;
 constexpr int kNoteMaxHeight = 72;
+
+// 「조용한 도판」 시대 띠: the period colours oldest first in square cells with a 1 px line between; the
+// recorded period is framed in ink with a 4 px tick below; 미정 is an empty box. Display only.
+class KaPeriodBand final : public QWidget {
+public:
+  explicit KaPeriodBand(QWidget* parent) : QWidget(parent) {
+    setObjectName(QStringLiteral("kaPeriodBand"));
+    setFixedSize(168, 13);
+    setProperty("periodIndex", -1);
+  }
+
+protected:
+  void paintEvent(QPaintEvent*) override {
+    const auto& periods = FeaturePresets::instance().periods();
+    if (periods.isEmpty()) return;
+    QPainter p(this);
+    const auto& t = KaTheme::tokens();
+    const double cell = double(width()) / periods.size();
+    for (int i = 0; i < periods.size(); ++i) {
+      const QRectF r(i * cell, 0, cell, 8);
+      const QColor fill(periods.at(i).color);
+      if (fill.isValid()) {
+        p.fillRect(r, fill);
+      } else {
+        p.setPen(QPen(t.borderStrong, 1));
+        p.drawRect(r.adjusted(0.5, 0.5, -0.5, -0.5));
+      }
+      if (i > 0) {
+        p.setPen(QPen(t.border, 1));
+        p.drawLine(QPointF(r.left(), 0), QPointF(r.left(), 8));
+      }
+    }
+    const int chosen = property("periodIndex").toInt();
+    if (chosen < 0 || chosen >= periods.size()) return;
+    const QRectF r(chosen * cell, 0, cell, 8);
+    p.setPen(QPen(t.ink, 1));
+    p.setBrush(Qt::NoBrush);
+    p.drawRect(r.adjusted(0.5, 0.5, -0.5, -0.5));
+    p.drawLine(QPointF(r.center().x(), 9), QPointF(r.center().x(), 13));
+  }
+};
 
 QString numberLabel(const QString& field) {
   if (field == QLatin1String("feature_no")) return QStringLiteral("유구번호");
@@ -129,6 +172,7 @@ void KaFeatureCard::buildEditors() {
     m_period = KaFeatureFormDialog::createValueEditor(m_body, m_layer, QStringLiteral("period"), QString());
     m_form->addRow(QStringLiteral("시대"), m_period);
     watch(QStringLiteral("period"), m_period);
+    if (KaTheme::displayOptions().paperLook) m_form->addRow(QString(), m_periodBand = new KaPeriodBand(m_body));
   }
   // 조사 상태·조사자·조사일 too, without opening the 조사카드 (user 2026-10-03, answer 「진행」).
   if (has("status")) addTextRow("status", "조사 상태");

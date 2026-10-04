@@ -3,6 +3,7 @@
 #include "KaChip.h"
 #include "KaIcons.h"
 #include "core/FeatureNumbering.h"
+#include "core/FeaturePresets.h"
 #include "core/FeatureRecord.h"
 #include "core/LayerOps.h"
 
@@ -215,7 +216,7 @@ void KaFeatureCard::dropEditors() {
   m_number = nullptr;
   m_nextNumber = nullptr;
   m_numberNote = nullptr;
-  m_kind = m_period = nullptr;
+  m_kind = m_period = m_periodBand = nullptr;
   m_note = nullptr;
   m_textEdits.clear();
   m_area = m_perimeter = nullptr;
@@ -251,6 +252,10 @@ void KaFeatureCard::refresh() {
   showText(m_number, number);
   showText(m_kind, kind);
   showText(m_period, value(QStringLiteral("period")));
+  if (m_periodBand) {
+    m_periodBand->setProperty("periodIndex", FeaturePresets::instance().periodOrder(value(QStringLiteral("period"))));
+    m_periodBand->update();
+  }
   showText(m_note, value(QStringLiteral("note")));
   const FeatureRecord::Measures m = FeatureRecord::measure(m_layer, f);
   if (m_area) m_area->setText(metres(m.area, "m²"));

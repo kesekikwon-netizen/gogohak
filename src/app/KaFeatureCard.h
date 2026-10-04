@@ -103,6 +103,7 @@ private:
   QLabel* m_numberNote = nullptr;
   QWidget* m_kind = nullptr;
   QWidget* m_period = nullptr;
+  QWidget* m_periodBand = nullptr;  // 새 모양 시대 띠 under 시대; property "periodIndex"
   QPlainTextEdit* m_note = nullptr;
   // Plain text rows: a survey area's 조사명·유적명 (a separate area layer: 이름), a record's 조사 상태·조사자·조사일.
   QList<QPair<QString, QLineEdit*>> m_textEdits;
