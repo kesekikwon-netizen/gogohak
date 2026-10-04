@@ -621,7 +621,7 @@ QFrame#studioBottomBar {
   border-top: 1px solid @border@;
   background: @surface@;
 }
-QFrame#mapCard { background: @surface@; }
+QFrame#mapCard { background: @surface@; border-radius: @mapRadius@px; }
 /* ---- Studio inspectors: 도면 and 단면도 share cards and a pinned output bar ---- */
 QWidget#sectionPropertiesPanel, QWidget#sectionInspectorColumn, QWidget#drawingInspectorColumn {
   background: @desk@;

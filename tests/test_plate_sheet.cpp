@@ -36,6 +36,16 @@ private slots:
     QCOMPARE(captured(rule), KaTheme::tokens().ink.name());
   }
 
+  // 지도는 그림: the map is a square figure in 새 모양 (r0), a rounded card (r10) in stock.
+  void mapFigureIsSquareInPaper() {
+    const QString radius = QStringLiteral("QFrame#mapCard \\{ background: #[0-9a-fA-F]{6}; border-radius: (\\d+)px;");
+    QCOMPARE(captured(radius), QStringLiteral("10"));
+    KaTheme::DisplayOptions paper;
+    paper.paperLook = true;
+    KaTheme::setDisplayOptions(qApp, paper);
+    QCOMPARE(captured(radius), QStringLiteral("0"));
+  }
+
   void paperTableHasInkRulesAndOatRow() {
     KaTheme::DisplayOptions paper;
     paper.paperLook = true;
