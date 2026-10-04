@@ -199,13 +199,13 @@ QToolButton:enabled:hover { background: @hover@; color: @ink@; }
 QToolButton:enabled:pressed { background: @pressed@; }
 QToolButton:enabled:checked {
   background: @selected@;
-  color: @accentDeep@;
+  color: @tabInk@;
   border: 2px solid transparent;
-  border-bottom: 2px solid @accent@;
+  border-bottom: 2px solid @tabMark@;
 }
 QToolButton:enabled:checked:hover {
   background: @selected@;
-  color: @accentDeep@;
+  color: @tabInk@;
   border: 2px solid transparent;
   border-bottom: 2px solid @accentHover@;
 }

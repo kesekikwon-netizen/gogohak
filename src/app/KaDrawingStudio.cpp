@@ -1,4 +1,5 @@
 #include "KaDrawingStudio.h"
+#include "KaWindowSize.h"
 #include "core/KaLogExcept.h"
 #include "KaLayerInformation.h"
 #include <QDomDocument>
@@ -374,7 +375,7 @@ bool KaDrawingStudio::promptPaper(QWidget* parent, double* widthMm, double* heig
   };
   QDialog dlg(parent);
   dlg.setWindowTitle(QStringLiteral("용지 설정"));
-  dlg.setMinimumWidth(400);
+  dlg.setMinimumWidth(KaWindowSize::width(KaWindowSize::Small, 400));
   auto* form = new QFormLayout(&dlg);
   auto makeChoice = [&dlg](const QString& text, const QIcon& icon, bool checked) {
     auto* b = new QToolButton(&dlg);

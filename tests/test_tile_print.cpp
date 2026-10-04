@@ -203,6 +203,17 @@ private slots:
     QVERIFY(dialog.summary().contains(QStringLiteral("한 장에")));
   }
 
+  // 창 크기: in 새 모양 「도면 인쇄」 opens as the large window of the design (860 × 640).
+  void paperPrintWindowIsTheLargeSize() {
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    const QString source = makeQuadrantPdf(dir.filePath(QStringLiteral("drawing.pdf")), QSizeF(297, 420));
+    qApp->setProperty("kaPaperLook", true);
+    KaPrintDialog dialog(source, QStringLiteral("시험 도면"));
+    qApp->setProperty("kaPaperLook", QVariant());
+    QCOMPARE(dialog.size(), QSize(860, 640));
+  }
+
   void oneSheetKeepsActualSizeWhenTheDrawingFits() {
     const QMarginsF edge(5, 5, 5, 5);
     // A4 도면을 A4 에: 실제 크기. 가장자리 5 mm 는 프린터가 못 찍을 수 있다고 알린다.

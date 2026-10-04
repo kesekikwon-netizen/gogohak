@@ -1,4 +1,5 @@
 #include "KaPrintDialog.h"
+#include "KaWindowSize.h"
 
 #include <QApplication>
 #include <QButtonGroup>
@@ -378,6 +379,8 @@ KaPrintDialog::KaPrintDialog(const QString& pdfPath, const QString& title, doubl
   connect(m_properties, &QPushButton::clicked, this, &KaPrintDialog::printNow);
   connect(m_savePdf, &QPushButton::clicked, this, &KaPrintDialog::saveTilesAs);
   connect(close, &QPushButton::clicked, this, &QDialog::reject);
+  // 「조용한 도판」 large window, 860 × 640; stock keeps the size its contents ask for.
+  if (const int large = KaWindowSize::width(KaWindowSize::Large, 0)) resize(large, 640);
 
   if (m_drawingMm.isEmpty()) {
     m_summary->setText(readError.isEmpty() ? QStringLiteral("도면을 읽지 못했습니다.") : readError);

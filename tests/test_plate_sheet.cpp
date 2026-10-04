@@ -99,6 +99,22 @@ private slots:
     QCOMPARE(captured(focus), ink);
   }
 
+  // 고른 칸: a chosen tool button (A4 | A3, 세로 | 가로 in 용지 설정) reads ink on oat with an ink underline in
+  // 새 모양; stock keeps its deep accent text and accent underline.
+  void chosenToolButtonIsInkInPaper() {
+    const QString rule = QStringLiteral("(?m)^QToolButton:enabled:checked \\{\\s*background: #[0-9a-fA-F]{6};\\s*color: (#[0-9a-fA-F]{6});\\s*border: 2px solid transparent;\\s*border-bottom: 2px solid (#[0-9a-fA-F]{6});");
+    const auto both = [&rule]() {
+      const auto m = QRegularExpression(rule).match(qApp->styleSheet());
+      return QStringList{m.captured(1).toLower(), m.captured(2).toLower()};
+    };
+    QCOMPARE(both(), (QStringList{KaTheme::tokens().accentDeep.name(), KaTheme::tokens().accent.name()}));
+    KaTheme::DisplayOptions paper;
+    paper.paperLook = true;
+    KaTheme::setDisplayOptions(qApp, paper);
+    const QString ink = KaTheme::tokens().ink.name();
+    QCOMPARE(both(), (QStringList{ink, ink}));
+  }
+
   // 창 너비: 새 모양 windows come in three widths (S 440 · M 560 · L 860); stock keeps each window's own width.
   void windowWidthsAreTheThreeSizesInPaper() {
     QCOMPARE(KaWindowSize::width(KaWindowSize::Medium, 460), 460);

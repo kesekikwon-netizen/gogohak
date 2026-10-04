@@ -5,13 +5,13 @@
 975 src/app/KaApplication.cpp
 343 src/app/KaBeginnerRibbon.cpp
 464 src/app/KaCaptureMapTool.cpp
-3852 src/app/KaDrawingStudio.cpp
+3853 src/app/KaDrawingStudio.cpp
 499 src/app/KaFeatureSelectTool.cpp
 381 src/app/KaFileBrowserPanel.cpp
 1538 src/app/KaHeritageBrowser.cpp
 1120 src/app/KaIcons.cpp
 504 src/app/KaMeasureMapTool.cpp
-807 src/app/KaPrintDialog.cpp
+810 src/app/KaPrintDialog.cpp
 1110 src/app/KaSectionDrawingStudio.cpp
 636 src/app/KaTerrain3dLayoutStudio.cpp
 546 src/app/KaTerrain3dStudio.cpp
@@ -86,7 +86,7 @@
 338 tests/test_survey_contour.cpp
 607 tests/test_terrain_3d.cpp
 1426 tests/test_theme.cpp
-415 tests/test_tile_print.cpp
+426 tests/test_tile_print.cpp
 1442 tests/test_topographic_browser.cpp
 320 tests/test_topographic_catalog.cpp
 922 tests/test_topographic_import.cpp
