@@ -139,6 +139,24 @@ private slots:
     QCOMPARE(captured(name), QStringLiteral("34"));
   }
 
+  // 풍선 도움말과 메뉴 (설계 2.4): the tip is ink with ivory words, r4; a menu row is 32 high with the light 「desk」
+  // wash under the pointer. Stock keeps the white tip and the oat row.
+  void tooltipIsInkAndMenuRowsAreLightInPaper() {
+    const QString tip = QStringLiteral("(?m)^QToolTip \\{\\s*color: ([^;]+);\\s*background: ([^;]+);");
+    const QString hover = QStringLiteral("QMenu::item:selected \\{ background: (#[0-9a-fA-F]{6});");
+    const auto both = [](const QString& pattern) {
+      const auto m = QRegularExpression(pattern).match(qApp->styleSheet());
+      return QStringList{m.captured(1).trimmed().toLower(), m.captured(2).trimmed().toLower()};
+    };
+    QCOMPARE(both(tip), (QStringList{KaTheme::tokens().ink.name(), KaTheme::tokens().surface.name()}));
+    QCOMPARE(captured(hover), KaTheme::tokens().selected.name());
+    KaTheme::DisplayOptions paper;
+    paper.paperLook = true;
+    KaTheme::setDisplayOptions(qApp, paper);
+    QCOMPARE(both(tip), (QStringList{QStringLiteral("#faf9f5"), KaTheme::tokens().ink.name()}));
+    QCOMPARE(captured(hover), KaTheme::tokens().desk.name());
+  }
+
   // 창 너비: 새 모양 windows come in three widths (S 440 · M 560 · L 860); stock keeps each window's own width.
   void windowWidthsAreTheThreeSizesInPaper() {
     QCOMPARE(KaWindowSize::width(KaWindowSize::Medium, 460), 460);

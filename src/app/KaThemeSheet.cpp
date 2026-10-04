@@ -108,6 +108,16 @@ QHash<QString, QString> replacementTable() {
   // The layer list's head is one line under the words in 새 모양 (stock: a box per cell).
   values.insert(QStringLiteral("layerHeadEdge"), paper ? QStringLiteral("none") : QStringLiteral("1px solid ") + c.border.name());
   values.insert(QStringLiteral("layerHeadFace"), paper ? clear : c.surface.name());
+  // 풍선 도움말 (설계 2.4): ink with ivory words, r4; a menu row is 32 high with the light desk wash.
+  values.insert(QStringLiteral("tipInk"), paper ? QStringLiteral("#faf9f5") : c.ink.name());
+  values.insert(QStringLiteral("tipFace"), (paper ? c.ink : c.surface).name());
+  values.insert(QStringLiteral("tipEdge"), (paper ? c.ink : c.border).name());
+  values.insert(QStringLiteral("tipRadius"), paper ? QStringLiteral("4") : QStringLiteral("0"));
+  values.insert(QStringLiteral("tipPad"), paper ? QStringLiteral("6px 8px") : QStringLiteral("6px 10px"));
+  values.insert(QStringLiteral("menuPad"), paper ? QStringLiteral("4") : QStringLiteral("6"));
+  values.insert(QStringLiteral("menuItemPad"), paper ? QStringLiteral("6px 12px") : QStringLiteral("8px 16px"));
+  values.insert(QStringLiteral("menuItemMin"), paper ? QStringLiteral("20") : QStringLiteral("22"));
+  values.insert(QStringLiteral("menuHover"), (paper ? c.desk : c.selected).name());
   values.insert(QStringLiteral("figureSize"), paper ? QStringLiteral("16") : QStringLiteral("13"));  // 수치 대장 (spec 20: 16 keeps 12,000,000.00 m² inside the 272 px panel)
   values.insert(QStringLiteral("subCheckedFace"), paper ? c.selected.name() : none);
   values.insert(QStringLiteral("subCheckedEdge"), paper ? c.accent.name() : none);

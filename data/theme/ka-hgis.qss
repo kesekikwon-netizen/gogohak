@@ -957,12 +957,12 @@ QMenu {
   background: @surface@;
   color: @ink@;
   border: 1px solid @border@;
-  padding: 6px;
+  padding: @menuPad@px;
   font-family: "Malgun Gothic", "Segoe UI";
   font-size: @uiFontSize@px;
 }
-QMenu::item { color: @ink@; padding: 8px 16px; min-height: 22px; border-radius: 6px; }
-QMenu::item:selected { background: @selected@; color: @ink@; }
+QMenu::item { color: @ink@; padding: @menuItemPad@; min-height: @menuItemMin@px; border-radius: 6px; }
+QMenu::item:selected { background: @menuHover@; color: @ink@; }
 QMenu::item:disabled { color: @inkDisabled@; }
 
 QStatusBar {
@@ -1023,10 +1023,11 @@ QToolButton#renderToggle:enabled:hover { background: @hover@; color: @accentDeep
 QMenuBar { height: 0px; max-height: 0px; border: none; }
 
 QToolTip {
-  color: @ink@;
-  background: @surface@;
-  border: 1px solid @border@;
-  padding: 6px 10px;
+  color: @tipInk@;
+  background: @tipFace@;
+  border: 1px solid @tipEdge@;
+  border-radius: @tipRadius@px;
+  padding: @tipPad@;
   font-family: "Malgun Gothic", "Segoe UI";
   font-size: @uiFontSize@px;
 }
