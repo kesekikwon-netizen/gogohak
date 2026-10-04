@@ -2109,6 +2109,8 @@ if(KA_HGIS_BUILD_TESTS)
     src/app/KaAppBar.cpp src/app/KaAppBar.h
     src/app/KaMapControls.cpp src/app/KaMapControls.h
     src/app/KaBasemapQuickCard.cpp src/app/KaBasemapQuickCard.h
+    src/app/KaGridOriginButton.cpp src/app/KaGridOriginButton.h src/app/KaCanvasGridOverlay.cpp src/app/KaCanvasGridOverlay.h
+    src/app/KaCrashGuard.cpp src/app/KaCrashGuard.h
     ${_ka_p5_app_sources} ${_ka_p1_chip_sources} ${_ka_p5_theme_sources})
   set_target_properties(ka_map_plate_tests PROPERTIES WIN32_EXECUTABLE FALSE)
   target_link_libraries(ka_map_plate_tests PRIVATE ${KA_TEST_LIBS})

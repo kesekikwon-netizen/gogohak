@@ -1,6 +1,7 @@
 #include "KaGridOriginButton.h"
 
 #include "KaCanvasGridOverlay.h"
+#include "KaTheme.h"
 
 #include <QDialog>
 #include <QDialogButtonBox>
@@ -54,12 +55,18 @@ void KaGridOriginButton::setOrigin(double x, double y) {
 void KaGridOriginButton::editOrigin() {
   KaCanvasGridOverlay* grid = m_grid ? m_grid() : nullptr;
   const KaCanvasGridOverlay::Config current = grid ? grid->config() : KaCanvasGridOverlay::Config();
+  const bool paper = KaTheme::displayOptions().paperLook;
   QDialog dialog(window());
+  dialog.setObjectName(QStringLiteral("gridOriginDialog"));
+  dialog.setProperty("kaPlate", paper);
   dialog.setWindowTitle(QStringLiteral("격자 원점"));
   auto* form = new QFormLayout(&dialog);
-  auto* hint = new QLabel(QStringLiteral("격자선 하나가 이 점을 지납니다. 회전한 격자는 이 점을 중심으로 돌고, "
-                                         "눈금은 이 점에서 잰 거리로 적습니다."),
+  auto* hint = new QLabel(paper ? QStringLiteral("격자선 하나가 이 점을 지납니다. 회전한 격자는 이 점을") + QLatin1Char(0x0A) +
+                                      QStringLiteral("중심으로 돌고, 눈금은 이 점에서 잰 거리로 적습니다.")
+                                : QStringLiteral("격자선 하나가 이 점을 지납니다. 회전한 격자는 이 점을 중심으로 돌고, "
+                                                 "눈금은 이 점에서 잰 거리로 적습니다."),
                           &dialog);
+  hint->setObjectName(QStringLiteral("gridOriginHint"));
   hint->setWordWrap(true);
   form->addRow(hint);
   auto* east = coordinateBox(&dialog, QStringLiteral("gridOriginX"), current.originX);
@@ -69,9 +76,23 @@ void KaGridOriginButton::editOrigin() {
   auto* quick = new QHBoxLayout();
   auto* center = new QPushButton(QStringLiteral("지도 가운데"), &dialog);
   auto* zero = new QPushButton(QStringLiteral("좌표계 원점 (0, 0)"), &dialog);
+  center->setObjectName(QStringLiteral("gridOriginCentre"));
+  zero->setObjectName(QStringLiteral("gridOriginZero"));
   quick->addWidget(center);
   quick->addWidget(zero);
   form->addRow(quick);
+  if (paper) {  // 2차 보드 판 5: 440 wide, 96 px words beside 176 px boxes, the two quick choices as small words
+    dialog.setMinimumWidth(440);
+    form->setContentsMargins(24, 24, 24, 16);
+    form->setHorizontalSpacing(0);
+    form->setVerticalSpacing(12);
+    for (QDoubleSpinBox* box : {east, north}) {
+      box->setFixedWidth(176);
+      if (auto* word = qobject_cast<QLabel*>(form->labelForField(box))) word->setFixedWidth(96);
+    }
+    for (QPushButton* choice : {center, zero}) choice->setProperty("kaPlate", true);
+    quick->addStretch(1);
+  }
   auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dialog);
   buttons->button(QDialogButtonBox::Ok)->setText(QStringLiteral("적용"));
   buttons->button(QDialogButtonBox::Cancel)->setText(QStringLiteral("취소"));

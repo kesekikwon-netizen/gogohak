@@ -3,11 +3,14 @@
 #include <QtTest>
 
 #include <QApplication>
+#include <QDialog>
+#include <QDoubleSpinBox>
 #include <QFontMetrics>
 #include <QStandardPaths>
 #include <QImage>
 #include <QLabel>
 #include <QLineEdit>
+#include <QTimer>
 #include <QToolButton>
 
 #include <qgsapplication.h>
@@ -16,6 +19,8 @@
 
 #include "app/KaAppBar.h"
 #include "app/KaBasemapQuickCard.h"
+#include "app/KaCanvasGridOverlay.h"
+#include "app/KaGridOriginButton.h"
 #include "app/KaMapControls.h"
 #include "app/KaStatusBar.h"
 #include "app/KaSurveyBadge.h"
@@ -255,6 +260,28 @@ class TestMapPlate : public QObject {
     QTRY_VERIFY(!alone(bar).isNull());
     image = alone(bar);
     for (int y = 0; y < image.height(); ++y) QVERIFY2(image.pixelColor(0, y).alpha() < 30, qPrintable(QString::number(y)));
+  }
+
+  // 격자 원점 (보드 판 5, 440): the note in two lines, 176 px boxes beside 96 px words.
+  void gridOriginWindowReadsLikeTheBoard() {
+    paper(true);
+    QgsMapCanvas canvas;
+    auto* grid = new KaCanvasGridOverlay(&canvas);
+    KaGridOriginButton button(&canvas, [grid] { return grid; });
+    QString note;
+    int width = 0, box = 0;
+    QTimer::singleShot(100, [&] {
+      auto* dialog = qobject_cast<QDialog*>(QApplication::activeModalWidget());
+      if (auto* label = dialog->findChild<QLabel*>(QStringLiteral("gridOriginHint"))) note = label->text();
+      width = dialog->minimumWidth();
+      box = dialog->findChild<QDoubleSpinBox*>(QStringLiteral("gridOriginX"))->maximumWidth();
+      dialog->reject();
+    });
+    button.click();
+    paper(false);
+    QCOMPARE(note, QStringLiteral("격자선 하나가 이 점을 지납니다. 회전한 격자는 이 점을") + QLatin1Char(0x0A) +
+                       QStringLiteral("중심으로 돌고, 눈금은 이 점에서 잰 거리로 적습니다."));
+    QCOMPARE(QPoint(width, box), QPoint(440, 176));
   }
 };
 
