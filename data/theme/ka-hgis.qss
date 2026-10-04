@@ -1263,7 +1263,8 @@ QLabel#xyReadout, QLabel#kaMeasureValue { font-family: @monoFont@; }
 /* ---- [P3 home] recent-survey table header, home cards, connection rows (append-only) ---- */
 QTableWidget#recentSurveyList QHeaderView::section { background: @surface@; color: @inkMuted@; font-size: 12px;
   font-weight: 400; border: none; border-bottom: 1px solid @border@; padding: 6px 12px; }
-QTableWidget#recentSurveyList::item:selected { border-left: 2px solid @accent@; }
+QTableWidget#recentSurveyList { border-top: 1px solid @plateRule@; border-bottom: 1px solid @plateRule@; }
+QTableWidget#recentSurveyList::item:selected { border-left: 2px solid @selectedBar@; }
 QPushButton#startContinueBtn { min-height: 40px; }
 QFrame#startGuideCard2, QFrame#startConnectionCard { background: @surface@; border: 1px solid @border@; border-radius: 10px; }
 QLabel#startStepDone { color: @ok@; }

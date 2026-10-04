@@ -39,6 +39,8 @@ void applyPaperLook(Tokens& t, bool highContrast) {
   t.tabInk = t.ink;  // the current tab is marked in ink, clay stays the one filled button
   t.tabMark = t.ink;
   t.chosenFill = QColor(0xE3, 0xDA, 0xCC);  // the chosen segment: oat with an ink edge
+  t.plateRule = t.ink;                      // a table's top and bottom rules
+  t.selectedBar = t.selected;               // a chosen row has no accent bar
   t.ribbonLabelInk = t.ink;
   t.ribbonActiveInk = t.ink;                 // the chosen label and text links read in ink
   t.ribbonGroupInk = t.inkMuted;

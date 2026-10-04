@@ -1855,6 +1855,13 @@ if(KA_HGIS_BUILD_TESTS)
   target_include_directories(ka_chip_plate_tests PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_BINARY_DIR}/generated)
   ka_add_qtest(chip_plate ka_chip_plate_tests)
   set_tests_properties(chip_plate PROPERTIES TIMEOUT 90)
+  add_executable(ka_plate_sheet_tests tests/test_plate_sheet.cpp
+    ${_ka_p1_font_sources} src/app/KaIcons.cpp src/app/KaTheme.cpp src/app/KaThemeSheet.cpp src/app/KaThemeStyle.cpp)
+  set_target_properties(ka_plate_sheet_tests PROPERTIES WIN32_EXECUTABLE FALSE)
+  target_link_libraries(ka_plate_sheet_tests PRIVATE Qt6::Test Qt6::Core Qt6::Gui Qt6::Widgets)
+  target_include_directories(ka_plate_sheet_tests PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_BINARY_DIR}/generated)
+  ka_add_qtest(plate_sheet ka_plate_sheet_tests)
+  set_tests_properties(plate_sheet PROPERTIES TIMEOUT 90)
 endif()
 
 # ---- [P2 icons] outline glyph set: travels with KaIcons.cpp wherever that file is compiled ----
