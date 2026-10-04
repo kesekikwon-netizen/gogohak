@@ -1344,7 +1344,7 @@ void KaDrawingStudio::buildUi() {
   m_studioSplit->setChildrenCollapsible(false);
   m_studioSplit->addWidget(leftCol);
   m_studioSplit->addWidget(right);
-  m_studioSplit->addWidget(inspectorScroll);
+  m_studioSplit->addWidget(KaDrawingStudioPlate::inspectorColumn(inspectorScroll));  // 새 모양: PDF·인쇄 at the foot
   m_studioSplit->setStretchFactor(0, 0);
   m_studioSplit->setStretchFactor(1, 1);
   m_studioSplit->setStretchFactor(2, 0);

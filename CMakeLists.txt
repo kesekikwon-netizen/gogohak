@@ -537,6 +537,7 @@ add_executable(ka-hgis
   src/app/KaControlPointDialog.cpp
   src/app/KaControlCsvBox.cpp
   src/app/KaProgressPlate.cpp
+  src/app/KaDrawingStudioPlate.cpp
   src/app/KaPrintDialog.cpp
   src/app/KaPrintDialogPlate.cpp
   src/app/KaTilePreview.cpp
@@ -546,6 +547,7 @@ add_executable(ka-hgis
   src/app/KaControlPointDialog.h
   src/app/KaControlCsvBox.h
   src/app/KaProgressPlate.h
+  src/app/KaDrawingStudioPlate.h
   src/app/KaPrintDialog.h
   src/app/KaTilePreview.h
   src/app/MainWindow.h
@@ -1519,6 +1521,14 @@ if(KA_HGIS_BUILD_TESTS)
   target_link_libraries(ka_print_plate_tests PRIVATE ka_core Qt6::Test)
   set_target_properties(ka_print_plate_tests PROPERTIES WIN32_EXECUTABLE FALSE)
   ka_add_qtest(print_plate ka_print_plate_tests)
+  # 「조용한 도판」 도면 (board 4): the output buttons at the foot of the right panel (no QGIS).
+  add_executable(ka_drawing_plate_tests tests/test_drawing_plate.cpp
+    src/app/KaDrawingStudioPlate.cpp src/app/KaDrawingStudioPlate.h)
+  target_include_directories(ka_drawing_plate_tests PRIVATE src)
+  target_link_libraries(ka_drawing_plate_tests PRIVATE Qt6::Test Qt6::Widgets)
+  set_target_properties(ka_drawing_plate_tests PROPERTIES WIN32_EXECUTABLE FALSE)
+  ka_add_qtest(drawing_plate ka_drawing_plate_tests)
+  set_tests_properties(drawing_plate PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen" TIMEOUT 60)
   add_executable(ka_drawing_studio_tests tests/test_drawing_studio.cpp
     src/app/KaDrawingNorthArrow.cpp src/app/KaDrawingNorthArrow.h
     src/app/KaDrawingCoordCallout.cpp src/app/KaDrawingCoordCallout.h

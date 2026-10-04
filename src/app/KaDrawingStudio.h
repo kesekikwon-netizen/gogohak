@@ -1,5 +1,6 @@
 #pragma once
 #include "core/HeritageLayoutNumbers.h"
+#include "KaDrawingStudioPlate.h"
 #include <QMainWindow>
 #include <QPoint>
 #include <QPointer>

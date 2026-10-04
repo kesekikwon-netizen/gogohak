@@ -1504,3 +1504,5 @@ QDialog#heritageRegionDialog[kaPlate="true"] QGroupBox#heritageNearbyGroup { bor
 /* PDF 내보내기 · 제출 꾸러미 만드는 중 (2차 보드 판 5): a 4 px ink bar on a light track, square ends, no figure. */
 QProgressDialog[kaPlate="true"] QProgressBar { min-height: 4px; max-height: 4px; border: none; border-radius: 0; background: @border@; }
 QProgressDialog[kaPlate="true"] QProgressBar::chunk { background: @ink@; border-radius: 0; }
+/* 도면 (2차 보드 판 4): 「PDF 내보내기 | 인쇄」 at the foot of the right panel under a hairline. */
+QWidget#studioOutputFoot { border: none; border-top: 1px solid @border@; }
