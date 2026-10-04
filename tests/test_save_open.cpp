@@ -427,10 +427,10 @@ private:
     return reference;
   }
   static bool hasNoAutosaveTimer(MainWindow& window) {
-    // layerWatchTimer and shellSyncTimer (300 ms badge/chip merge, MainWindowChrome.cpp) write no file.
+    // layerWatchTimer, shellSyncTimer (300 ms badge/chip merge, MainWindowChrome.cpp) and mapDisplayRefresh (700 ms redraw after a resize) write no file.
     for (auto* timer : window.findChildren<QTimer*>(QString(), Qt::FindDirectChildrenOnly))
       if (timer->isActive() && timer->objectName() != QLatin1String("layerWatchTimer") &&
-          timer->objectName() != QLatin1String("shellSyncTimer") && timer->interval() > 0 &&
+          timer->objectName() != QLatin1String("shellSyncTimer") && timer->objectName() != QLatin1String("mapDisplayRefresh") && timer->interval() > 0 &&
           timer->interval() <= 60000)
         return false;
     return true;
@@ -652,7 +652,7 @@ private slots:
     QVERIFY(window.openSurveyGpkg(path));
     disableRendering(window);
     if (qEnvironmentVariableIsEmpty("KA_HGIS_SMALL_SCREEN_QA")) window.setAttribute(Qt::WA_DontShowOnScreen);
-    window.resize(requestedSize);
+    window.setWindowState(Qt::WindowNoState); window.resize(requestedSize);
     if (maximized) window.showMaximized(); else window.show();
     auto* project = QgsProject::instance();
     auto* canvas = window.findChild<QgsMapCanvas*>(QStringLiteral("mapCanvas"));
@@ -903,7 +903,7 @@ private slots:
     {
       MainWindow window;
       disableRendering(window);
-      window.resize(1600, 900);
+      window.setWindowState(Qt::WindowNoState); window.resize(1600, 900);
       window.show();
       QCoreApplication::processEvents();
       auto* mainTb = window.findChild<QToolBar*>(QStringLiteral("mainToolbar"));
@@ -936,7 +936,7 @@ private slots:
   // The app starts on 홈; the 지도 tab and its sidebar are sized only when it is first shown.
   static void showMapAfterHome(MainWindow& window, const QSize& size) {
     disableRendering(window);
-    window.resize(size);
+    window.setWindowState(Qt::WindowNoState); window.resize(size);
     window.show();
     QCoreApplication::processEvents();
     if (auto* tabs = window.findChild<QTabWidget*>(QStringLiteral("viewTabs")))
@@ -952,6 +952,19 @@ private slots:
   static void forgetWindowLayout() {
     QSettings st = RecentSurveys::userSettings();
     for (const QString& key : windowLayoutKeys()) st.remove(key);
+  }
+  // 처음 켜면(저장된 창 모양이 없으면) 전체 창으로 뜨고, 사용자가 줄인 창 모양은 그대로 기억한다.
+  void firstStartIsMaximizedAndAChosenSizeIsKept() {
+    forgetWindowLayout();
+    const auto cleanup = qScopeGuard([] { forgetWindowLayout(); });
+    {
+      MainWindow window;
+      QVERIFY(window.windowState().testFlag(Qt::WindowMaximized));
+      window.showNormal();
+      QVERIFY(window.close());  // closeEvent stores the geometry of the normal window
+    }
+    MainWindow again;
+    QVERIFY(!again.windowState().testFlag(Qt::WindowMaximized));
   }
   // 처음 켜면 파일함이 보이고, 파일함 단추로 닫거나 연 상태가 다음 실행까지 남는다.
   void filesBoxStartsOpenAndKeepsTheChosenState() {
@@ -1003,7 +1016,7 @@ private slots:
     for (const QSize size : {QSize(1024, 768), QSize(1280, 720), QSize(1904, 1000)}) {
       MainWindow window;
       disableRendering(window);
-      window.resize(size);
+      window.setWindowState(Qt::WindowNoState); window.resize(size);
       window.show();
       QCoreApplication::processEvents();
       auto* mainTb = window.findChild<QToolBar*>(QStringLiteral("mainToolbar"));
@@ -1070,7 +1083,7 @@ private slots:
     for (const int width : {1280, 1536, 1920}) {
       MainWindow window;
       disableRendering(window);
-      window.resize(width, 800);
+      window.setWindowState(Qt::WindowNoState); window.resize(width, 800);
       window.show();
       QCoreApplication::processEvents();
       auto* ribbon = window.findChild<KaBeginnerRibbon*>(QStringLiteral("beginnerRibbon"));

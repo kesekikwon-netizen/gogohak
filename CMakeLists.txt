@@ -1619,6 +1619,7 @@ if(KA_HGIS_BUILD_TESTS)
     homePageShowsStrataHeroWithoutOpeningASurvey
     mapControlsZoomTheCanvasAndShowAScaleBar
     drawingToolsGetTheirOwnRowBelowTheRibbon
+    firstStartIsMaximizedAndAChosenSizeIsKept
     filesBoxStartsOpenAndKeepsTheChosenState
     narrowWindowKeepsSearchOnTheRibbonRow
     ribbonButtonsAllHaveDifferentIcons

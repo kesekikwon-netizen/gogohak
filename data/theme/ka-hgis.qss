@@ -761,7 +761,7 @@ QTabBar::tab {
   border-bottom: 2px solid transparent;
   margin: 0 2px;
 }
-QTabBar::tab:selected { color: @accentDeep@; border-bottom: 2px solid @accent@; }
+QTabBar::tab:selected { color: @tabInk@; border-bottom: 2px solid @tabMark@; }
 /* 홈·지도 탭 줄(목업): 바탕은 작업대 색, 고른 탭은 흰 판에 위·좌·우 1px 테두리와 위 모서리 8, 밑줄 없음. */
 QTabWidget#viewTabs > QTabBar { background: @desk@; }
 QTabWidget#viewTabs > QTabBar::tab {

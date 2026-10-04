@@ -91,6 +91,8 @@ Tokens strataTokens() {
   t.primaryPressed = t.accentDeep;
   t.primaryText = t.surface;
   t.primaryFocus = t.ink;
+  t.tabInk = t.accentDeep;
+  t.tabMark = t.accent;
   t.chrome = t.surface;
   t.heroButton = t.surface;
   t.heroButtonText = t.rail;

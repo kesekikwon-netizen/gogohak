@@ -36,6 +36,8 @@ void applyPaperLook(Tokens& t, bool highContrast) {
   t.progressFill = QColor(0xD9, 0x77, 0x57);  // clay: ink 5.9:1 on it, 3.1:1 against white
   t.focusRing = t.ink;
   t.primaryFocus = t.ink;
+  t.tabInk = t.ink;  // the current tab is marked in ink, clay stays the one filled button
+  t.tabMark = t.ink;
   t.ribbonLabelInk = t.ink;
   t.ribbonActiveInk = t.ink;                 // the chosen label and text links read in ink
   t.ribbonGroupInk = t.inkMuted;

@@ -274,8 +274,7 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
   {
     QSettings st = RecentSurveys::userSettings();
     const QByteArray geo = st.value(QStringLiteral("MainWindow/geometry")).toByteArray();
-    if (!geo.isEmpty())
-      restoreGeometry(geo);
+    if (!geo.isEmpty()) restoreGeometry(geo); else setWindowState(Qt::WindowMaximized);  // first start: full window
     const QByteArray dockState = st.value(QStringLiteral("MainWindow/state")).toByteArray();
     if (!dockState.isEmpty())
       restoreState(dockState);

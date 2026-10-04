@@ -9,6 +9,9 @@
 #include <QDir>
 #include <QFontDatabase>
 #include <QFrame>
+#include <QImage>
+#include <QPainter>
+#include <QStyleOptionButton>
 #include <QLabel>
 #include <QProgressBar>
 #include <QPushButton>
@@ -55,6 +58,8 @@ private slots:
   void progressBarTextReadableOnChunk();
   void radioIndicatorUsesAccent();
   void paperLook_mainButtonIsClayAndBandIsPaper();
+  void paperLook_currentTabUnderlineIsInk();
+  void paperLook_checkedBoxIsInk();
   void paperLook_drawingRowToolsAreButtons();
 };
 
@@ -165,6 +170,45 @@ void TestThemeRender::radioIndicatorUsesAccent() {
     for (int x = 0; x < qMin(image.width(), 24); ++x)
       if (near(image.pixelColor(x, y), KaTheme::tokens().accent, 24)) ++accent;
   QVERIFY2(accent >= 8, qPrintable(QStringLiteral("accent pixels %1").arg(accent)));
+}
+
+// 「조용한 도판」: the current tab is marked in ink (clay is only the one filled button); stock keeps its accent.
+void TestThemeRender::paperLook_currentTabUnderlineIsInk() {
+  const auto underline = []() {
+    const QRegularExpression rule(QStringLiteral("QTabBar::tab:selected \{ color: (#[0-9a-fA-F]{6}); border-bottom: 2px solid (#[0-9a-fA-F]{6});"));
+    return rule.match(qApp->styleSheet()).captured(2);
+  };
+  QCOMPARE(underline(), KaTheme::tokens().accent.name());
+  KaTheme::DisplayOptions paper;
+  paper.paperLook = true;
+  KaTheme::setDisplayOptions(qApp, paper);
+  const QString mark = underline();
+  const QString ink = KaTheme::tokens().ink.name();
+  KaTheme::setDisplayOptions(qApp, KaTheme::DisplayOptions());
+  QCOMPARE(mark, ink);
+}
+
+// 「조용한 도판」: a ticked check box is filled in ink, not clay; stock keeps its accent.
+void TestThemeRender::paperLook_checkedBoxIsInk() {
+  const auto fill = []() {
+    QImage image(16, 16, QImage::Format_ARGB32_Premultiplied);
+    image.fill(Qt::white);
+    QPainter painter(&image);
+    QStyleOptionButton option;
+    option.rect = QRect(0, 0, 16, 16);
+    option.state = QStyle::State_Enabled | QStyle::State_On;
+    qApp->style()->drawPrimitive(QStyle::PE_IndicatorCheckBox, &option, &painter);
+    painter.end();
+    return image.pixelColor(3, 3);
+  };
+  QVERIFY(near(fill(), KaTheme::tokens().accent));
+  KaTheme::DisplayOptions paper;
+  paper.paperLook = true;
+  KaTheme::setDisplayOptions(qApp, paper);
+  const QColor on = fill();
+  const QColor ink = KaTheme::tokens().ink;
+  KaTheme::setDisplayOptions(qApp, KaTheme::DisplayOptions());
+  QVERIFY2(near(on, ink), qPrintable(on.name()));
 }
 
 // 새 모양: the main button is the filled clay one with white text, and the download header becomes a paper band

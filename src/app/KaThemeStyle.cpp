@@ -57,11 +57,12 @@ void drawCheckIndicator(const QStyleOption* opt, QPainter* p) {
   const bool dis = !opt->state.testFlag(QStyle::State_Enabled);
   const bool hover = opt->state.testFlag(QStyle::State_MouseOver);
   const auto& colors = tokens();
-  const QColor edge = hover ? colors.accentDeep : colors.accentHover;
+  const bool plate = displayOptions().paperLook;  // 「조용한 도판」: ticked = ink, clay is the one filled button
+  const QColor edge = plate ? colors.ink : hover ? colors.accentDeep : colors.accentHover;
   const QColor tickInk = dis ? colors.inkDisabled : colors.surface;
   const QColor stone = hover ? colors.accentHover : colors.borderStrong;
   p->setPen(QPen(dis ? colors.border : ((on || part) ? edge : stone), 1.1));
-  p->setBrush(dis ? colors.disabledSurface : ((on || part) ? colors.accent : colors.surface));
+  p->setBrush(dis ? colors.disabledSurface : ((on || part) ? (plate ? colors.ink : colors.accent) : colors.surface));
   p->drawRoundedRect(r, 3.5, 3.5);
   if (on) {
     QPainterPath tick;
@@ -89,13 +90,14 @@ void drawRadioIndicator(const QStyleOption* opt, QPainter* p) {
   const bool dis = !opt->state.testFlag(QStyle::State_Enabled);
   const bool hover = opt->state.testFlag(QStyle::State_MouseOver);
   const auto& colors = tokens();
-  const QColor edge = dis ? colors.border : on ? colors.accent : hover ? colors.accentHover : colors.borderStrong;
+  const QColor mark = displayOptions().paperLook ? colors.ink : colors.accent;
+  const QColor edge = dis ? colors.border : on ? mark : hover ? colors.accentHover : colors.borderStrong;
   p->setPen(QPen(edge, on ? 1.6 : 1.1));
   p->setBrush(dis ? colors.disabledSurface : colors.surface);
   p->drawEllipse(r);
   if (on) {
     p->setPen(Qt::NoPen);
-    p->setBrush(dis ? colors.inkDisabled : colors.accent);
+    p->setBrush(dis ? colors.inkDisabled : mark);
     const qreal d = r.width() * 0.26;
     p->drawEllipse(r.adjusted(d, d, -d, -d));
   }
