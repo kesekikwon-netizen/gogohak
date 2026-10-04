@@ -1513,3 +1513,9 @@ QWidget#layoutBottomTools[kaPlate="true"] QToolButton { border: none; border-rad
 QWidget#layoutBottomTools[kaPlate="true"] QToolButton[kaCell="rest"] { border-left: 1px solid @border@; }
 QWidget#layoutBottomTools[kaPlate="true"] QToolButton:enabled:hover { background: @hover@; }
 QWidget#layoutBottomTools[kaPlate="true"] QToolButton::menu-indicator { width: 0; }
+/* 도면 축척 단추 (2차 보드 판 4): one joined table, seven a row, shared inner edges, regular figures; the chosen cell
+   is oat with an ink edge. */
+QToolButton#scaleChip[kaRow] { border-radius: 0; font-weight: 400; }
+QToolButton#scaleChip[kaCol="rest"] { border-left: none; }
+QToolButton#scaleChip[kaRow="rest"] { border-top: none; }
+QToolButton#scaleChip[kaRow]:enabled:checked { color: @ink@; border-color: @tabMark@; }

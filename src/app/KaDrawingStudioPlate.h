@@ -15,4 +15,10 @@ QWidget* inspectorColumn(QScrollArea* scroll);
 QWidget* bottomStrip(QWidget* strip);
 // 「세트」 on the layer-set button, 「세트 ▾」 in 새 모양 (the board's list mark); follows a switch of the look.
 void setWord(QToolButton* button);
+// The scale presets: 3 a row with the stock gap; in 새 모양 7 a row with none (the board's joined table).
+int chipsPerRow();
+int chipGap(int stockGap);
+// In 새 모양 marks the scaleChip rows and columns under content (kaRow/kaCol, first or rest) so the QSS shares their
+// inner edges, and closes the gaps between the chip rows; the gap above the table stays. Nothing in stock.
+void joinScaleTable(QWidget* content);
 }  // namespace KaDrawingStudioPlate

@@ -7,6 +7,7 @@
 #include <QHBoxLayout>
 #include <QListWidget>
 #include <QScrollArea>
+#include <QSpacerItem>
 #include <QToolButton>
 #include <QVBoxLayout>
 
@@ -129,6 +130,36 @@ private slots:
     QCOMPARE(delegate->sizeHint(option, row).height(), 24);
     qApp->setProperty("kaPaperLook", QVariant());
     QCOMPARE(delegate->sizeHint(option, row).height(), stockHeight);
+  }
+
+  // 축척 단추 (보드 판 4): seven a row in one joined table — no gap between the rows, inner edges shared; stock keeps
+  // three a row with gaps.
+  void scaleChipsAreOneJoinedTableInPaper() {
+    QCOMPARE(KaDrawingStudioPlate::chipsPerRow(), 3);
+    QCOMPARE(KaDrawingStudioPlate::chipGap(6), 6);
+    qApp->setProperty("kaPaperLook", true);
+    QCOMPARE(KaDrawingStudioPlate::chipsPerRow(), 7);
+    QCOMPARE(KaDrawingStudioPlate::chipGap(6), 0);
+    QWidget bar;  // as KaDrawingStudio builds it: a gap before each row of chips
+    auto* column = new QVBoxLayout(&bar);
+    for (int r = 0; r < 2; ++r) {
+      column->addSpacerItem(new QSpacerItem(0, 10, QSizePolicy::Minimum, QSizePolicy::MinimumExpanding));
+      auto* row = new QHBoxLayout;
+      for (int c = 0; c < 7; ++c) {
+        auto* chip = new QToolButton(&bar);
+        chip->setObjectName(QStringLiteral("scaleChip"));
+        row->addWidget(chip);
+      }
+      column->addLayout(row);
+    }
+    KaDrawingStudioPlate::joinScaleTable(&bar);
+    const auto chips = bar.findChildren<QToolButton*>(QStringLiteral("scaleChip"));
+    QCOMPARE(chips.at(0)->property("kaRow").toString(), QStringLiteral("first"));
+    QCOMPARE(chips.at(0)->property("kaCol").toString(), QStringLiteral("first"));
+    QCOMPARE(chips.at(8)->property("kaRow").toString(), QStringLiteral("rest"));
+    QCOMPARE(chips.at(8)->property("kaCol").toString(), QStringLiteral("rest"));
+    QCOMPARE(column->itemAt(0)->spacerItem()->sizeHint().height(), 10);  // the gap above the table stays
+    QCOMPARE(column->itemAt(2)->spacerItem()->sizeHint().height(), 0);   // none between its rows
   }
 
   void stockKeepsTheButtonsInTheirCard() {

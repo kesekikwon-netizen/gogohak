@@ -1168,7 +1168,7 @@ void KaDrawingStudio::buildUi() {
   m_scaleProps = m_scaleBar;
   auto addChipRow = [&](const int* vals, int count) {
     auto* row = new QHBoxLayout;
-    row->setSpacing(buttonMetrics.buttonSpacing);
+    row->setSpacing(KaDrawingStudioPlate::chipGap(buttonMetrics.buttonSpacing));  // 새 모양: one joined table
     for (int i = 0; i < count; ++i) {
       const int n = vals[i];
       auto* chip = new QToolButton(m_scaleBar);
@@ -1189,7 +1189,7 @@ void KaDrawingStudio::buildUi() {
       row->addWidget(chip, 1);
     }
     // Keep a partial last row aligned with the three preset columns above it.
-    for (int i = count; i < 3; ++i) {
+    for (int i = count; i < KaDrawingStudioPlate::chipsPerRow(); ++i) {
       auto* spacer = new QWidget(m_scaleBar);
       spacer->setMinimumWidth(buttonMetrics.scaleButtonMinWidth);
       spacer->setFixedHeight(buttonMetrics.scaleButtonHeight);
@@ -1202,8 +1202,8 @@ void KaDrawingStudio::buildUi() {
   // One shared scale table (StandardScales): excavation 1:20·1:30·1:50 first,
   // then the user's presets up to 1:25,000, three per row.
   const QList<int> chipScales = StandardScales::denominators(StandardScales::StudioChip);
-  for (qsizetype first = 0; first < chipScales.size(); first += 3) {
-    const int count = static_cast<int>(std::min<qsizetype>(3, chipScales.size() - first));
+  for (qsizetype first = 0; first < chipScales.size(); first += KaDrawingStudioPlate::chipsPerRow()) {  // 새 모양: 7
+    const int count = static_cast<int>(std::min<qsizetype>(KaDrawingStudioPlate::chipsPerRow(), chipScales.size() - first));
     addChipRow(chipScales.constData() + first, count);
   }
   auto* barRow = new QHBoxLayout;

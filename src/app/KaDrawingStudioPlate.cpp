@@ -3,7 +3,9 @@
 #include <QApplication>
 #include <QEvent>
 #include <QHBoxLayout>
+#include <QLayout>
 #include <QScrollArea>
+#include <QSpacerItem>
 #include <QToolButton>
 #include <QVBoxLayout>
 
@@ -28,6 +30,7 @@ namespace KaDrawingStudioPlate {
 QWidget* inspectorColumn(QScrollArea* scroll) {
   if (!qApp || !qApp->property("kaPaperLook").toBool()) return scroll;
   QWidget* content = scroll->widget();
+  if (content) joinScaleTable(content);  // the panel is built: share the scale presets' edges
   auto* pdf = content ? content->findChild<QToolButton*>(QStringLiteral("btnPrimary")) : nullptr;
   auto* print = content ? content->findChild<QToolButton*>(QStringLiteral("btnPrint")) : nullptr;
   if (!pdf || !print) return scroll;
@@ -70,6 +73,33 @@ QWidget* bottomStrip(QWidget* strip) {
     first = false;
   }
   return strip;
+}
+
+int chipsPerRow() { return paperLook() ? 7 : 3; }
+
+int chipGap(int stockGap) { return paperLook() ? 0 : stockGap; }
+
+void joinScaleTable(QWidget* content) {
+  if (!paperLook()) return;
+  const auto chips = content->findChildren<QToolButton*>(QStringLiteral("scaleChip"));
+  if (chips.isEmpty() || !chips.first()->parentWidget()->layout()) return;
+  QLayout* column = chips.first()->parentWidget()->layout();
+  int rows = 0;
+  for (int i = 0; i < column->count(); ++i) {
+    QLayout* row = column->itemAt(i)->layout();
+    if (!row) continue;
+    int cols = 0;
+    for (int c = 0; c < row->count(); ++c) {
+      auto* chip = qobject_cast<QToolButton*>(row->itemAt(c)->widget());
+      if (!chip || chip->objectName() != QLatin1String("scaleChip")) continue;
+      chip->setProperty("kaRow", rows == 0 ? QStringLiteral("first") : QStringLiteral("rest"));
+      chip->setProperty("kaCol", cols++ == 0 ? QStringLiteral("first") : QStringLiteral("rest"));
+    }
+    if (cols == 0) continue;
+    if (rows++ > 0 && i > 0)  // the gap before a later row of the table closes
+      if (QSpacerItem* gap = column->itemAt(i - 1)->spacerItem()) gap->changeSize(0, 0, QSizePolicy::Minimum, QSizePolicy::Fixed);
+  }
+  column->invalidate();
 }
 
 void setWord(QToolButton* button) {
