@@ -95,8 +95,10 @@ void KaDrawGuideBand::bindAction(QToolButton* button, QAction* action, const QSt
 }
 
 void KaDrawGuideBand::setMeasure(const QString& text) {
+  const bool show = !text.isEmpty() && KaTheme::displayOptions().paperLook;
+  if (text == m_measure->text() && show == !m_measure->isHidden()) return;  // called on every mouse move
   m_measure->setText(text);
-  m_measure->setVisible(!text.isEmpty() && KaTheme::displayOptions().paperLook);
+  m_measure->setVisible(show);
   relayout();
 }
 

@@ -1366,10 +1366,12 @@ private slots:
     auto* scaleBar = window.findChild<QWidget*>(QStringLiteral("mapScaleBar"));
     QVERIFY(!scaleBar->accessibleDescription().contains(QStringLiteral("도북")));
     KaTheme::DisplayOptions paper; paper.paperLook = true; KaTheme::setDisplayOptions(qApp, paper);
-    canvas->setExtent(QgsRectangle(200000, 400000, 202500, 401500));
+    QCoreApplication::processEvents();  // switching the look alone (no map move) brings the arrow
     const QString described = scaleBar->accessibleDescription();
     KaTheme::setDisplayOptions(qApp, KaTheme::DisplayOptions());
+    QCoreApplication::processEvents();
     QVERIFY2(described.contains(QStringLiteral("도북")), qPrintable(described));
+    QVERIFY(!scaleBar->accessibleDescription().contains(QStringLiteral("도북")));
     QgsProject::instance()->setDirty(false);
   }
   void topographicActualWindowRemainsStableAfterCompletion() {

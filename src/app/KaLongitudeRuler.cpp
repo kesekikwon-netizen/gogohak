@@ -1,6 +1,7 @@
 #include "KaLongitudeRuler.h"
 
 #include "KaTheme.h"
+#include "KaThemeFonts.h"
 
 #include <QFontMetrics>
 #include <QPainter>
@@ -55,7 +56,8 @@ void KaLongitudeRuler::paintEvent(QPaintEvent*) {
   // Axis, one tick per degree with a mono label under it, the 128° boundary as a full ink line.
   p.setPen(QPen(t.ink, 1));
   p.drawLine(QPointF(xFor(kWest), kAxisY + 0.5), QPointF(xFor(kEast), kAxisY + 0.5));
-  QFont mono(QStringLiteral("Consolas"));
+  QFont mono;
+  mono.setFamilies(KaTheme::monoFontStack());
   mono.setStyleHint(QFont::Monospace);
   mono.setPixelSize(10);
   for (int degree = int(kWest); degree <= int(kEast); ++degree) {

@@ -245,7 +245,8 @@ void KaFeatureCard::fillControlPoint(const QgsFeature& f) {
     if (!text(field).isEmpty()) meta << text(field);
   if (text("origin").isEmpty()) meta << QStringLiteral("원점 비어 있음");
   m_controlMeta->setText(meta.join(QStringLiteral(" · ")));
-  const QgsPointXY at = f.hasGeometry() ? f.geometry().asPoint() : QgsPointXY();
+  const bool located = f.hasGeometry() && !f.geometry().isMultipart();
+  const QgsPointXY at = located ? f.geometry().asPoint() : QgsPointXY();
   const auto number = [&f](const char* field, double fallback, bool* ok) {
     const int index = f.fields().lookupField(QString::fromLatin1(field));
     const QVariant v = index >= 0 ? f.attribute(index) : QVariant();
@@ -253,9 +254,12 @@ void KaFeatureCard::fillControlPoint(const QgsFeature& f) {
     return *ok ? v.toDouble() : fallback;
   };
   const QLocale grouped(QLocale::English);
+  const QString none = QStringLiteral("—");  // no stored value and no point: not 0.000
   bool ok = false;
-  m_controlXyz[0]->setText(grouped.toString(number("x", at.x(), &ok), 'f', 3));
-  m_controlXyz[1]->setText(grouped.toString(number("y", at.y(), &ok), 'f', 3));
+  const double x = number("x", at.x(), &ok);
+  m_controlXyz[0]->setText(ok || located ? grouped.toString(x, 'f', 3) : none);
+  const double y = number("y", at.y(), &ok);
+  m_controlXyz[1]->setText(ok || located ? grouped.toString(y, 'f', 3) : none);
   const double z = number("z", 0.0, &ok);
-  m_controlXyz[2]->setText(ok ? QStringLiteral("EL. %1").arg(z, 0, 'f', 2) : QStringLiteral("—"));
+  m_controlXyz[2]->setText(ok ? QStringLiteral("EL. %1").arg(z, 0, 'f', 2) : none);
 }

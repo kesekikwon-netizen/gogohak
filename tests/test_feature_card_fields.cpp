@@ -166,6 +166,19 @@ class TestFeatureCardFields : public QObject {
     QCOMPARE(text("kaControlX"), QStringLiteral("147,962.418"));
     QCOMPARE(text("kaControlY"), QStringLiteral("98,131.207"));
     QCOMPARE(text("kaControlZ"), QStringLiteral("EL. 152.36"));
+    // A point with no coordinates says so instead of 0.000.
+    QgsFeature empty(layer.fields());
+    empty.setAttribute(QStringLiteral("point_id"), QStringLiteral("GCP9"));
+    QVERIFY(layer.dataProvider()->addFeature(empty));
+    KaTheme::setDisplayOptions(qApp, paper);
+    QgsFeatureId emptyId = FID_NULL;
+    QgsFeature each;
+    for (QgsFeatureIterator it = layer.getFeatures(); it.nextFeature(each);)
+      if (each.attribute(QStringLiteral("point_id")).toString() == QLatin1String("GCP9")) emptyId = each.id();
+    card.setFeature(&layer, emptyId);
+    QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);  // the previous point's rows
+    KaTheme::setDisplayOptions(qApp, KaTheme::DisplayOptions());
+    QCOMPARE(text("kaControlX"), QStringLiteral("—"));
   }
 
   // Text still being typed when the card shows another record goes to its own record, never to

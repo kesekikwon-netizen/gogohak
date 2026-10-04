@@ -41,6 +41,7 @@ public:
     }
     setProperty("present", present);
     setProperty("missing", missing);
+    setVisible(!present.isEmpty() || !missing.isEmpty());  // no rule file: no drawing state to show
     update();
   }
 

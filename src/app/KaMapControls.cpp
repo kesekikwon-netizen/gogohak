@@ -130,6 +130,11 @@ bool KaMapScaleBar::eventFilter(QObject* watched, QEvent* event) {
   return QWidget::eventFilter(watched, event);
 }
 
+void KaMapScaleBar::changeEvent(QEvent* event) {
+  QWidget::changeEvent(event);
+  if (event->type() == QEvent::StyleChange) refresh();  // 새 모양 switched on or off: the 도북 arrow follows
+}
+
 void KaMapScaleBar::refresh() {
   if (!m_canvas || m_canvas->width() <= 0) return;
   const QgsCoordinateReferenceSystem crs = m_canvas->mapSettings().destinationCrs();

@@ -44,6 +44,8 @@ private slots:
     QCOMPARE(strip->property("missing").toStringList(), (QStringList{QStringLiteral("개별유구실측도"), QStringLiteral("층위도")}));
     QCOMPARE(strip->property("present").toStringList(),
              (QStringList{QStringLiteral("조사구역도"), QStringLiteral("유적위치도"), QStringLiteral("유구배치도")}));
+    dialog.setResults({}, false);  // no rule file: no drawing state to show
+    QVERIFY(strip->isHidden());
   }
   void errorsBlockThePackage() {
     KaSubmitDialog dialog;
