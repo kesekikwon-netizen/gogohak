@@ -254,8 +254,8 @@ void TestIconsMockup::paperLook_tilesFollowTokens() {
   const QImage on = tileOf(QIcon::On);
   KaTheme::setDisplayOptions(nullptr, KaTheme::DisplayOptions());  // restore before a check can return early
   VERIFY_NEAR(off, 4, 16, QColor(0xF0, 0xEE, 0xE6), 6);
-  VERIFY_NEAR(on, 1, 16, QColor(0xB5, 0x57, 0x3A), 10);
-  VERIFY_NEAR(on, 4, 16, QColor(0xF4, 0xE3, 0xDA), 6);
+  VERIFY_NEAR(on, 1, 16, QColor(0x30, 0x30, 0x2E), 10);
+  VERIFY_NEAR(on, 4, 16, QColor(0x30, 0x30, 0x2E), 6);
   VERIFY_NEAR(tileOf(QIcon::Off), 4, 16, kTile, 6);
 }
 

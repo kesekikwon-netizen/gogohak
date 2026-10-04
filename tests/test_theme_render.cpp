@@ -54,7 +54,7 @@ private slots:
   void downloadWindowIsFlatAndReadable();
   void progressBarTextReadableOnChunk();
   void radioIndicatorUsesAccent();
-  void paperLook_mainButtonIsSlateAndBandIsPaper();
+  void paperLook_mainButtonIsClayAndBandIsPaper();
   void paperLook_drawingRowToolsAreButtons();
 };
 
@@ -167,9 +167,9 @@ void TestThemeRender::radioIndicatorUsesAccent() {
   QVERIFY2(accent >= 8, qPrintable(QStringLiteral("accent pixels %1").arg(accent)));
 }
 
-// 새 모양: the main button turns slate with paper text, and the download header becomes a paper band
-// with slate text. The stock look keeps its accent button and blue header.
-void TestThemeRender::paperLook_mainButtonIsSlateAndBandIsPaper() {
+// 새 모양: the main button is the filled clay one with white text, and the download header becomes a paper band
+// with ink text. The stock look keeps its accent button and blue header.
+void TestThemeRender::paperLook_mainButtonIsClayAndBandIsPaper() {
   QPushButton main(QStringLiteral("등고선 만들기"));
   main.setDefault(true);
   main.resize(180, 40);
@@ -193,6 +193,7 @@ void TestThemeRender::paperLook_mainButtonIsSlateAndBandIsPaper() {
   KaTheme::setDisplayOptions(qApp, KaTheme::DisplayOptions());  // restore before any check can return early
   QVERIFY(shown && header && title);
   QVERIFY2(near(slate, t.primary), qPrintable(slate.name()));
+  QVERIFY2(!near(slate, t.ink), "the main button is clay, not slate");
   QVERIFY2(near(band, t.rail), qPrintable(band.name()));
   QVERIFY2(contrast(titleInk, band) >= 4.5, qPrintable(titleInk.name()));
 }

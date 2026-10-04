@@ -208,7 +208,8 @@ void TestThemeOptions::paperLook_isOptInAndKeepsStock() {
   QCOMPARE(t.accent, QColor(0xB5, 0x57, 0x3A));
   QCOMPARE(t.ink, QColor(0x14, 0x14, 0x13));
   QCOMPARE(t.desk, QColor(0xF5, 0xF4, 0xED));
-  QCOMPARE(t.primary, QColor(0x14, 0x14, 0x13));
+  QCOMPARE(t.primary, QColor(0xB5, 0x57, 0x3A));
+  QCOMPARE(t.focusRing, t.ink);  // the ring is ink, clay is only the filled button
   QCOMPARE(t.chrome, QColor(0xFA, 0xF9, 0xF5));
   QCOMPARE(t.tile, QColor(0xF0, 0xEE, 0xE6));
   QCOMPARE(t.sky1, t.accent);  // the legacy aliases follow the look

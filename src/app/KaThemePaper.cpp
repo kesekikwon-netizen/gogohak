@@ -3,7 +3,8 @@
 
 namespace KaTheme {
 
-// Design canvas board 5 (색·글꼴·버튼): ivory paper, slate ink, clay as the one accent.
+// 「조용한 도판」 (docs/design/2026-10-04-quiet-plate): ivory sheet, ink says "on", clay is the one filled
+// button and the unsaved 저장 tile.
 // Named assignments like strataTokens(); each contrast note is checked in test_theme_options.cpp.
 void applyPaperLook(Tokens& t, bool highContrast) {
   t.accent = QColor(0xB5, 0x57, 0x3A);       // clay that carries white text, 4.8:1
@@ -17,9 +18,9 @@ void applyPaperLook(Tokens& t, bool highContrast) {
   t.desk = QColor(0xF5, 0xF4, 0xED);
   t.altRow = QColor(0xFA, 0xF9, 0xF5);
   t.stripe = QColor(0xF7, 0xF6, 0xF0);
-  t.hover = QColor(0xF3, 0xF1, 0xEA);
-  t.selected = QColor(0xF4, 0xE3, 0xDA);     // the clay wash marks the chosen row
-  t.pressed = QColor(0xE3, 0xE0, 0xD4);
+  t.hover = QColor(0xF5, 0xF4, 0xED);
+  t.selected = QColor(0xE3, 0xDA, 0xCC);     // oat marks the chosen row, never clay
+  t.pressed = QColor(0xDD, 0xD8, 0xCB);
   t.disabledSurface = QColor(0xF0, 0xEE, 0xE6);
   t.border = QColor(0xDE, 0xDC, 0xD1);
   t.borderStrong = QColor(0xC2, 0xC0, 0xB6);
@@ -33,15 +34,15 @@ void applyPaperLook(Tokens& t, bool highContrast) {
   t.railText = t.ink;
   t.railMuted = t.inkMuted;
   t.progressFill = QColor(0xD9, 0x77, 0x57);  // clay: ink 5.9:1 on it, 3.1:1 against white
-  t.focusRing = t.accent;
-  t.primaryFocus = t.accent;  // a clay ring: the slate main button would swallow an ink one
+  t.focusRing = t.ink;
+  t.primaryFocus = t.ink;
   t.ribbonLabelInk = t.ink;
-  t.ribbonActiveInk = QColor(0x9C, 0x4A, 0x2F);  // 5.8:1 on the paper chrome
+  t.ribbonActiveInk = t.ink;                 // the chosen label and text links read in ink
   t.ribbonGroupInk = t.inkMuted;
-  t.primary = t.ink;                         // the main button is slate, clay stays the accent
-  t.primaryHover = QColor(0x30, 0x30, 0x2E);
-  t.primaryPressed = QColor(0x00, 0x00, 0x00);
-  t.primaryText = QColor(0xFA, 0xF9, 0xF5);
+  t.primary = t.accent;                      // the one filled button of a view is clay
+  t.primaryHover = t.accentHover;
+  t.primaryPressed = t.accentDeep;
+  t.primaryText = QColor(0xFF, 0xFF, 0xFF);
   t.chrome = QColor(0xFA, 0xF9, 0xF5);
   t.heroButton = t.primary;
   t.heroButtonText = t.primaryText;
@@ -52,12 +53,12 @@ void applyPaperLook(Tokens& t, bool highContrast) {
   t.band = t.rail;
   t.tile = QColor(0xF0, 0xEE, 0xE6);
   t.tileHover = QColor(0xE8, 0xE6, 0xDC);
-  t.tileOn = QColor(0xF4, 0xE3, 0xDA);
-  t.tileOnBorder = t.accent;
+  t.tileOn = QColor(0x30, 0x30, 0x2E);       // a tool in hand: slate tile, ivory glyph
+  t.tileOnBorder = t.tileOn;
   t.tileDisabled = QColor(0xF5, 0xF4, 0xED);
   t.tileStrong = t.accent;
   t.glyph = QColor(0x30, 0x30, 0x2E);
-  t.glyphOn = t.ribbonActiveInk;
+  t.glyphOn = QColor(0xFA, 0xF9, 0xF5);
   if (!highContrast)
     return;
   // Glare profile on paper: edges reach 3:1 on white, secondary text 7:1, washes step further apart.
@@ -65,13 +66,12 @@ void applyPaperLook(Tokens& t, bool highContrast) {
   t.altRow = QColor(0xF5, 0xF4, 0xED);
   t.stripe = QColor(0xF0, 0xEE, 0xE6);
   t.hover = QColor(0xF0, 0xEE, 0xE6);
-  t.selected = QColor(0xEF, 0xD6, 0xC8);
-  t.pressed = QColor(0xDA, 0xD7, 0xCA);
+  t.selected = QColor(0xD9, 0xCE, 0xBB);
+  t.pressed = QColor(0xCF, 0xCA, 0xBC);
   t.border = QColor(0x87, 0x86, 0x7F);
   t.borderStrong = QColor(0x73, 0x72, 0x6C);
   t.warn = QColor(0x5C, 0x37, 0x00);
   t.railMuted = t.inkMuted;
-  t.focusRing = t.accentDeep;
   t.ribbonGroupInk = t.inkMuted;
 }
 
