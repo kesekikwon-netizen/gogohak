@@ -240,9 +240,13 @@ void TestRecent::closeEvent_asksBeforeDiscardingUnsavedWork() {
   const QString fn = src.mid(close, 1200);
   QVERIFY2(fn.contains(QLatin1String("surveyHasUnsavedChanges")),
            "닫기 전에 저장 안 된 작업이 있는지 봐야 한다");
-  QVERIFY2(fn.contains(QLatin1String("QMessageBox::Save")) &&
-               fn.contains(QLatin1String("QMessageBox::Discard")) &&
-               fn.contains(QLatin1String("QMessageBox::Cancel")),
+  // The question itself is KaClosePrompt (조사 닫기, 2차 보드 판 5); closeEvent asks it and acts on the answer.
+  QFile prompt(QStringLiteral("src/app/KaClosePrompt.cpp"));
+  QVERIFY2(prompt.open(QIODevice::ReadOnly | QIODevice::Text), "KaClosePrompt.cpp");
+  const QString asked = QString::fromUtf8(prompt.readAll());
+  QVERIFY2(fn.contains(QLatin1String("KaClosePrompt::ask")) && fn.contains(QLatin1String("QMessageBox::Save")) &&
+               fn.contains(QLatin1String("QMessageBox::Cancel")) && asked.contains(QLatin1String("QMessageBox::Save")) &&
+               asked.contains(QLatin1String("QMessageBox::Discard")) && asked.contains(QLatin1String("QMessageBox::Cancel")),
            "저장 / 저장 안 함 / 취소를 물어야 한다");
   QVERIFY2(fn.contains(QLatin1String("persistSurveyWork")),
            "저장을 고르면 실제로 저장해야 한다");

@@ -487,6 +487,7 @@ add_executable(ka-hgis
   src/app/KaHomeRecentCard.cpp
   src/app/KaHomeStatus.cpp
   src/app/KaHomeText.cpp
+  src/app/KaClosePrompt.cpp
   src/app/KaNewSurveyDialog.cpp
   src/app/KaLongitudeRuler.cpp
   src/app/KaRecoverySnapshots.cpp
@@ -566,6 +567,7 @@ add_executable(ka-hgis
   src/app/KaHomeRecentCard.h
   src/app/KaHomeStatus.h
   src/app/KaHomeText.h
+  src/app/KaClosePrompt.h
   src/app/KaNewSurveyDialog.h
   src/app/KaLongitudeRuler.h
   src/app/KaWindowSize.h
@@ -2102,6 +2104,14 @@ if(KA_HGIS_BUILD_TESTS)
   ka_add_qtest(map_plate ka_map_plate_tests)
   set_tests_properties(map_plate PROPERTIES ENVIRONMENT
     "GDAL_DATA=${OSGEO4W_ROOT}/apps/gdal-dev/share/gdal;PATH=${_ka_path_esc};QGIS_PREFIX_PATH=${QGIS_PREFIX_PATH};QT_QPA_PLATFORM=offscreen" TIMEOUT 90)
+  # 「조용한 도판」 windows (board 5): message boxes with a serif question and no icon disc (no QGIS).
+  add_executable(ka_window_plate_tests tests/test_window_plate.cpp
+    src/app/KaClosePrompt.cpp src/app/KaClosePrompt.h src/app/KaHomeText.cpp src/app/KaHomeText.h ${_ka_p5_theme_sources})
+  set_target_properties(ka_window_plate_tests PROPERTIES WIN32_EXECUTABLE FALSE)
+  target_link_libraries(ka_window_plate_tests PRIVATE Qt6::Test Qt6::Core Qt6::Gui Qt6::Widgets)
+  target_include_directories(ka_window_plate_tests PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_BINARY_DIR}/generated)
+  ka_add_qtest(window_plate ka_window_plate_tests)
+  set_tests_properties(window_plate PROPERTIES ENVIRONMENT "PATH=${_ka_path_esc};QT_QPA_PLATFORM=offscreen" TIMEOUT 90)
   # Three-pane splitter, F10 fold and the rail inset (tests/test_shell.cpp is at its 300-line limit).
   add_executable(ka_shell_focus_tests tests/test_shell_focus.cpp
     src/app/KaShellFocus.cpp src/app/KaShellFocus.h

@@ -11,6 +11,8 @@
 #include "core/DemPresentation.h"
 #include "KaTheme.h"
 #include "KaUserError.h"
+#include "KaClosePrompt.h"
+#include "core/EditBufferSummary.h"
 #include "KaCadImport.h"
 #include "KaIcons.h"
 #include "KaCaptureMapTool.h"
@@ -332,11 +334,7 @@ void MainWindow::closeEvent(QCloseEvent* event) {
   // 예전에는 여기서 말없이 저장했다. 이제 저장은 사용자가 시키는 것이므로,
   // 저장 안 한 작업이 있으면 묻고 답에 따른다. 묻지 않고 버리면 조용히 잃는다.
   if (surveyHasUnsavedChanges()) {
-    const auto answer = QMessageBox::question(
-        this, QStringLiteral("조사 닫기"),
-        QStringLiteral("저장하지 않은 작업이 있습니다.\n\n%1\n\n저장할까요?")
-            .arg(QFileInfo(m_surveyPath).fileName()),
-        QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel, QMessageBox::Save);
+    const auto answer = KaClosePrompt::ask(this, m_surveyPath, EditBufferSummary::summarize(QgsProject::instance()).features);
     if (answer == QMessageBox::Cancel) {
       event->ignore();
       return;

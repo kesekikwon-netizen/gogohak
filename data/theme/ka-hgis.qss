@@ -1431,3 +1431,7 @@ QLabel#kaFeatureCardSub { color: @inkMuted@; font-size: 12px; }
 QFrame#kaMeasureHead { border: none; border-bottom: 1px solid @plateRule@; }
 QFrame#kaMeasureHead QLabel#kaMeasureAuto { color: @inkMuted@; font-size: 11px; }
 QFrame#kaMeasureField[kaPlate="true"] { background: transparent; border: none; border-bottom: 1px solid @border@; border-radius: 0; }
+/* 알림 창 (2차 보드 판 5, 설계 2.4 Dialog, 새 모양): the question or outcome in the 20 px serif Heading, the one
+   sentence under it 12 px muted; no icon disc (set in code). */
+QMessageBox[kaPlate="true"] QLabel#qt_msgbox_label { font-family: @titleFont@; font-weight: @titleWeight@; font-size: 20px; color: @ink@; }
+QMessageBox[kaPlate="true"] QLabel#qt_msgbox_informativelabel { font-size: 12px; color: @inkMuted@; }
