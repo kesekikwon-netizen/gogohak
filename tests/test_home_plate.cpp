@@ -188,6 +188,31 @@ private slots:
       QVERIFY(row->property("kaPlate").toBool());
   }
 
+  // 「새 모양」 switched while the app runs (화면 보기): the home is rebuilt in the other look, with its survey.
+  void homeFollowsALiveSwitch() {
+    const QString path = touch(m_dir.filePath(QStringLiteral("f/광령리1.gpkg")));
+    {
+      QSettings st = RecentSurveys::userSettings();
+      RecentSurveys::remember(st, path, QStringLiteral("광령리1"));
+    }
+    KaStartPage page;
+    page.resize(1600, 900);
+    page.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&page));
+    QVERIFY(page.findChild<QFrame*>(QStringLiteral("startTitleBlock")));
+    KaTheme::setDisplayOptions(qApp, KaTheme::DisplayOptions());
+    QTRY_VERIFY(!page.findChild<QFrame*>(QStringLiteral("startTitleBlock")));
+    auto* card = page.findChild<QFrame*>(QStringLiteral("startContinueCard"));
+    QVERIFY(card);
+    QTRY_VERIFY(card->isVisible());  // Qt shows widgets laid out into a shown page on the next turn
+    QCOMPARE(text(page, "startContinueName"), QStringLiteral("광령리1"));
+    KaTheme::DisplayOptions paper;
+    paper.paperLook = true;
+    KaTheme::setDisplayOptions(qApp, paper);
+    QTRY_VERIFY(page.findChild<QFrame*>(QStringLiteral("startTitleBlock")));
+    QCOMPARE(text(page, "startTitleName"), QStringLiteral("광령리1"));
+  }
+
   void heroDrawsNoBand() {
     KaStartPage page;
     page.resize(1600, 900);

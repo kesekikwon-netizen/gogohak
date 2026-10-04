@@ -13,6 +13,7 @@
 #include "core/SurveyFacts.h"
 
 #include <QDesktopServices>
+#include <QEvent>
 #include <QFileInfo>
 #include <QFrame>
 #include <QHBoxLayout>
@@ -54,6 +55,12 @@ QLabel* glyph(const QString& id, int px, const QColor& ink, QWidget* parent) {
 KaStartPage::KaStartPage(QWidget* parent) : QWidget(parent) {
   setObjectName(QStringLiteral("startPage"));
   setAttribute(Qt::WA_StyledBackground, true);
+  build();
+}
+
+// The page in the current look; changeEvent builds it again when 「새 모양」 is switched while the app runs.
+void KaStartPage::build() {
+  m_paper = KaTheme::displayOptions().paperLook;
   auto* root = new QVBoxLayout(this);
   root->setContentsMargins(20, 20, 20, 20);
   root->setSpacing(16);
@@ -222,6 +229,29 @@ void KaStartPage::applyWindowMetrics() {
   if (m_rightColumn) m_rightColumn->setFixedWidth(rightColumnWidthFor(window()->width()));
   const bool strip = window()->height() >= kCompactWindowHeight;  // 연결 상태: one row under both cards; a short window (1366x768) keeps 최근 조사 its rows
   if (m_connection && m_rightColumn) m_connection->placeIn(qobject_cast<QBoxLayout*>(strip ? layout() : m_rightColumn->widget()->layout()), strip);
+}
+
+void KaStartPage::changeEvent(QEvent* event) {
+  QWidget::changeEvent(event);
+  if (event->type() != QEvent::StyleChange || m_paper == KaTheme::displayOptions().paperLook || m_rebuildQueued) return;
+  m_rebuildQueued = true;  // next turn: the application is still restyling every widget
+  QTimer::singleShot(0, this, [this]() {
+    m_rebuildQueued = false;
+    if (m_paper == KaTheme::displayOptions().paperLook) return;
+    delete layout();
+    for (QWidget* child : findChildren<QWidget*>(QString(), Qt::FindDirectChildrenOnly)) delete child;
+    m_hero = m_continue = nullptr;
+    m_rightColumn = nullptr;
+    m_recentCard = nullptr;
+    m_guide = nullptr;
+    m_connection = nullptr;
+    m_titleBlock = nullptr;
+    m_badge = nullptr;
+    m_continueName = m_continuePath = m_continueWhen = m_recovery = nullptr;
+    m_resume = nullptr;
+    build();
+    refreshConnections();
+  });
 }
 
 void KaStartPage::resizeEvent(QResizeEvent* event) {

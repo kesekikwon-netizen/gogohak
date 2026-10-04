@@ -14,6 +14,7 @@ class KaHomeRecentCard;
 class KaHomeTitleBlock;
 class QLabel;
 class QPushButton;
+class QEvent;
 class QResizeEvent;
 class QScrollArea;
 class QShowEvent;
@@ -50,8 +51,10 @@ signals:
 protected:
   void showEvent(QShowEvent* event) override;
   void resizeEvent(QResizeEvent* event) override;
+  void changeEvent(QEvent* event) override;
 
 private:
+  void build();
   QWidget* buildHero();
   QWidget* buildRightColumn();
   void applyWindowMetrics();
@@ -76,4 +79,6 @@ private:
   QVector<RecentSurveys::Item> m_items;
   QString m_continueTarget;
   QString m_recoverySnapshot;  // unsaved-edit copy of the continue survey, if any
+  bool m_paper = false;          // the look the page was built in
+  bool m_rebuildQueued = false;
 };
