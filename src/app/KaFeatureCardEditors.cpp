@@ -16,12 +16,16 @@
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QLineEdit>
+#include <QLocale>
 #include <QPainter>
 #include <QPlainTextEdit>
 #include <QToolButton>
 #include <QVBoxLayout>
 
+#include <qgsfeature.h>
 #include <qgsfields.h>
+#include <qgsgeometry.h>
+#include <qgspointxy.h>
 #include <qgsvectorlayer.h>
 
 namespace {
@@ -158,6 +162,8 @@ void KaFeatureCard::buildEditors() {
     m_textEdits.append({QString::fromLatin1(field), edit});
     return edit;
   };
+  if (KaTheme::displayOptions().paperLook && LayerOps::layerKeyOf(m_layer) == QLatin1String("control_points"))
+    buildControlPointRows();
   // A survey area has no number, kind or period: its record is 조사명·유적명 (user 2026-10-03).
   const std::pair<const char*, const char*> nameRows[] = {{"survey_name", "조사명"}, {"site_name", "유적명"}, {"name", "이름"}};
   if (LayerOps::layerKeyOf(m_layer) == QLatin1String("survey_area"))
@@ -203,4 +209,53 @@ void KaFeatureCard::buildEditors() {
 bool KaFeatureCard::eventFilter(QObject* watched, QEvent* event) {
   if (m_note && watched == m_note && event->type() == QEvent::FocusOut) commitEditor(QStringLiteral("note"), m_note);
   return QFrame::eventFilter(watched, event);
+}
+
+// 새 모양 기준점 (2차 보드 ⑤): under the heading, 「세계측지계 · GRS80 · TM · 중부원점」 in muted ink and
+// X / Y / Z as mono figures on dotted leaders. Display only; the values are edited in the 조사카드.
+void KaFeatureCard::buildControlPointRows() {
+  m_controlMeta = new QLabel(m_body);
+  m_controlMeta->setObjectName(QStringLiteral("kaControlMeta"));
+  m_form->insertRow(0, m_controlMeta);
+  const char* names[3] = {"kaControlX", "kaControlY", "kaControlZ"};
+  const char* labels[3] = {"X (동)", "Y (북)", "Z"};
+  for (int i = 0; i < 3; ++i) {
+    auto* row = new QWidget(m_body);
+    auto* line = new QHBoxLayout(row);
+    line->setContentsMargins(0, 0, 0, 0);
+    line->setSpacing(6);
+    auto* leader = new QFrame(row);
+    leader->setObjectName(QStringLiteral("kaLeader"));
+    leader->setFixedHeight(10);
+    m_controlXyz[i] = new QLabel(row);
+    m_controlXyz[i]->setObjectName(QString::fromLatin1(names[i]));
+    line->addWidget(leader, 1, Qt::AlignVCenter);
+    line->addWidget(m_controlXyz[i]);
+    m_form->insertRow(1 + i, QString::fromUtf8(labels[i]), row);
+  }
+}
+
+void KaFeatureCard::fillControlPoint(const QgsFeature& f) {
+  const auto text = [&f](const char* field) {
+    const int index = f.fields().lookupField(QString::fromLatin1(field));
+    return index >= 0 && !f.attribute(index).isNull() ? f.attribute(index).toString().trimmed() : QString();
+  };
+  QStringList meta;
+  for (const char* field : {"datum", "ellipsoid", "projection", "origin"})
+    if (!text(field).isEmpty()) meta << text(field);
+  if (text("origin").isEmpty()) meta << QStringLiteral("원점 비어 있음");
+  m_controlMeta->setText(meta.join(QStringLiteral(" · ")));
+  const QgsPointXY at = f.hasGeometry() ? f.geometry().asPoint() : QgsPointXY();
+  const auto number = [&f](const char* field, double fallback, bool* ok) {
+    const int index = f.fields().lookupField(QString::fromLatin1(field));
+    const QVariant v = index >= 0 ? f.attribute(index) : QVariant();
+    *ok = !v.isNull();
+    return *ok ? v.toDouble() : fallback;
+  };
+  const QLocale grouped(QLocale::English);
+  bool ok = false;
+  m_controlXyz[0]->setText(grouped.toString(number("x", at.x(), &ok), 'f', 3));
+  m_controlXyz[1]->setText(grouped.toString(number("y", at.y(), &ok), 'f', 3));
+  const double z = number("z", 0.0, &ok);
+  m_controlXyz[2]->setText(ok ? QStringLiteral("EL. %1").arg(z, 0, 'f', 2) : QStringLiteral("—"));
 }

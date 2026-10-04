@@ -1355,3 +1355,7 @@ QToolButton#northSwatch:enabled:checked {
   color: @northOnInk@;
   border: 1px solid @northOnEdge@;
 }
+/* 「조용한 도판」 기준점 on the card: the geodetic line muted, X / Y / Z mono on dotted leaders. */
+QLabel#kaControlMeta { color: @inkMuted@; font-size: 12px; }
+QLabel#kaControlX, QLabel#kaControlY, QLabel#kaControlZ { font-family: @monoFont@; font-size: 13px; color: @ink@; }
+QFrame#kaLeader { border: none; border-bottom: 1px dotted @borderStrong@; background: transparent; }

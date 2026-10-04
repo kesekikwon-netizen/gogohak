@@ -2,6 +2,7 @@
 // only finishes that box (user 2026-10-03 「선택한 유구의 속성정보를 수정할수있게하라」, answer 「진행」,
 // docs/intent/2026-10-03-edit-record-while-drawing.md). tests/test_feature_card.cpp is at its 300-line limit.
 #include <QtTest>
+#include <QDir>
 #include <QFrame>
 #include <QLabel>
 #include <QLineEdit>
@@ -17,6 +18,7 @@
 #include <qgsapplication.h>
 #include <qgsfeature.h>
 #include <qgsgeometry.h>
+#include <qgspointxy.h>
 #include <qgsrectangle.h>
 #include <qgsvectordataprovider.h>
 #include <qgsvectorlayer.h>
@@ -121,6 +123,49 @@ class TestFeatureCardFields : public QObject {
     QVERIFY2(band, "no 시대 띠 widget");
     QVERIFY(band->isVisibleTo(&card));
     QCOMPARE(band->property("periodIndex").toInt(), FeaturePresets::instance().periodOrder(QStringLiteral("청동기")));
+  }
+
+  // 기준점: the card shows the geodetic line and X / Y / Z as mono figures on dotted leaders (새 모양 only).
+  void controlPointShowsItsCoordinatesInPaper() {
+    QgsVectorLayer layer(QStringLiteral("Point?crs=EPSG:5186&field=point_id:string&field=x:double&field=y:double&field=z:double"
+                                        "&field=datum:string&field=ellipsoid:string&field=projection:string&field=origin:string"),
+                         QStringLiteral("기준점"), QStringLiteral("memory"));
+    LayerOps::markSurveyLayer(&layer, QStringLiteral("control_points"));
+    QgsFeature f(layer.fields());
+    const QList<QPair<QString, QVariant>> values = {
+        {QStringLiteral("point_id"), QStringLiteral("GCP1")}, {QStringLiteral("x"), 147962.418},
+        {QStringLiteral("y"), 98131.207}, {QStringLiteral("z"), 152.36}, {QStringLiteral("datum"), QStringLiteral("세계측지계")},
+        {QStringLiteral("ellipsoid"), QStringLiteral("GRS80")}, {QStringLiteral("projection"), QStringLiteral("TM")},
+        {QStringLiteral("origin"), QStringLiteral("중부원점")}};
+    for (const auto& [field, value] : values) f.setAttribute(field, value);
+    f.setGeometry(QgsGeometry::fromPointXY(QgsPointXY(147962.418, 98131.207)));
+    QVERIFY(layer.dataProvider()->addFeature(f));
+    {
+      KaFeatureCard stock;
+      stock.setFeature(&layer, firstId(&layer));
+      QVERIFY(!stock.findChild<QLabel*>(QStringLiteral("kaControlX")));
+    }
+    KaTheme::DisplayOptions paper;
+    paper.paperLook = true;
+    KaTheme::setDisplayOptions(qApp, paper);
+    KaFeatureCard card;
+    card.setFeature(&layer, firstId(&layer));
+    const QString output = qEnvironmentVariable("KA_HGIS_QA_OUTPUT_DIR");  // opt-in look check
+    if (!output.isEmpty() && QDir(output).exists()) {
+      card.resize(272, 420);
+      card.show();
+      QCoreApplication::processEvents();
+      QVERIFY(card.grab().save(QDir(output).filePath(QStringLiteral("control-point-card.png"))));
+    }
+    KaTheme::setDisplayOptions(qApp, KaTheme::DisplayOptions());
+    const auto text = [&card](const char* name) {
+      auto* label = card.findChild<QLabel*>(QString::fromLatin1(name));
+      return label ? label->text() : QStringLiteral("(없음)");
+    };
+    QCOMPARE(text("kaControlMeta"), QStringLiteral("세계측지계 · GRS80 · TM · 중부원점"));
+    QCOMPARE(text("kaControlX"), QStringLiteral("147,962.418"));
+    QCOMPARE(text("kaControlY"), QStringLiteral("98,131.207"));
+    QCOMPARE(text("kaControlZ"), QStringLiteral("EL. 152.36"));
   }
 
   // Text still being typed when the card shows another record goes to its own record, never to

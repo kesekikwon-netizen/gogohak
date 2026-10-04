@@ -217,6 +217,7 @@ void KaFeatureCard::dropEditors() {
   m_nextNumber = nullptr;
   m_numberNote = nullptr;
   m_kind = m_period = m_periodBand = nullptr;
+  m_controlMeta = m_controlXyz[0] = m_controlXyz[1] = m_controlXyz[2] = nullptr;
   m_note = nullptr;
   m_textEdits.clear();
   m_area = m_perimeter = nullptr;
@@ -257,6 +258,7 @@ void KaFeatureCard::refresh() {
     m_periodBand->update();
   }
   showText(m_note, value(QStringLiteral("note")));
+  if (m_controlMeta) fillControlPoint(f);
   const FeatureRecord::Measures m = FeatureRecord::measure(m_layer, f);
   if (m_area) m_area->setText(metres(m.area, "m²"));
   if (m_perimeter) m_perimeter->setText(metres(std::isnan(m.length) ? m.perimeter : m.length, "m"));

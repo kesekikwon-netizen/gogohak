@@ -82,6 +82,8 @@ private:
   void buildEditors();  // KaFeatureCardEditors.cpp
   void dropEditors();
   QWidget* measureField(QLabel** valueOut);  // KaFeatureCardEditors.cpp
+  void buildControlPointRows();  // KaFeatureCardEditors.cpp
+  void fillControlPoint(const QgsFeature& f);  // KaFeatureCardEditors.cpp
   void setState(const QString& text, bool changed, bool failed = false);
 
   QPointer<QgsVectorLayer> m_layer;
@@ -104,6 +106,9 @@ private:
   QWidget* m_kind = nullptr;
   QWidget* m_period = nullptr;
   QWidget* m_periodBand = nullptr;  // 새 모양 시대 띠 under 시대; property "periodIndex"
+  // 새 모양 기준점: the geodetic line and X / Y / Z on dotted leaders (fillControlPoint).
+  QLabel* m_controlMeta = nullptr;
+  QLabel* m_controlXyz[3] = {nullptr, nullptr, nullptr};
   QPlainTextEdit* m_note = nullptr;
   // Plain text rows: a survey area's 조사명·유적명 (a separate area layer: 이름), a record's 조사 상태·조사자·조사일.
   QList<QPair<QString, QLineEdit*>> m_textEdits;
