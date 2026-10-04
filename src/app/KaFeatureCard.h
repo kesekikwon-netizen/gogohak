@@ -5,6 +5,7 @@
 #include <QMetaObject>
 #include <QPointer>
 #include <QString>
+#include <QStringList>
 
 #include <qgsfeature.h>
 #include <qgsfeatureid.h>
@@ -84,6 +85,8 @@ private:
   QWidget* measureField(QLabel** valueOut);  // KaFeatureCardEditors.cpp
   void buildControlPointRows();  // KaFeatureCardEditors.cpp
   void fillControlPoint(const QgsFeature& f);  // KaFeatureCardEditors.cpp
+  void showPlateHeader(const QgsFeature& feature, QStringList record);  // KaFeatureCardPlate.cpp
+  static QFrame* measureHead(QWidget* parent);  // 새 모양 「자동 계산」 over the ledger, KaFeatureCardPlate.cpp
   void setState(const QString& text, bool changed, bool failed = false);
 
   QPointer<QgsVectorLayer> m_layer;
@@ -97,6 +100,8 @@ private:
   QWidget* m_header = nullptr;
   QLabel* m_name = nullptr;
   QLabel* m_layerKind = nullptr;
+  QLabel* m_swatch = nullptr;  // 새 모양: the shape's own symbol before the name
+  QLabel* m_sub = nullptr;     // 새 모양: 「유구 면 · 주거지 · 청동기」 under the name
   QLabel* m_empty = nullptr;
   QWidget* m_body = nullptr;
   QFormLayout* m_form = nullptr;

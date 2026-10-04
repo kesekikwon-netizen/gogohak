@@ -1416,3 +1416,10 @@ QFrame#submitCountRule { background: @border@; border: none; }
 QLabel#submitCountCaption { color: @inkMuted@; font-size: 11px; }
 QLabel#submitCountError, QLabel#submitCountWarn, QLabel#submitCountPass { color: @ink@; font-size: 18px; }
 QLabel#submitCountError { color: @danger@; }
+/* 기록 카드 (2차 보드 판 3 B1, 새 모양): no box on the panel, the record line under the name muted, one 「자동 계산」
+   head over an ink rule, and the 면적·둘레 figures on hairlines instead of boxes. */
+QFrame#kaFeatureCard[kaPlate="true"] { border: none; background: transparent; }
+QLabel#kaFeatureCardSub { color: @inkMuted@; font-size: 12px; }
+QFrame#kaMeasureHead { border: none; border-bottom: 1px solid @plateRule@; }
+QFrame#kaMeasureHead QLabel#kaMeasureAuto { color: @inkMuted@; font-size: 11px; }
+QFrame#kaMeasureField[kaPlate="true"] { background: transparent; border: none; border-bottom: 1px solid @border@; border-radius: 0; }

@@ -2,6 +2,7 @@
 
 #include "KaChip.h"
 #include "KaIcons.h"
+#include "KaTheme.h"
 #include "core/FeatureNumbering.h"
 #include "core/FeaturePresets.h"
 #include "core/FeatureRecord.h"
@@ -69,6 +70,7 @@ QString KaFeatureCard::layerKindFor(const QgsVectorLayer* layer) {
 KaFeatureCard::KaFeatureCard(QWidget* parent) : QFrame(parent) {
   setObjectName(QStringLiteral("kaFeatureCard"));
   setFrameShape(QFrame::StyledPanel);
+  KaTheme::followPaperLook(this);  // 새 모양: no box on the panel (QSS)
   auto* root = new QVBoxLayout(this);
   root->setContentsMargins(12, 8, 12, 8);
   root->setSpacing(8);
@@ -80,9 +82,15 @@ KaFeatureCard::KaFeatureCard(QWidget* parent) : QFrame(parent) {
   root->addWidget(m_title);
   // Header line: 「1호 주거지」 at the left, the layer kind 「유구 면」 muted at the right.
   m_header = new QWidget(this);
-  auto* headerLine = new QHBoxLayout(m_header);
-  headerLine->setContentsMargins(0, 0, 0, 0);
+  auto* headerRows = new QVBoxLayout(m_header);
+  headerRows->setContentsMargins(0, 0, 0, 0);
+  headerRows->setSpacing(2);
+  auto* headerLine = new QHBoxLayout;
   headerLine->setSpacing(8);
+  m_swatch = new QLabel(m_header);
+  m_swatch->setObjectName(QStringLiteral("kaFeatureCardSwatch"));
+  m_swatch->hide();
+  headerLine->addWidget(m_swatch, 0, Qt::AlignVCenter);
   m_name = new QLabel(m_header);
   m_name->setObjectName(QStringLiteral("kaFeatureCardName"));
   QFont nameFont = m_name->font();
@@ -93,6 +101,11 @@ KaFeatureCard::KaFeatureCard(QWidget* parent) : QFrame(parent) {
   m_layerKind->setObjectName(QStringLiteral("kaFeatureCardKind"));
   headerLine->addWidget(m_name, 1);
   headerLine->addWidget(m_layerKind, 0, Qt::AlignRight | Qt::AlignVCenter);
+  headerRows->addLayout(headerLine);
+  m_sub = new QLabel(m_header);
+  m_sub->setObjectName(QStringLiteral("kaFeatureCardSub"));
+  m_sub->hide();
+  headerRows->addWidget(m_sub);
   root->addWidget(m_header);
   m_empty = new QLabel(QStringLiteral("도형 하나를 고르면 기록이 여기에 나옵니다."), this);
   m_empty->setWordWrap(true);
@@ -250,6 +263,8 @@ void KaFeatureCard::refresh() {
     if (area && header.isEmpty()) header = value(field);  // a survey area is named by its 조사명
   }
   m_name->setText(header.isEmpty() ? QStringLiteral("이름 없음") : header);
+  showPlateHeader(f, {m_layerKind->text(), kind, value(QStringLiteral("period")),
+                      area && value(QStringLiteral("survey_name")) != header ? value(QStringLiteral("survey_name")) : QString()});
   showText(m_number, number);
   showText(m_kind, kind);
   showText(m_period, value(QStringLiteral("period")));

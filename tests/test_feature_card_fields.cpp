@@ -4,6 +4,7 @@
 #include <QtTest>
 #include <QDir>
 #include <QFrame>
+#include <QHBoxLayout>
 #include <QLabel>
 #include <QLineEdit>
 #include <QPlainTextEdit>
@@ -99,6 +100,47 @@ class TestFeatureCardFields : public QObject {
       QVERIFY(!box->findChild<QLabel*>(QStringLiteral("kaMeasureAuto"))->isVisibleTo(box));
       QVERIFY(box->findChild<QLabel*>(QStringLiteral("kaMeasureValue"))->toolTip().contains(QStringLiteral("자동 계산")));
     }
+  }
+
+  // 「조용한 도판」 기록 카드 (2차 보드 판 3 B1): no box on the panel, the shape's swatch before the name, the record
+  // in one line under it, one 「자동 계산」 head over the 면적·둘레 ledger, figures without boxes.
+  void cardIsALedgerOnThePageInPaper() {
+    KaTheme::DisplayOptions paper;
+    paper.paperLook = true;
+    KaTheme::setDisplayOptions(qApp, paper);
+    auto layer = recordedFeature();
+    const QgsFeatureId id = firstId(layer.get());
+    layer->dataProvider()->changeAttributeValues(
+        {{id, {{layer->fields().lookupField(QStringLiteral("kind")), QStringLiteral("주거지")},
+               {layer->fields().lookupField(QStringLiteral("period")), QStringLiteral("청동기")}}}});
+    QWidget host;
+    host.setAutoFillBackground(true);
+    auto* card = new KaFeatureCard(&host);
+    (new QHBoxLayout(&host))->addWidget(card);
+    host.resize(300, 640);
+    host.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&host));
+    card->setFeature(layer.get(), id);
+    QCoreApplication::processEvents();
+    auto* swatch = card->findChild<QLabel*>(QStringLiteral("kaFeatureCardSwatch"));
+    auto* sub = card->findChild<QLabel*>(QStringLiteral("kaFeatureCardSub"));
+    auto* head = card->findChild<QWidget*>(QStringLiteral("kaMeasureHead"));
+    const QImage image = host.grab().toImage();
+    const auto at = [&](QWidget* w, const QPoint& p) { return image.pixelColor(w->mapTo(&host, p) * image.devicePixelRatio()).name(); };
+    const QString ground = at(card, QPoint(card->width() / 2, -2));
+    QFrame* box = card->findChildren<QFrame*>(QStringLiteral("kaMeasureField")).value(0);
+    const QString boxFace = box ? at(box, QPoint(4, box->height() / 2)) : QString();
+    const QString cardEdge = at(card, QPoint(0, card->height() / 2));
+    KaTheme::setDisplayOptions(qApp, KaTheme::DisplayOptions());
+    QVERIFY(swatch && swatch->isVisible() && swatch->pixmap().size() == QSize(20, 14));
+    QVERIFY(sub && sub->isVisible());
+    QCOMPARE(sub->text(), QStringLiteral("유구 면 · 주거지 · 청동기"));
+    QVERIFY(!card->findChild<QLabel*>(QStringLiteral("kaFeatureCardKind"))->isVisible());
+    QVERIFY(head && head->isVisible());
+    auto* number = card->findChild<QLineEdit*>(QStringLiteral("kaFeatureCardNumber"));
+    QVERIFY2(head->mapTo(card, QPoint()).y() < number->mapTo(card, QPoint()).y(), "the ledger comes right under the name");
+    QCOMPARE(cardEdge, ground);  // no box around the card
+    QCOMPARE(boxFace, ground);   // the figure has no box of its own
   }
 
   // 시대 띠: under 시대 the card shows the ten period cells with the recorded one marked (새 모양 only).

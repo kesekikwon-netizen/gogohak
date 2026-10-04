@@ -105,6 +105,7 @@ QWidget* KaFeatureCard::measureField(QLabel** valueOut) {
   line->addStretch(1);
   line->addWidget(value);
   if (KaTheme::displayOptions().paperLook) {  // 수치 대장: the figure stands alone, the words go to its tooltip
+    box->setProperty("kaPlate", true);  // no box of its own (QSS)
     lock->hide();
     caption->hide();
     value->setToolTip(QStringLiteral("자동 계산 — 도형에서 바로 잰 값이라 고칠 수 없습니다"));
@@ -133,6 +134,17 @@ void KaFeatureCard::buildEditors() {
     if (auto* line = combo ? combo->lineEdit() : qobject_cast<QLineEdit*>(editor))
       connect(line, &QLineEdit::returnPressed, this, &KaFeatureCard::valueEntered);  // Enter: this box only
   };
+  const Qgis::GeometryType gt = m_layer->geometryType();
+  const bool plate = KaTheme::displayOptions().paperLook;
+  const auto addLedger = [this, gt, plate] {
+    if (plate && (gt == Qgis::GeometryType::Polygon || gt == Qgis::GeometryType::Line))
+      m_form->addRow(measureHead(m_body));  // 수치 대장: one 「자동 계산」 head over the figures
+    if (gt == Qgis::GeometryType::Polygon) m_form->addRow(QStringLiteral("면적"), measureField(&m_area));
+    if (gt == Qgis::GeometryType::Polygon || gt == Qgis::GeometryType::Line)
+      m_form->addRow(gt == Qgis::GeometryType::Line ? QStringLiteral("길이") : QStringLiteral("둘레"),
+                     measureField(&m_perimeter));
+  };
+  if (plate) addLedger();  // 2차 보드 판 3: the ledger right under the name
   m_numberField = FeatureNumbering::fieldsOf(m_layer).numberName;
   if (!m_numberField.isEmpty()) {
     auto* row = new QWidget(m_body);
@@ -184,11 +196,7 @@ void KaFeatureCard::buildEditors() {
   if (has("status")) addTextRow("status", "조사 상태");
   if (has("surveyor")) addTextRow("surveyor", "조사자");
   if (has("surv_date")) addTextRow("surv_date", "조사일")->setPlaceholderText(QStringLiteral("예: 2026-10-03"));
-  const Qgis::GeometryType gt = m_layer->geometryType();
-  if (gt == Qgis::GeometryType::Polygon) m_form->addRow(QStringLiteral("면적"), measureField(&m_area));
-  if (gt == Qgis::GeometryType::Polygon || gt == Qgis::GeometryType::Line)
-    m_form->addRow(gt == Qgis::GeometryType::Line ? QStringLiteral("길이") : QStringLiteral("둘레"),
-                   measureField(&m_perimeter));
+  if (!plate) addLedger();
   if (has("note")) {
     m_note = new QPlainTextEdit(m_body);
     m_note->setObjectName(QStringLiteral("kaFeatureCardNote"));

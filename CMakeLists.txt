@@ -1983,7 +1983,7 @@ endif()
 set(_ka_p4_list_sources
   ${CMAKE_SOURCE_DIR}/src/app/KaLayerInformationView.cpp
   ${CMAKE_SOURCE_DIR}/src/app/KaLayerSectionDelegate.cpp ${CMAKE_SOURCE_DIR}/src/app/KaLayerSectionDelegate.h)
-set(_ka_p4_card_sources ${CMAKE_SOURCE_DIR}/src/app/KaFeatureCardEditors.cpp)
+set(_ka_p4_card_sources ${CMAKE_SOURCE_DIR}/src/app/KaFeatureCardEditors.cpp ${CMAKE_SOURCE_DIR}/src/app/KaFeatureCardPlate.cpp)
 set(_ka_p4_panel_sources
   ${CMAKE_SOURCE_DIR}/src/app/KaLayerListChrome.cpp ${CMAKE_SOURCE_DIR}/src/app/KaLayerListChrome.h
   ${CMAKE_SOURCE_DIR}/src/app/KaInspectorPanel.cpp ${CMAKE_SOURCE_DIR}/src/app/KaInspectorPanel.h
