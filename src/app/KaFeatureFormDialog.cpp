@@ -5,10 +5,12 @@
 #include "core/FeatureRecord.h"
 #include "core/LayerOps.h"
 
+#include <QApplication>
 #include <QComboBox>
 #include <QCompleter>
 #include <QDialogButtonBox>
 #include <QFormLayout>
+#include <QHBoxLayout>
 #include <QLabel>
 #include <QLineEdit>
 #include <QPushButton>
@@ -60,12 +62,18 @@ QComboBox* makeChoiceCombo(QWidget* parent, const QgsVectorLayer* layer, const Q
 
 KaFeatureFormDialog::KaFeatureFormDialog(QgsVectorLayer* layer, QWidget* parent, QgsFeatureId featureId)
     : QDialog(parent), m_layer(layer), m_featureId(featureId) {
+  // 새 모양 (2차 보드 판 5, 440): two plain lines, 96 px words, the filled-in number named beside its box.
+  const bool paper = qApp && qApp->property("kaPaperLook").toBool();
   setObjectName(QStringLiteral("kaFeatureForm"));
+  setProperty("kaPlate", paper);
   setWindowTitle(QStringLiteral("이름·번호"));
   setMinimumWidth(KaWindowSize::width(KaWindowSize::Small, 380));
   auto* form = new QFormLayout(this);
-  auto* tip = new QLabel(
-      QStringLiteral("선택입니다. 취소해도 그린 도형은 그대로 남습니다."), this);
+  auto* tip = new QLabel(paper ? QStringLiteral("이름과 번호는 나중에 넣어도 됩니다.") + QLatin1Char(0x0A) +
+                                     QStringLiteral("건너뛰어도 그린 도형은 그대로 남습니다.")
+                               : QStringLiteral("선택입니다. 취소해도 그린 도형은 그대로 남습니다."),
+                         this);
+  tip->setObjectName(QStringLiteral("kaFeatureFormTip"));
   tip->setWordWrap(true);
   form->addRow(tip);
   const auto fields = LayerOps::featureFormFields(layer);
@@ -89,7 +97,17 @@ KaFeatureFormDialog::KaFeatureFormDialog(QgsVectorLayer* layer, QWidget* parent,
     m_number = new QLineEdit(this);
     m_number->setObjectName(QStringLiteral("kaFeatureFormNumber"));
     m_number->setPlaceholderText(QStringLiteral("예: 1호"));
-    form->addRow(QStringLiteral("번호"), m_number);
+    if (paper) {
+      auto* line = new QHBoxLayout;
+      line->setSpacing(8);
+      m_numberFilled = new QLabel(QStringLiteral("다음 번호를 미리 넣었습니다"), this);
+      m_numberFilled->setObjectName(QStringLiteral("kaFeatureFormNumberFilled"));
+      line->addWidget(m_number, 1);
+      line->addWidget(m_numberFilled);
+      form->addRow(QStringLiteral("번호"), line);
+    } else {
+      form->addRow(QStringLiteral("번호"), m_number);
+    }
     m_numberNote = new QLabel(this);
     m_numberNote->setObjectName(QStringLiteral("kaFeatureFormNumberNote"));
     m_numberNote->setWordWrap(true);
@@ -124,6 +142,17 @@ KaFeatureFormDialog::KaFeatureFormDialog(QgsVectorLayer* layer, QWidget* parent,
   buttons->button(QDialogButtonBox::Save)->setText(QStringLiteral("저장"));
   buttons->button(QDialogButtonBox::Cancel)->setText(QStringLiteral("건너뛰기"));
   form->addRow(buttons);
+  if (paper) {
+    form->setContentsMargins(24, 24, 24, 16);
+    form->setHorizontalSpacing(0);
+    form->setVerticalSpacing(12);
+    for (int row = 0; row < form->rowCount(); ++row)
+      if (QLayoutItem* item = form->itemAt(row, QFormLayout::LabelRole))
+        if (auto* word = qobject_cast<QLabel*>(item->widget())) {
+          word->setFixedWidth(96);
+          word->setProperty("kaFormWord", true);
+        }
+  }
   connect(buttons, &QDialogButtonBox::accepted, this, &QDialog::accept);
   connect(buttons, &QDialogButtonBox::rejected, this, &QDialog::reject);
 }
@@ -138,6 +167,7 @@ void KaFeatureFormDialog::updateNumberHint() {
     const QSignalBlocker block(m_number);
     m_number->setText(FeatureNumbering::nextFrom(used, m_numberTemplate));
   }
+  if (m_numberFilled) m_numberFilled->setVisible(!m_numberTyped && !m_number->text().isEmpty());
   const QString wanted = FeatureNumbering::normalized(m_number->text());
   const bool repeated = !wanted.isEmpty() && std::any_of(used.cbegin(), used.cend(), [&](const QString& n) {
     return FeatureNumbering::normalized(n) == wanted;

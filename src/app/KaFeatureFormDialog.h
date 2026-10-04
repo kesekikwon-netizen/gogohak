@@ -52,6 +52,7 @@ private:
   QComboBox* m_period = nullptr;
   QLineEdit* m_number = nullptr;
   QLabel* m_numberNote = nullptr;
+  QLabel* m_numberFilled = nullptr;  // 새 모양: 「다음 번호를 미리 넣었습니다」 while the box holds the filled-in number
   bool m_numberTyped = false;
   bool m_groupByKind = false;  // feature_no: numbers run per kind
   // kind key -> numbers already used for that kind (read once when the form opens)

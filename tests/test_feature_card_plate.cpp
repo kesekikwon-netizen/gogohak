@@ -10,6 +10,7 @@
 #include <memory>
 
 #include "app/KaFeatureCard.h"
+#include "app/KaFeatureFormDialog.h"
 #include "app/KaTheme.h"
 #include "core/FeaturePresets.h"
 #include "core/LayerOps.h"
@@ -225,6 +226,27 @@ class TestFeatureCardPlate : public QObject {
     QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);  // the previous point's rows
     KaTheme::setDisplayOptions(qApp, KaTheme::DisplayOptions());
     QCOMPARE(text("kaControlX"), QStringLiteral("—"));
+  }
+
+  // 이름·번호 (2차 보드 판 5, 440): two plain lines on top, 96 px words, and the next number filled in with
+  // 「다음 번호를 미리 넣었습니다」 beside it until a number is typed.
+  void nameNumberWindowReadsLikeTheBoardInPaper() {
+    auto layer = recordedFeature();
+    qApp->setProperty("kaPaperLook", true);
+    KaFeatureFormDialog form(layer.get(), nullptr, firstId(layer.get()));
+    qApp->setProperty("kaPaperLook", QVariant());
+    QCOMPARE(form.minimumWidth(), 440);
+    QCOMPARE(form.findChild<QLabel*>(QStringLiteral("kaFeatureFormTip"))->text(),
+             QStringLiteral("이름과 번호는 나중에 넣어도 됩니다.") + QLatin1Char(0x0A) +
+                 QStringLiteral("건너뛰어도 그린 도형은 그대로 남습니다."));
+    auto* filled = form.findChild<QLabel*>(QStringLiteral("kaFeatureFormNumberFilled"));
+    QVERIFY(filled && filled->isVisibleTo(&form));
+    QCOMPARE(filled->text(), QStringLiteral("다음 번호를 미리 넣었습니다"));
+    QTest::keyClicks(form.findChild<QLineEdit*>(QStringLiteral("kaFeatureFormNumber")), QStringLiteral("7"));
+    QVERIFY(!filled->isVisibleTo(&form));
+    KaFeatureFormDialog stock(layer.get(), nullptr, firstId(layer.get()));
+    QVERIFY(!stock.findChild<QLabel*>(QStringLiteral("kaFeatureFormNumberFilled")));
+    QVERIFY(stock.findChild<QLabel*>(QStringLiteral("kaFeatureFormTip"))->text().startsWith(QStringLiteral("선택입니다")));
   }
 };
 
