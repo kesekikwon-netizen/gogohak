@@ -44,6 +44,7 @@ private:
   void addResultRow(QTreeWidgetItem* group, int index);
 
   QLabel* m_summary = nullptr;
+  QWidget* m_drawings = nullptr;  // 새 모양 필수 도면 5종 strip
   QLabel* m_blockReason = nullptr;
   QTreeWidget* m_tree = nullptr;
   QPushButton* m_package = nullptr;

@@ -1,9 +1,11 @@
 #include "KaSubmitDialog.h"
 
+#include <QApplication>
 #include <QHBoxLayout>
 #include <QHash>
 #include <QHeaderView>
 #include <QLabel>
+#include <QPainter>
 #include <QPushButton>
 #include <QTreeWidget>
 #include <QVBoxLayout>
@@ -13,6 +15,75 @@
 namespace {
 constexpr int kMaxTargetRows = 30;
 constexpr int kTargetRole = Qt::UserRole + 1;
+
+// 「조용한 도판」 필수 도면 5종 (2차 보드 검수 목록): a paper tile per drawing, ink-framed when its rule
+// passed, dashed with 「없음」 when it failed. Display only; the drawing rules decide. The strip exists
+// only in 새 모양, so it paints with the board's colours (this dialog does not link the theme).
+struct RequiredDrawing { const char* rule; const char* name; };
+constexpr RequiredDrawing kRequiredDrawings[] = {{"REQ_DRAWING_SURVEY_AREA", "조사구역도"},
+                                                 {"REQ_DRAWING_SITE_LOCATION", "유적위치도"},
+                                                 {"REQ_DRAWING_FEATURE_PLAN", "유구배치도"},
+                                                 {"REQ_DRAWING_FEATURE_DETAIL", "개별유구실측도"},
+                                                 {"REQ_DRAWING_SECTION", "층위도"}};
+
+class DrawingStrip final : public QWidget {
+public:
+  explicit DrawingStrip(QWidget* parent) : QWidget(parent) {
+    setObjectName(QStringLiteral("submitDrawingStrip"));
+    setFixedHeight(108);
+  }
+  void setResults(const QVector<CheckResult>& results) {
+    QStringList present, missing;
+    for (const RequiredDrawing& drawing : kRequiredDrawings) {
+      const auto found = std::find_if(results.cbegin(), results.cend(),
+                                      [&drawing](const CheckResult& r) { return r.id == QLatin1String(drawing.rule); });
+      if (found != results.cend()) (found->passed ? present : missing) << QString::fromUtf8(drawing.name);
+    }
+    setProperty("present", present);
+    setProperty("missing", missing);
+    update();
+  }
+
+protected:
+  void paintEvent(QPaintEvent*) override {
+    const QColor desk(0xF0, 0xEE, 0xE6), ink(0x14, 0x14, 0x13), edge(0xC2, 0xC0, 0xB6), muted(0x5E, 0x5D, 0x59),
+        caution(0x7A, 0x5A, 0x00);
+    QPainter p(this);
+    p.fillRect(rect(), desk);
+    const QStringList present = property("present").toStringList();
+    const QStringList missing = property("missing").toStringList();
+    constexpr int kTileW = 88, kTileH = 62;
+    const int count = int(std::size(kRequiredDrawings));
+    const int gap = qMax(8, (width() - count * kTileW) / (count + 1));
+    QFont font = p.font();
+    for (int i = 0; i < count; ++i) {
+      const QString name = QString::fromUtf8(kRequiredDrawings[i].name);
+      const QRect tile(gap + i * (kTileW + gap), 10, kTileW, kTileH);
+      const bool has = present.contains(name);
+      if (has) p.fillRect(tile, Qt::white);
+      p.setPen(has ? QPen(ink, 1) : QPen(edge, 1, Qt::DashLine));
+      p.setBrush(Qt::NoBrush);
+      p.drawRect(tile.adjusted(0, 0, -1, -1));
+      font.setPixelSize(12);
+      p.setFont(font);
+      p.setPen(ink);
+      p.drawText(QRect(tile.left() - 10, tile.bottom() + 4, kTileW + 20, 16), Qt::AlignCenter, name);
+      if (!missing.contains(name)) continue;
+      // 「없음」 with a caution triangle under the name.
+      font.setPixelSize(11);
+      p.setFont(font);
+      const QRect status(tile.left(), tile.bottom() + 20, kTileW, 14);
+      p.setRenderHint(QPainter::Antialiasing);
+      p.setPen(Qt::NoPen);
+      p.setBrush(caution);
+      const double cx = status.center().x() - 16, top = status.top() + 2;
+      p.drawPolygon(QPolygonF({QPointF(cx, top), QPointF(cx + 5, top + 9), QPointF(cx - 5, top + 9)}));
+      p.setRenderHint(QPainter::Antialiasing, false);
+      p.setPen(muted);
+      p.drawText(status.adjusted(10, 0, 0, 0), Qt::AlignCenter, QStringLiteral("없음"));
+    }
+  }
+};
 }  // namespace
 
 KaSubmitDialog::KaSubmitDialog(QWidget* parent) : QDialog(parent) {
@@ -36,6 +107,10 @@ KaSubmitDialog::KaSubmitDialog(QWidget* parent) : QDialog(parent) {
   bold.setBold(true);
   m_summary->setFont(bold);
   layout->addWidget(m_summary);
+  if (qApp && qApp->property("kaPaperLook").toBool()) {
+    m_drawings = new DrawingStrip(this);
+    layout->addWidget(m_drawings);
+  }
 
   m_tree = new QTreeWidget(this);
   m_tree->setObjectName(QStringLiteral("submitReviewTree"));
@@ -183,6 +258,7 @@ void KaSubmitDialog::addResultRow(QTreeWidgetItem* group, int index) {
 
 void KaSubmitDialog::rebuild() {
   m_tree->clear();
+  if (m_drawings) static_cast<DrawingStrip*>(m_drawings)->setResults(m_results);
   const int errors = errorCount();
   const int warns = warnCount();
   const int passed = int(std::count_if(m_results.cbegin(), m_results.cend(),

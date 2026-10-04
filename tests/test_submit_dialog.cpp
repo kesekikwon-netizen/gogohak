@@ -23,6 +23,28 @@ CheckResult result(const QString& id, const QString& severity, bool passed, cons
 class TestSubmitDialog : public QObject {
   Q_OBJECT
 private slots:
+  // 「조용한 도판」: five paper tiles for the required drawings, present or 「없음」, from the drawing rules.
+  void requiredDrawingsStripFollowsTheDrawingRules() {
+    const QVector<CheckResult> results = {result(QStringLiteral("REQ_DRAWING_SURVEY_AREA"), QStringLiteral("error"), true),
+                                          result(QStringLiteral("REQ_DRAWING_SITE_LOCATION"), QStringLiteral("error"), true),
+                                          result(QStringLiteral("REQ_DRAWING_FEATURE_PLAN"), QStringLiteral("error"), true),
+                                          result(QStringLiteral("REQ_DRAWING_FEATURE_DETAIL"), QStringLiteral("warn"), false),
+                                          result(QStringLiteral("REQ_DRAWING_SECTION"), QStringLiteral("warn"), false)};
+    {
+      KaSubmitDialog stock;
+      stock.setResults(results, true);
+      QVERIFY(!stock.findChild<QWidget*>(QStringLiteral("submitDrawingStrip")));
+    }
+    qApp->setProperty("kaPaperLook", true);
+    KaSubmitDialog dialog;
+    qApp->setProperty("kaPaperLook", QVariant());
+    dialog.setResults(results, true);
+    auto* strip = dialog.findChild<QWidget*>(QStringLiteral("submitDrawingStrip"));
+    QVERIFY(strip);
+    QCOMPARE(strip->property("missing").toStringList(), (QStringList{QStringLiteral("개별유구실측도"), QStringLiteral("층위도")}));
+    QCOMPARE(strip->property("present").toStringList(),
+             (QStringList{QStringLiteral("조사구역도"), QStringLiteral("유적위치도"), QStringLiteral("유구배치도")}));
+  }
   void errorsBlockThePackage() {
     KaSubmitDialog dialog;
     auto* package = dialog.findChild<QPushButton*>(QStringLiteral("btnSubmitPackage"));
