@@ -8,10 +8,13 @@
 #include <QBrush>
 #include <QFont>
 #include <QKeyEvent>
+#include <QPainter>
 #include <cmath>
 #include <qgslayertree.h>
 #include <qgslayertreeview.h>
 #include <qgsproject.h>
+#include <qgsrenderer.h>
+#include <qgssymbollayerutils.h>
 #include <qgsvectorlayer.h>
 
 namespace {
@@ -175,6 +178,21 @@ QVariant KaLayerInformationModel::data(const QModelIndex& item, int role) const 
     auto* vector = leaf ? qobject_cast<QgsVectorLayer*>(leaf->layer()) : nullptr;
     if (vector && !LayerOps::layerKeyOf(vector).isEmpty() && vector->featureCount() > 0)
       return QgsLayerTreeModel::data(item, role).toString() + QStringLiteral("  ") + QString::number(vector->featureCount());
+  }
+  // 유구 표지: a survey layer's patch is a 20 × 14 swatch of its own map symbol in a 1 px ink frame.
+  if (item.column() == 0 && role == Qt::DecorationRole && KaTheme::displayOptions().paperLook) {
+    auto* leaf = qobject_cast<QgsLayerTreeLayer*>(index2node(item));
+    auto* vector = leaf ? qobject_cast<QgsVectorLayer*>(leaf->layer()) : nullptr;
+    const QgsLegendSymbolList symbols = vector && vector->renderer() && !LayerOps::layerKeyOf(vector).isEmpty()
+                                            ? vector->renderer()->legendSymbolItems() : QgsLegendSymbolList();
+    if (symbols.size() == 1 && symbols.first().symbol()) {
+      QPixmap patch = QgsSymbolLayerUtils::symbolPreviewPixmap(symbols.first().symbol(), QSize(20, 14), 0);
+      QPainter painter(&patch);
+      painter.setPen(QPen(KaTheme::tokens().ink, 1));
+      painter.drawRect(0, 0, 19, 13);
+      painter.end();
+      return QIcon(patch);
+    }
   }
   if (item.column() == 0 && role == Qt::ToolTipRole) {
     // Rows whose map position is fixed by a user rule say so, instead of a drag

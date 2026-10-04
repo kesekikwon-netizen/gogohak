@@ -3,6 +3,7 @@
 // branch drawing that KaLayerSectionDelegate needs.
 #include "KaLayerInformation.h"
 #include "KaLayerSectionDelegate.h"
+#include "KaTheme.h"
 
 #include <QFont>
 #include <QHeaderView>
@@ -129,6 +130,7 @@ void KaLayerInformationModel::configureView(QgsLayerTreeView* view) {
   // Keep the header and at least four compact rows usable in a short sidebar.
   view->setMinimumHeight(view->header()->sizeHint().height() + 4 * 22 + 4);
   view->setIndentation(12);
+  if (KaTheme::displayOptions().paperLook) view->setIconSize(QSize(20, 14));  // 유구 표지 20 × 14
   view->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
   // Section bands make the first row of each section 16 px taller than the rest.
   view->setUniformRowHeights(false);

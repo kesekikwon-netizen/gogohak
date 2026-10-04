@@ -105,6 +105,27 @@ private slots:
     KaTheme::setDisplayOptions(nullptr, KaTheme::DisplayOptions());
     QVERIFY2(shown.startsWith(QStringLiteral("유구 (면)")) && shown.endsWith(QStringLiteral("2")), qPrintable(shown));
   }
+  // 유구 표지: in 새 모양 a survey layer's patch is a 20 × 14 square-cornered swatch of its own map symbol in a
+  // 1 px ink frame, and the list makes room for it; stock keeps QGIS's square symbol icon.
+  void surveyLayerPatchIsAFramedSwatchInPaper() {
+    QgsProject project;
+    auto* layer = add(project, project.layerTreeRoot()->addGroup(QStringLiteral("조사 데이터")), QStringLiteral("유구 (면)"));
+    LayerOps::markSurveyLayer(layer, QStringLiteral("feature_poly"));
+    KaLayerInformationModel model(&project, false);
+    const auto row = model.node2index(project.layerTreeRoot()->findLayer(layer->id()));
+    KaTheme::DisplayOptions paper; paper.paperLook = true; KaTheme::setDisplayOptions(nullptr, paper);
+    const QIcon patch = model.data(row, Qt::DecorationRole).value<QIcon>();
+    QgsLayerTreeView view; view.setModel(&model); KaLayerInformationModel::configureView(&view);
+    const QSize room = view.iconSize();
+    const QColor ink = KaTheme::tokens().ink;
+    KaTheme::setDisplayOptions(nullptr, KaTheme::DisplayOptions());
+    QCOMPARE(room, QSize(20, 14));
+    const QImage image = patch.pixmap(QSize(20, 14)).toImage();
+    QCOMPARE(image.size(), QSize(20, 14));
+    QCOMPARE(image.pixelColor(0, 7).name(), ink.name());
+    QCOMPARE(image.pixelColor(10, 0).name(), ink.name());
+    QVERIFY2(image.pixelColor(10, 7) != ink, "the swatch shows the symbol, not a solid ink box");
+  }
   void nativeModelSupportsSecondColumnWithoutBreakingTree() {
     QgsProject project;
     auto* group = project.layerTreeRoot()->addGroup(QStringLiteral("참조 지도"));

@@ -73,7 +73,7 @@
 456 tests/test_heritage_flow.cpp
 508 tests/test_heritage_import.cpp
 2536 tests/test_heritage_style.cpp
-486 tests/test_layer_information.cpp
+507 tests/test_layer_information.cpp
 680 tests/test_layer_state.cpp
 524 tests/test_network_services.cpp
 564 tests/test_perf.cpp

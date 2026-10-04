@@ -1,5 +1,6 @@
 #pragma once
 #include <QCoreApplication>
+#include <QVariant>
 
 // 「조용한 도판」 window widths (docs/design/2026-10-04-quiet-plate: S 440 · M 560 · L 860). The stock look keeps
 // each window's own width. Reads the application's "kaPaperLook" property (set by KaTheme::setDisplayOptions)
