@@ -12,6 +12,7 @@
 #include "KaTheme.h"
 #include "KaUserError.h"
 #include "KaClosePrompt.h"
+#include "KaControlCsvBox.h"
 #include "core/EditBufferSummary.h"
 #include "KaCadImport.h"
 #include "KaIcons.h"
@@ -2549,9 +2550,7 @@ void MainWindow::importControlCsv() {
     return;
   }
   QMessageBox box(this);
-  box.setIcon(preview.swapSuggested ? QMessageBox::Warning : QMessageBox::Information);
-  box.setWindowTitle(QStringLiteral("기준점 미리보기"));
-  box.setText(preview.summary);
+  KaControlCsvBox::dress(box, preview.swapSuggested, preview.count, preview.summary);
   auto* keep = qobject_cast<QPushButton*>(box.addButton(QStringLiteral("이대로 가져오기"), QMessageBox::AcceptRole));
   auto* swap = qobject_cast<QPushButton*>(box.addButton(QStringLiteral("X·Y 바꿔서 가져오기"), QMessageBox::ActionRole));
   box.addButton(QStringLiteral("취소"), QMessageBox::RejectRole);

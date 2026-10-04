@@ -18,6 +18,7 @@
 
 #include "app/KaApiKeyDialog.h"
 #include "app/KaClosePrompt.h"
+#include "app/KaControlCsvBox.h"
 #include "app/KaControlPointDialog.h"
 #include "app/KaFormPlate.h"
 #include "app/KaMenuCaption.h"
@@ -226,6 +227,32 @@ class TestWindowPlate : public QObject {
     KaControlPointDialog stock(hint, QStringLiteral("정확도(m)"), QStringLiteral("수신상태"));
     QVERIFY(stock.findChildren<QLabel*>(QStringLiteral("controlPointSection")).isEmpty());
     QVERIFY(!stock.findChild<QLabel*>(QStringLiteral("controlPointHint"))->text().contains(QLatin1Char(0x0A)));
+  }
+
+  // 기준점 미리보기 (보드 판 5): the finding is the serif heading 「X·Y가 바뀐 것 같습니다.」 with the reason first
+  // under it and the rest of the summary after; stock keeps the whole summary under an icon.
+  void csvPreviewLeadsWithTheFindingInPaper() {
+    const QString summary = QStringLiteral("UTF-8 · 4점") + QLatin1Char(0x0A) + QStringLiteral("표고(Z) 열도 함께 가져옵니다.") +
+                            QLatin1Char(0x0A) + QStringLiteral("조사구역까지 이대로 181 km, 교환하면 12 m.") + QLatin1Char(0x0A) +
+                            QStringLiteral("X·Y가 바뀐 것 같습니다. 교환한 쪽이 조사구역에 더 가깝습니다.");
+    paper(true);
+    QMessageBox box;
+    KaControlCsvBox::dress(box, true, 4, summary);
+    QCOMPARE(box.windowTitle(), QStringLiteral("기준점 미리보기"));
+    QCOMPARE(box.text(), QStringLiteral("X·Y가 바뀐 것 같습니다."));
+    QVERIFY(box.informativeText().startsWith(QStringLiteral("교환한 쪽이 조사구역에 더 가깝습니다.")));
+    QVERIFY(box.informativeText().contains(QStringLiteral("조사구역까지 이대로 181 km, 교환하면 12 m.")));
+    QVERIFY(!box.informativeText().contains(QStringLiteral("바뀐 것 같습니다")));
+    QCOMPARE(box.icon(), QMessageBox::NoIcon);
+    QVERIFY(box.property("kaPlate").toBool());
+    QMessageBox calm;
+    KaControlCsvBox::dress(calm, false, 4, QStringLiteral("UTF-8 · 4점"));
+    QCOMPARE(calm.text(), QStringLiteral("기준점 4개를 가져옵니다."));
+    paper(false);
+    QMessageBox stock;
+    KaControlCsvBox::dress(stock, true, 4, summary);
+    QCOMPARE(stock.text(), summary);
+    QCOMPARE(stock.icon(), QMessageBox::Warning);
   }
 
   // 「광령리1을」 · 「테스트를」 · 「광령리2를」: the object particle follows how the name ends.
