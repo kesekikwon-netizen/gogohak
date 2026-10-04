@@ -1435,3 +1435,11 @@ QFrame#kaMeasureField[kaPlate="true"] { background: transparent; border: none; b
    sentence under it 12 px muted; no icon disc (set in code). */
 QMessageBox[kaPlate="true"] QLabel#qt_msgbox_label { font-family: @titleFont@; font-weight: @titleWeight@; font-size: 20px; color: @ink@; }
 QMessageBox[kaPlate="true"] QLabel#qt_msgbox_informativelabel { font-size: 12px; color: @inkMuted@; }
+/* 새 조사 (2차 보드 판 5): the caption over the ruler, the origins set left with 「추천」 in clay inside, and the
+   three sentences at 12 px: the zone in ink, the boundary rule and the later change muted. */
+QDialog[kaPlate="true"] QLabel#newSurveyCrsCaption { font-size: 12px; color: @inkMuted@; }
+QDialog[kaPlate="true"] QLabel#newSurveyCrsBoundary { font-size: 11px; color: @inkMuted@; }
+QPushButton#newSurveyCrs5186[kaPlate="true"], QPushButton#newSurveyCrs5187[kaPlate="true"] { text-align: left; padding: 0 14px; }
+QLabel#newSurveyCrsRecommend { font-size: 12px; color: @accentDeep@; background: transparent; }
+QDialog[kaPlate="true"] QLabel#newSurveyCrsSuggestion { font-size: 12px; color: @ink@; }
+QDialog[kaPlate="true"] QLabel#newSurveyCrsHint, QDialog[kaPlate="true"] QLabel#newSurveyTip { font-size: 12px; color: @inkMuted@; }

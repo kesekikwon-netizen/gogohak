@@ -43,12 +43,14 @@ QString zoneLabel(const QString& authId) {
 
 KaNewSurveyDialog::KaNewSurveyDialog(const QString& currentWorkCrs, double mapLongitude,
                                      QWidget* parent)
-    : QDialog(parent), m_suggested(suggestedWorkCrs(mapLongitude)), m_longitude(mapLongitude) {
+    : QDialog(parent), m_suggested(suggestedWorkCrs(mapLongitude)), m_longitude(mapLongitude),
+      m_paper(KaTheme::displayOptions().paperLook) {
   setWindowTitle(QStringLiteral("새 조사"));
   setMinimumWidth(KaWindowSize::width(KaWindowSize::Medium, 460));
+  setProperty("kaPlate", m_paper);  // 「조용한 도판」 caption and sentence colours (QSS)
   auto* form = new QFormLayout(this);
   form->setSpacing(12);
-  form->setContentsMargins(20, 20, 20, 16);
+  form->setContentsMargins(m_paper ? 24 : 20, m_paper ? 24 : 20, m_paper ? 24 : 20, 16);
 
   m_name = new QLineEdit(this);
   m_name->setObjectName(QStringLiteral("newSurveyName"));
@@ -81,7 +83,11 @@ KaNewSurveyDialog::KaNewSurveyDialog(const QString& currentWorkCrs, double mapLo
   m_btn5186->setChecked(!use5187);
   m_btn5187->setChecked(use5187);
 
-  auto* regions = new QLabel(regionHint(), this);
+  // 새 모양 (2차 보드 판 5): the ruler shows which places use which origin, so the sentences shorten to the
+  // boundary rule and the later change; 「추천」 sits inside the recommended origin.
+  auto* regions = new QLabel(m_paper ? QStringLiteral("경계 가까운 곳은 발주처·측량 성과의 원점을 따르세요.")
+                                     : regionHint(),
+                             this);
   regions->setObjectName(QStringLiteral("newSurveyCrsHint"));
   regions->setWordWrap(true);
   m_suggestion = new QLabel(this);
@@ -89,24 +95,51 @@ KaNewSurveyDialog::KaNewSurveyDialog(const QString& currentWorkCrs, double mapLo
   m_suggestion->setWordWrap(true);
   m_suggestion->setVisible(!m_suggested.isEmpty());
   auto* tip = new QLabel(
-      QStringLiteral("작업 좌표계는 나중에 아래 상태줄의 「작업 5186/5187」 단추를 눌러 바꿀 수 "
-                     "있습니다. 제출 파일은 작업 좌표계와 상관없이 5179로 변환됩니다."),
+      m_paper ? QStringLiteral("작업 좌표계는 나중에 화면 아래에서 바꿀 수 있습니다.") + QLatin1Char(0x0A) +
+                    QStringLiteral("제출 파일은 언제나 5179로 바뀝니다.")
+              : QStringLiteral("작업 좌표계는 나중에 아래 상태줄의 「작업 5186/5187」 단추를 눌러 바꿀 수 "
+                               "있습니다. 제출 파일은 작업 좌표계와 상관없이 5179로 변환됩니다."),
       this);
   tip->setObjectName(QStringLiteral("newSurveyTip"));
   tip->setWordWrap(true);
 
   form->addRow(QStringLiteral("조사명"), m_name);
   form->addRow(QString(), m_nameError);
-  if (KaTheme::displayOptions().paperLook) {  // 「조용한 도판」: the longitude ruler above the two origins
+  if (m_paper) {  // 「조용한 도판」: caption, the longitude ruler, then the two origins, all full width
+    auto* caption = new QHBoxLayout();
+    auto* captionWord = new QLabel(QStringLiteral("작업 좌표계"), this);
+    captionWord->setObjectName(QStringLiteral("newSurveyCrsCaption"));
+    caption->addWidget(captionWord);
+    caption->addStretch(1);
+    auto* boundary = new QLabel(QStringLiteral("동경 128°를 경계로 나뉩니다"), this);
+    boundary->setObjectName(QStringLiteral("newSurveyCrsBoundary"));
+    caption->addWidget(boundary);
     auto* ruler = new KaLongitudeRuler(mapLongitude, this);
     ruler->setObjectName(QStringLiteral("newSurveyLongitudeRuler"));
-    form->addRow(QStringLiteral("작업 좌표계"), ruler);
-    form->addRow(QString(), crsRow);
+    form->addRow(caption);
+    form->addRow(ruler);
+    form->addRow(crsRow);
+    for (auto* button : {m_btn5186, m_btn5187})
+      button->setProperty("kaPlate", true);  // left-set 「5186  중부원점」 (QSS)
+    QPushButton* recommended = m_suggested == QLatin1String("EPSG:5186")   ? m_btn5186
+                               : m_suggested == QLatin1String("EPSG:5187") ? m_btn5187
+                                                                           : nullptr;
+    if (recommended) {
+      auto* recommend = new QLabel(QStringLiteral("추천"), recommended);
+      recommend->setObjectName(QStringLiteral("newSurveyCrsRecommend"));
+      recommend->setAttribute(Qt::WA_TransparentForMouseEvents);
+      auto* inside = new QHBoxLayout(recommended);
+      inside->setContentsMargins(0, 0, 14, 0);
+      inside->addStretch(1);
+      inside->addWidget(recommend);
+    }
+    form->addRow(m_suggestion);
+    form->addRow(regions);
   } else {
     form->addRow(QStringLiteral("작업 좌표계"), crsRow);
+    form->addRow(regions);
+    form->addRow(m_suggestion);
   }
-  form->addRow(regions);
-  form->addRow(m_suggestion);
   form->addRow(tip);
   auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, this);
   m_ok = buttons->button(QDialogButtonBox::Ok);
@@ -140,6 +173,10 @@ void KaNewSurveyDialog::updateState() {
   QString text = QStringLiteral("지금 지도 중심(동경 %1°)은 %2 구역입니다.")
                      .arg(m_longitude, 0, 'f', 1)
                      .arg(zoneLabel(m_suggested));
+  if (m_paper) {  // the boundary rule and 「추천」 are already on the window
+    m_suggestion->setText(text);
+    return;
+  }
   if (std::abs(m_longitude - 128.0) < 0.15)
     text += QStringLiteral(" 경계에 가까우니 발주처 기준을 확인하세요.");
   if (workCrs() != m_suggested)

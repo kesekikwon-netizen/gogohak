@@ -40,4 +40,5 @@ private:
   QLabel* m_suggestion = nullptr;
   QString m_suggested;
   double m_longitude = 0.0;
+  bool m_paper = false;  // 새 모양 when the dialog was built
 };
