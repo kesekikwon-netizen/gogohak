@@ -24,6 +24,18 @@ private slots:
     QCOMPARE(captured(rule), KaTheme::tokens().surface.name());  // invisible on the white table ground
   }
 
+  // 수치 대장: the inspector's 면적 and 둘레 read as 16 px figures between ink rules (13 px, no rule in stock).
+  void measureFigureIsLedgerInPaper() {
+    const QString size = QStringLiteral("QFrame#kaMeasureField QLabel#kaMeasureValue \\{ color: #[0-9a-fA-F]{6}; font-size: (\\d+)px;");
+    QCOMPARE(captured(size), QStringLiteral("13"));
+    KaTheme::DisplayOptions paper;
+    paper.paperLook = true;
+    KaTheme::setDisplayOptions(qApp, paper);
+    QCOMPARE(captured(size), QStringLiteral("16"));
+    const QString rule = QStringLiteral("QFrame#kaMeasureField \\{ border-top: 1px solid (#[0-9a-fA-F]{6});");
+    QCOMPARE(captured(rule), KaTheme::tokens().ink.name());
+  }
+
   void paperTableHasInkRulesAndOatRow() {
     KaTheme::DisplayOptions paper;
     paper.paperLook = true;

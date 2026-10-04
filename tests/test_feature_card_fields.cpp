@@ -2,12 +2,15 @@
 // only finishes that box (user 2026-10-03 「선택한 유구의 속성정보를 수정할수있게하라」, answer 「진행」,
 // docs/intent/2026-10-03-edit-record-while-drawing.md). tests/test_feature_card.cpp is at its 300-line limit.
 #include <QtTest>
+#include <QFrame>
+#include <QLabel>
 #include <QLineEdit>
 #include <QPlainTextEdit>
 #include <QSignalSpy>
 #include <memory>
 
 #include "app/KaFeatureCard.h"
+#include "app/KaTheme.h"
 #include "core/FeaturePresets.h"
 #include "core/LayerOps.h"
 
@@ -75,6 +78,25 @@ class TestFeatureCardFields : public QObject {
     QCOMPARE(entered.count(), 1);  // while drawing the window hands the keys back to the map
     QCOMPARE(layer->getFeature(firstId(layer.get())).attribute(QStringLiteral("surveyor")).toString(), QStringLiteral("김조사"));
     layer->rollBack();
+  }
+
+  // 「조용한 도판」 수치 대장: the 면적 and 둘레 rows show only the figure (20 px); the 「자동 계산」 words move
+  // into the tooltip, so the card keeps its width (stock look keeps the lock and the words).
+  void measureFigureStandsAlone() {
+    KaTheme::DisplayOptions paper;
+    paper.paperLook = true;
+    KaTheme::setDisplayOptions(qApp, paper);
+    auto layer = recordedFeature();
+    KaFeatureCard card;
+    card.show();
+    card.setFeature(layer.get(), firstId(layer.get()));
+    const auto boxes = card.findChildren<QFrame*>(QStringLiteral("kaMeasureField"));
+    KaTheme::setDisplayOptions(qApp, KaTheme::DisplayOptions());
+    QCOMPARE(boxes.size(), 2);
+    for (QFrame* box : boxes) {
+      QVERIFY(!box->findChild<QLabel*>(QStringLiteral("kaMeasureAuto"))->isVisibleTo(box));
+      QVERIFY(box->findChild<QLabel*>(QStringLiteral("kaMeasureValue"))->toolTip().contains(QStringLiteral("자동 계산")));
+    }
   }
 
   // Text still being typed when the card shows another record goes to its own record, never to

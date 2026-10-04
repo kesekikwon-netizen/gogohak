@@ -57,6 +57,11 @@ QWidget* KaFeatureCard::measureField(QLabel** valueOut) {
   line->addWidget(caption);
   line->addStretch(1);
   line->addWidget(value);
+  if (KaTheme::displayOptions().paperLook) {  // 수치 대장: the figure stands alone, the words go to its tooltip
+    lock->hide();
+    caption->hide();
+    value->setToolTip(QStringLiteral("자동 계산 — 도형에서 바로 잰 값이라 고칠 수 없습니다"));
+  }
   *valueOut = value;
   return box;
 }
