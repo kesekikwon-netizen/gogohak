@@ -75,6 +75,14 @@ QHash<QString, QString> replacementTable() {
   // Home section heads (최근 조사·작업 순서): the 15 px sans Lead in 새 모양, the title face in stock.
   values.insert(QStringLiteral("sectionFont"), paper ? quotedFamilies(uiFontStack()) : titleFontFamilies());
   values.insert(QStringLiteral("figureFont"), quotedFamilies(paper ? monoFontStack() : uiFontStack()));  // scale chips
+  // Drawing tiles that are on: oat with a grey ring (legend, title) or an ink edge (chosen north).
+  // Stock resolves to the same accent face the sample tiles already use.
+  values.insert(QStringLiteral("sheetOnFace"), (paper ? c.tileShown : c.selected).name());
+  values.insert(QStringLiteral("sheetOnInk"), (paper ? c.ink : c.accentDeep).name());
+  values.insert(QStringLiteral("sheetOnEdge"), (paper ? c.tileShownBorder : c.accent).name());
+  values.insert(QStringLiteral("northOnFace"), (paper ? c.chosenFill : c.selected).name());
+  values.insert(QStringLiteral("northOnInk"), (paper ? c.ink : c.accentDeep).name());
+  values.insert(QStringLiteral("northOnEdge"), (paper ? c.ink : c.accent).name());
   values.insert(QStringLiteral("sectionWeight"), paper ? QStringLiteral("400") : QString::number(titleFontWeight()));
   // The drawing row's tools (QToolBar#subToolbar): buttons in 새 모양, the flat row in the stock look.
   const QString none = QStringLiteral("transparent");

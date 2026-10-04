@@ -193,6 +193,7 @@ private:
   void applyCrsGrid(QgsLayoutItemMap* map);
   void loadGridSettings();
   void syncGridButton();
+  void syncSheetTiles();
   void syncAdjustButton();
   void clearGridCoordinateLabels();
   // Marks the sheet as composed only on user composing actions (placing or moving
@@ -232,6 +233,8 @@ private:
   bool m_gridShowNums = false;
   double m_gridIntervalM = 0.0;
   QToolButton* m_gridBtn = nullptr;
+  QToolButton* m_legendTile = nullptr;
+  QToolButton* m_titleTile = nullptr;
   QToolButton* m_adjustBtn = nullptr;
   QLabel* m_status = nullptr;
   void showStatus(const QString& text);

@@ -1341,3 +1341,16 @@ QLabel#startRecentTitle { font-family: @sectionFont@; font-weight: @sectionWeigh
 QLabel#kaFeatureCardName { font-family: @titleFont@; font-weight: @titleWeight@; font-size: @nameSize@px; }
 /* 「조용한 도판」: the drawing's scale presets read as mono figures (the UI face in stock). */
 QToolButton#scaleChip { font-family: @figureFont@; }
+/* 범례·표제란이 용지에 있으면 귀리색에 회색 고리. 고른 방위 칸은 귀리색에 먹 테두리.
+   예전 모양은 견본 타일과 같은 강조색 테두리다. */
+QToolButton#legendTile:enabled:checked,
+QToolButton#btnTitleBlock:enabled:checked {
+  background: @sheetOnFace@;
+  color: @sheetOnInk@;
+  border: 1px solid @sheetOnEdge@;
+}
+QToolButton#northSwatch:enabled:checked {
+  background: @northOnFace@;
+  color: @northOnInk@;
+  border: 1px solid @northOnEdge@;
+}

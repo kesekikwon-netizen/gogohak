@@ -36,6 +36,7 @@ void KaDrawingStudio::placeTitleBlock() {
   auto* map = mapItem();
   if (!ly || !map) {
     showStatus(QStringLiteral("먼저 지도 칸을 그리세요."));
+    syncSheetTiles();
     return;
   }
   endActivateMap();
@@ -46,7 +47,10 @@ void KaDrawingStudio::placeTitleBlock() {
                                 QStringLiteral("도면명 (예: 조사구역도, 유적위치도, 유구배치도)"),
                                 QLineEdit::Normal, title, &ok)
               .trimmed();
-  if (!ok) return;
+  if (!ok) {
+    syncSheetTiles();
+    return;
+  }
   const KaTitleBlock::Info info = KaTitleBlock::collect(m_project);
   const bool existed = ly->itemById(KaTitleBlock::itemId()) != nullptr;
   const QRectF page(0.0, 0.0, m_paperW, m_paperH);
@@ -60,6 +64,7 @@ void KaDrawingStudio::placeTitleBlock() {
   showStatus(info.surveyName.isEmpty() && info.siteName.isEmpty()
                  ? QStringLiteral("표제란을 넣었습니다. 조사구역에 조사명·유적명이 없어 ―로 두었습니다.")
                  : QStringLiteral("표제란을 넣었습니다. 끌어 옮기세요. 필요 없으면 Delete로 지웁니다."));
+  syncSheetTiles();
 }
 
 void KaDrawingStudio::storeCurrentSheet() {

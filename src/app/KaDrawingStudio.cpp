@@ -367,10 +367,11 @@ bool KaDrawingStudio::promptPaper(QWidget* parent, double* widthMm, double* heig
     p.setRenderHint(QPainter::Antialiasing, true);
     p.setPen(QPen(QColor(15, 23, 42), 1.6));
     p.setBrush(QColor(255, 255, 255));
+    const qreal corner = KaTheme::depictedPaperRadius();
     if (landscape)
-      p.drawRoundedRect(QRectF(5, 14, 38, 22), 3, 3);
+      p.drawRoundedRect(QRectF(5, 14, 38, 22), corner, corner);
     else
-      p.drawRoundedRect(QRectF(13, 4, 22, 40), 3, 3);
+      p.drawRoundedRect(QRectF(13, 4, 22, 40), corner, corner);
     return QIcon(pm);
   };
   QDialog dlg(parent);
@@ -1006,6 +1007,8 @@ void KaDrawingStudio::buildUi() {
   legendRow->setSpacing(8);
   auto* legendBtn = makeRailTile(m_cardLegend, KaIcons::icon(QStringLiteral("layout_legend")),
                                  QStringLiteral("범례"), QSize(KaTheme::buttonMetrics().layoutIconSize, KaTheme::buttonMetrics().layoutIconSize));
+  legendBtn->setObjectName(QStringLiteral("legendTile"));
+  m_legendTile = legendBtn;
   legendBtn->setToolTip(QStringLiteral("범례를 용지에 넣습니다. 넣은 뒤 끌어 옮깁니다"));
   legendBtn->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
   legendBtn->setFixedSize(legendBtn->sizeHint());
@@ -1036,6 +1039,7 @@ void KaDrawingStudio::buildUi() {
   auto* titleBtn = makeRailTile(m_cardLegend, KaIcons::icon(QStringLiteral("new")),
                                 QStringLiteral("표제란"), QSize(KaTheme::buttonMetrics().layoutIconSize, KaTheme::buttonMetrics().layoutIconSize));
   titleBtn->setObjectName(QStringLiteral("btnTitleBlock"));
+  m_titleTile = titleBtn;
   titleBtn->setToolTip(QStringLiteral("도면명·조사명·유적명·축척·작성일 상자를 넣습니다. 조사구역의 조사명·유적명을 씁니다. 필요할 때만 넣습니다"));
   titleBtn->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
   titleBtn->setFixedSize(titleBtn->sizeHint());
@@ -1092,8 +1096,10 @@ void KaDrawingStudio::buildUi() {
   for (const auto& ns : norths) {
     auto* b = makeRailTile(m_cardNorth, KaDrawingNorth::previewIcon(ns.art), QString::fromUtf8(ns.tip),
                            QSize(KaTheme::buttonMetrics().layoutIconSize, KaTheme::buttonMetrics().layoutIconSize));
+    b->setObjectName(QStringLiteral("northSwatch"));
     b->setToolTip(QString::fromUtf8(ns.tip) + QStringLiteral(" — ") + KaDrawingNorth::gridNorthNote());
     const QString rel = QString::fromUtf8(ns.rel);
+    b->setProperty("northRel", rel);
     connect(b, &QToolButton::clicked, this, [this, rel]() { beginPlaceNorth(rel); });
     northRow->addWidget(b);
   }
@@ -1615,6 +1621,40 @@ void KaDrawingStudio::syncGridButton() {
                 .arg(m_gridIntervalM > 0.0 ? QStringLiteral("%1 m").arg(m_gridIntervalM, 0, 'f', 0)
                                            : QStringLiteral("간격 자동"))
           : QStringLiteral("지도 안 +와 테두리 좌표 자를 켭니다. 기본은 꺼져 있습니다."));
+}
+
+void KaDrawingStudio::syncSheetTiles() {
+  // 새 모양에서만: 용지에 있는 범례·표제란은 귀리색, 지금 방위는 귀리색에 먹 테두리.
+  const bool paper = KaTheme::displayOptions().paperLook;
+  auto* ly = layout();
+  auto mark = [](QToolButton* b, bool on) {
+    if (!b) return;
+    const bool blocked = b->blockSignals(true);
+    b->setCheckable(on || b->isChecked());
+    b->setChecked(on);
+    if (!on) b->setCheckable(false);
+    b->blockSignals(blocked);
+  };
+  if (!paper) {
+    mark(m_legendTile, false);
+    mark(m_titleTile, false);
+  } else {
+    mark(m_legendTile, ly && findItemById(ly, kIdLegend));
+    mark(m_titleTile, ly && ly->itemById(KaTitleBlock::itemId()));
+  }
+  QString chosenRel;
+  QgsLayoutItem* north = paper && ly ? findItemById(ly, kIdNorth) : nullptr;
+  if (north) {
+    const int kind = KaDrawingNorth::generatedKind(north);
+    if (kind >= 0)
+      chosenRel = KaDrawingNorth::relForKind(kind);
+    else if (!dynamic_cast<QgsLayoutItemLabel*>(north))
+      chosenRel = m_pendingNorthSvg;
+  }
+  if (!m_cardNorth) return;
+  const auto buttons = m_cardNorth->findChildren<QToolButton*>(QStringLiteral("northSwatch"));
+  for (QToolButton* b : buttons)
+    mark(b, north && b->property("northRel").toString() == chosenRel);
 }
 
 void KaDrawingStudio::beginPlaceLegend() {
@@ -2346,12 +2386,18 @@ QRectF KaDrawingStudio::defaultItemRect(const char* id) const {
 
 void KaDrawingStudio::applyLegendSettings() {
   auto* ly = layout();
-  if (!ly) return;
+  if (!ly) {
+    syncSheetTiles();
+    return;
+  }
   auto* legend = dynamic_cast<QgsLayoutItemLegend*>(findItemById(ly, kIdLegend));
   const bool created = !legend;
   if (!legend) {
     // 사용자가 지운 범례는 글자 설정을 만졌다고 되살아나면 안 된다.
-    if (m_legendRemoved) return;
+    if (m_legendRemoved) {
+      syncSheetTiles();
+      return;
+    }
     legend = new QgsLayoutItemLegend(ly);
     legend->setId(QString::fromUtf8(kIdLegend));
     legend->setFrameEnabled(true);
@@ -2388,6 +2434,7 @@ void KaDrawingStudio::applyLegendSettings() {
   }
   legend->update();
   legend->setCacheMode(QGraphicsItem::DeviceCoordinateCache);
+  syncSheetTiles();
 }
 
 void KaDrawingStudio::rebuildNorthIfNeeded() {
@@ -2463,6 +2510,7 @@ void KaDrawingStudio::placeNorth(const QRectF& layoutRect, bool selectAfter) {
   }
   if (selectAfter)
     finishPlace();
+  syncSheetTiles();
 }
 
 void KaDrawingStudio::applyScaleBarNow() {
@@ -2716,6 +2764,7 @@ void KaDrawingStudio::ensureStandardDecorations() {
     applyCrsGrid(map);
   relinkDecorations();
   applyStandardChromePositions();
+  syncSheetTiles();
 }
 
 void KaDrawingStudio::applyStandardChromePositions() {
@@ -3215,6 +3264,7 @@ void KaDrawingStudio::deleteSelectedItems() {
     n += coordTags.size();
   }
   updateInspector(nullptr);
+  syncSheetTiles();
   if (m_status) {
     if (n > 0)
       showStatus(QStringLiteral("선택한 항목 %1개를 지웠습니다.").arg(n));
@@ -3445,6 +3495,7 @@ void KaDrawingStudio::undoLastChange() {
   if (ly && ly->undoStack() && ly->undoStack()->stack() && ly->undoStack()->stack()->canUndo()) {
     ly->undoStack()->stack()->undo();
     updateInspector(nullptr);
+    syncSheetTiles();
     if (m_status)
       showStatus(QStringLiteral("한 단계 되돌렸습니다."));
     return;
@@ -3455,6 +3506,7 @@ void KaDrawingStudio::undoLastChange() {
     if (it && !dynamic_cast<QgsLayoutItemPage*>(it)) {
       ly->removeLayoutItem(it);
       updateInspector(nullptr);
+      syncSheetTiles();
       if (m_status)
         showStatus(QStringLiteral("방금 넣은 항목을 되돌렸습니다."));
       return;
@@ -3493,6 +3545,7 @@ void KaDrawingStudio::handleRedoKey() {
   if (ly && ly->undoStack() && ly->undoStack()->stack() && ly->undoStack()->stack()->canRedo()) {
     ly->undoStack()->stack()->redo();
     updateInspector(nullptr);
+    syncSheetTiles();
     if (m_status)
       showStatus(QStringLiteral("다시 실행했습니다."));
     return;

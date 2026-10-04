@@ -95,6 +95,8 @@ int titleFontWeight() { return displayOptions().paperLook ? 500 : 700; }
 
 int buttonEdgeWidth() { return displayOptions().paperLook ? 1 : 2; }
 
+int depictedPaperRadius() { return displayOptions().paperLook ? 0 : 3; }
+
 QString appIconPath() {
   return displayOptions().paperLook ? QStringLiteral(":/ka-hgis/app-icon-paper.png") : QStringLiteral(":/ka-hgis/app-icon.png");
 }

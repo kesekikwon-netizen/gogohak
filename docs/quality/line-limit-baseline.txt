@@ -5,7 +5,7 @@
 975 src/app/KaApplication.cpp
 343 src/app/KaBeginnerRibbon.cpp
 464 src/app/KaCaptureMapTool.cpp
-3853 src/app/KaDrawingStudio.cpp
+3906 src/app/KaDrawingStudio.cpp
 499 src/app/KaFeatureSelectTool.cpp
 381 src/app/KaFileBrowserPanel.cpp
 1538 src/app/KaHeritageBrowser.cpp

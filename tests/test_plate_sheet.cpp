@@ -136,6 +136,29 @@ private slots:
     QCOMPARE(KaWindowSize::width(KaWindowSize::Large, 820), 860);
   }
 
+  // 도면: 범례·표제란이 켜지면 귀리색에 회색 고리, 고른 방위 칸은 귀리색에 먹 테두리,
+  // 용지 그림(세로·가로)은 각진다. 예전 모양은 강조색 테두리와 둥근 모서리 그대로.
+  void sheetTilesAreOatInPaper() {
+    const QString sheet = QStringLiteral("QToolButton#legendTile:enabled:checked,\\s*QToolButton#btnTitleBlock:enabled:checked \\{\\s*background: (#[0-9a-fA-F]{6});\\s*color: (#[0-9a-fA-F]{6});\\s*border: 1px solid (#[0-9a-fA-F]{6});");
+    const QString north = QStringLiteral("QToolButton#northSwatch:enabled:checked \\{\\s*background: (#[0-9a-fA-F]{6});\\s*color: (#[0-9a-fA-F]{6});\\s*border: 1px solid (#[0-9a-fA-F]{6});");
+    const auto three = [](const QString& pattern) {
+      const auto m = QRegularExpression(pattern).match(qApp->styleSheet());
+      return QStringList{m.captured(1).toLower(), m.captured(2).toLower(), m.captured(3).toLower()};
+    };
+    const KaTheme::Tokens stock = KaTheme::tokens();
+    const QStringList accent = {stock.selected.name(), stock.accentDeep.name(), stock.accent.name()};
+    QCOMPARE(three(sheet), accent);
+    QCOMPARE(three(north), accent);
+    QCOMPARE(KaTheme::depictedPaperRadius(), 3);
+    KaTheme::DisplayOptions paper;
+    paper.paperLook = true;
+    KaTheme::setDisplayOptions(qApp, paper);
+    const KaTheme::Tokens t = KaTheme::tokens();
+    QCOMPARE(three(sheet), (QStringList{t.tileShown.name(), t.ink.name(), t.tileShownBorder.name()}));
+    QCOMPARE(three(north), (QStringList{t.chosenFill.name(), t.ink.name(), t.ink.name()}));
+    QCOMPARE(KaTheme::depictedPaperRadius(), 0);
+  }
+
   void paperTableHasInkRulesAndOatRow() {
     KaTheme::DisplayOptions paper;
     paper.paperLook = true;
