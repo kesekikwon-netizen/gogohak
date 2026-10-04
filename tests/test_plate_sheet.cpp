@@ -46,6 +46,16 @@ private slots:
     QCOMPARE(captured(radius), QStringLiteral("0"));
   }
 
+  // 판은 각지다: the docked cards (레이어·파일함·기록) lose their rounded corners in 새 모양.
+  void dockedCardsAreSquareInPaper() {
+    const QString radius = QStringLiteral("QFrame#terrainFilesCard \\{(?:[^}]*?)border-radius: (\\d+)px;");
+    QCOMPARE(captured(radius), QStringLiteral("10"));
+    KaTheme::DisplayOptions paper;
+    paper.paperLook = true;
+    KaTheme::setDisplayOptions(qApp, paper);
+    QCOMPARE(captured(radius), QStringLiteral("0"));
+  }
+
   void paperTableHasInkRulesAndOatRow() {
     KaTheme::DisplayOptions paper;
     paper.paperLook = true;

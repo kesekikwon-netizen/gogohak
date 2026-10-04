@@ -596,7 +596,7 @@ QFrame#terrainLayersCard, QFrame#terrainFilesCard {
   border: 1px solid @border@;
   border-bottom: 1px solid @borderStrong@;
   border-right: 1px solid @border@;
-  border-radius: 10px;
+  border-radius: @mapRadius@px;
   color: @ink@;
 }
 QFrame#filesInner, QFrame#layersInner {
