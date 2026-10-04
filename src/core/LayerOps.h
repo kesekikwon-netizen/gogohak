@@ -187,6 +187,10 @@ public:
   // https://hgis.history.go.kr/api/intro.do
   static bool historyGisApiKeyUsable(const QString& apiKey);
   static QString historyGisWmtsUri(const QString& apiKey, const QString& layerId);
+  // The 1919 sheet, tried several times: the server often answers GetCapabilities with HTTP 400.
+  static QStringList historyGisMap1919Uris(const QString& apiKey);
+  // Plain Korean failure text for the notice; the key never appears in it.
+  static QString historyGisFailureText(const QString& providerError, const QString& apiKey);
   static bool addHistoryGisMap1919(QgsProject* project, QgsMapCanvas* canvas, const QString& apiKey,
                                    QString* errorOut = nullptr);
   // 국토지리정보원 국토정보플랫폼 역사지도 WMS. API 키 없음.

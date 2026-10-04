@@ -170,6 +170,19 @@ private slots:
     QVERIFY(!fallback.contains(QStringLiteral("840e2e2c"), Qt::CaseInsensitive));
   }
 
+  // 국사편찬위원회 server answers GetCapabilities with HTTP 400 (GWC out of sync) about half the time
+  // (2026-10-04): retry the layer it really has, and never show the key in the failure text.
+  void historyGis1919_retriesTheRealLayerAndHidesTheKeyWhenItFails() {
+    const QString key = QStringLiteral("TEST-KEY-1919");
+    const QStringList uris = LayerOps::historyGisMap1919Uris(key);
+    QVERIFY(uris.size() >= 4);
+    for (const QString& uri : uris) QCOMPARE(uri, LayerOps::historyGisWmtsUri(key, QStringLiteral("history:map1919")));
+    const QString raw = QStringLiteral("WMS provider: Tile layer or tile matrix set not found (URI: ...apiKey%3D") + key + QStringLiteral(")");
+    const QString shown = LayerOps::historyGisFailureText(raw, key);
+    QVERIFY2(shown.contains(QStringLiteral("잠시 뒤")), qPrintable(shown));
+    QVERIFY2(!shown.contains(key), qPrintable(shown));
+  }
+
   void daedongyeojido_buildsOfficialNgiiWmsUriWithoutKey() {
     const QString uri = LayerOps::daedongyeojidoWmsUri();
     QVERIFY2(uri.contains(QStringLiteral("map.ngii.go.kr")), qPrintable(uri.left(200)));

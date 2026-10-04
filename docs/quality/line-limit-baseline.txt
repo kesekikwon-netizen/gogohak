@@ -30,7 +30,7 @@
 958 src/app/MainWindowRibbon.cpp
 1865 src/app/MainWindowSession.cpp
 565 src/app/MainWindowUndo.cpp
-2554 src/core/BasemapOps.cpp
+2572 src/core/BasemapOps.cpp
 340 src/core/CadastralImport.cpp
 352 src/core/CadastralPortal.cpp
 585 src/core/ControlPointCsv.cpp
@@ -60,7 +60,7 @@
 370 src/core/TopographicSourceCrs.cpp
 686 src/core/TrenchGridGenerator.cpp
 393 tests/test_buffer.cpp
-890 tests/test_cadastral.cpp
+903 tests/test_cadastral.cpp
 973 tests/test_checklist.cpp
 319 tests/test_dem_legend.cpp
 485 tests/test_dem_presentation.cpp

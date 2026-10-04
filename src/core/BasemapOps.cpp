@@ -1487,6 +1487,25 @@ QString LayerOps::historyGisWmtsUri(const QString& apiKey, const QString& layerI
       .arg(layer, encUrl);
 }
 
+// The server only has history:map1919 (bare map1919 is not in its capabilities), but it answers
+// GetCapabilities with HTTP 400 「GWC configuration out of synch」 about half the time (checked 2026-10-04,
+// 3 of 6 requests): the same request is tried four times.
+QStringList LayerOps::historyGisMap1919Uris(const QString& apiKey) {
+  return QStringList(4, historyGisWmtsUri(apiKey, QStringLiteral("history:map1919")));
+}
+
+QString LayerOps::historyGisFailureText(const QString& providerError, const QString& apiKey) {
+  QString detail = providerError;
+  const QString key = apiKey.trimmed();
+  if (!key.isEmpty()) {
+    detail.replace(key, QStringLiteral("[가림]"));
+    detail.replace(QString::fromLatin1(QUrl::toPercentEncoding(key)), QStringLiteral("[가림]"));
+  }
+  return QStringLiteral("국사편찬위원회 역사지리정보DB 서버가 지도 목록을 보내 주지 않았습니다(4번 시도). "
+                        "서버 쪽이 잠시 불안정할 때 생기는 일이니 잠시 뒤 다시 눌러 보세요.\n\n") +
+         detail;
+}
+
 bool LayerOps::addHistoryGisMap1919(QgsProject* project, QgsMapCanvas* canvas, const QString& apiKey,
                                     QString* errorOut) {
   if (!historyGisApiKeyUsable(apiKey)) {
@@ -1500,12 +1519,11 @@ bool LayerOps::addHistoryGisMap1919(QgsProject* project, QgsMapCanvas* canvas, c
   }
   const QString key = apiKey.trimmed();
   const QString name = QStringLiteral("1919 조선지형도 1:5만");
-  const QStringList uris = {
-      historyGisWmtsUri(key, QStringLiteral("history:map1919")),
-      historyGisWmtsUri(key, QStringLiteral("map1919")),
-  };
-  if (!addBasemapWithFallbacks(project, canvas, uris, name, errorOut))
+  QString failure;
+  if (!addBasemapWithFallbacks(project, canvas, historyGisMap1919Uris(key), name, &failure)) {
+    if (errorOut) *errorOut = historyGisFailureText(failure, key);
     return false;
+  }
   placeKindInReferenceGroup(project, name);
   return true;
 }
