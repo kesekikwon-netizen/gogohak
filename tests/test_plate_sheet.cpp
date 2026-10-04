@@ -80,6 +80,24 @@ private slots:
     QVERIFY(captured(QStringLiteral("QLabel#startRecentTitle \\{ font-family: ([^;]+);")).contains(QStringLiteral("malgun gothic")));
   }
 
+  // 고른 단추·입력칸: a chosen push button (5186 | 5187 in 새 조사) and a focused text field are edged in ink
+  // in 새 모양, not clay; stock keeps its accent edge and deep accent text.
+  void chosenButtonAndFocusedFieldAreInkInPaper() {
+    const QString chosen = QStringLiteral("(?m)^QPushButton:enabled:checked \\{\\s*background: #[0-9a-fA-F]{6};\\s*color: (#[0-9a-fA-F]{6});\\s*border-color: (#[0-9a-fA-F]{6});");
+    const QString edge = QStringLiteral("(?m)^QPushButton:enabled:checked \\{\\s*background: #[0-9a-fA-F]{6};\\s*color: #[0-9a-fA-F]{6};\\s*border-color: (#[0-9a-fA-F]{6});");
+    const QString focus = QStringLiteral("(?m)^QLineEdit:focus \\{\\s*border-color: (#[0-9a-fA-F]{6});");
+    QCOMPARE(captured(chosen), KaTheme::tokens().accentDeep.name());
+    QCOMPARE(captured(edge), KaTheme::tokens().accent.name());
+    QCOMPARE(captured(focus), KaTheme::tokens().accent.name());
+    KaTheme::DisplayOptions paper;
+    paper.paperLook = true;
+    KaTheme::setDisplayOptions(qApp, paper);
+    const QString ink = KaTheme::tokens().ink.name();
+    QCOMPARE(captured(chosen), ink);
+    QCOMPARE(captured(edge), ink);
+    QCOMPARE(captured(focus), ink);
+  }
+
   void paperTableHasInkRulesAndOatRow() {
     KaTheme::DisplayOptions paper;
     paper.paperLook = true;

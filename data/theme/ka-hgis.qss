@@ -124,7 +124,7 @@ QToolBar#mainToolbar QLineEdit#appBarSearch {
   min-height: 30px;
   font-size: @uiFontSize@px;
 }
-QToolBar#mainToolbar QLineEdit#appBarSearch:focus { border-color: @accent@; }
+QToolBar#mainToolbar QLineEdit#appBarSearch:focus { border-color: @tabMark@; }
 QDialogButtonBox QPushButton {
   font-size: @uiFontSize@px;
   min-height: 34px;
@@ -153,9 +153,9 @@ QPushButton:enabled:hover { background: @hover@; border-color: @borderStrong@; b
 QPushButton:enabled:pressed { background: @pressed@; border-bottom: 1px solid @borderStrong@; }
 QPushButton:enabled:checked {
   background: @selected@;
-  color: @accentDeep@;
-  border-color: @accent@;
-  border-bottom: @buttonEdge@px solid @accentDeep@;
+  color: @tabInk@;
+  border-color: @tabMark@;
+  border-bottom: @buttonEdge@px solid @tabInk@;
 }
 /* The main button has its own tokens: the accent steps in the stock look, slate in 새 모양. */
 QPushButton:default, QPushButton#btnAdjustDone, QPushButton.primary, QPushButton#btnPrimary {
@@ -481,7 +481,7 @@ QAbstractSpinBox QLineEdit, QComboBox QLineEdit {
   background: transparent;
 }
 QLineEdit:focus {
-  border-color: @accent@;
+  border-color: @tabMark@;
 }
 QLineEdit:disabled, QComboBox:disabled, QAbstractSpinBox:disabled {
   background: @desk@;
