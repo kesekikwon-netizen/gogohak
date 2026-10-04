@@ -538,6 +538,7 @@ add_executable(ka-hgis
   src/app/KaControlCsvBox.cpp
   src/app/KaProgressPlate.cpp
   src/app/KaDrawingStudioPlate.cpp
+  src/app/KaTabClose.cpp
   src/app/KaPrintDialog.cpp
   src/app/KaPrintDialogPlate.cpp
   src/app/KaTilePreview.cpp
@@ -548,6 +549,7 @@ add_executable(ka-hgis
   src/app/KaControlCsvBox.h
   src/app/KaProgressPlate.h
   src/app/KaDrawingStudioPlate.h
+  src/app/KaTabClose.h
   src/app/KaPrintDialog.h
   src/app/KaTilePreview.h
   src/app/MainWindow.h
@@ -1941,7 +1943,7 @@ if(KA_HGIS_BUILD_TESTS)
   ka_add_qtest(chip_plate ka_chip_plate_tests)
   set_tests_properties(chip_plate PROPERTIES TIMEOUT 90)
   add_executable(ka_plate_sheet_tests tests/test_plate_sheet.cpp
-    ${_ka_p1_font_sources} src/app/KaIcons.cpp src/app/KaTheme.cpp src/app/KaThemeSheet.cpp src/app/KaThemeStyle.cpp)
+    ${_ka_p1_font_sources} src/app/KaIcons.cpp src/app/KaTheme.cpp src/app/KaThemeSheet.cpp src/app/KaThemeStyle.cpp src/app/KaTabClose.cpp src/app/KaTabClose.h)
   set_target_properties(ka_plate_sheet_tests PROPERTIES WIN32_EXECUTABLE FALSE)
   target_link_libraries(ka_plate_sheet_tests PRIVATE Qt6::Test Qt6::Core Qt6::Gui Qt6::Widgets)
   target_include_directories(ka_plate_sheet_tests PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_BINARY_DIR}/generated)

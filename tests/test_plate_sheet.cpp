@@ -4,7 +4,12 @@
 #include <QApplication>
 #include <QHBoxLayout>
 #include <QPushButton>
+#include <QSignalSpy>
+#include <QTabBar>
+#include <QTabWidget>
+#include <QToolButton>
 #include <QRegularExpression>
+#include "app/KaTabClose.h"
 #include "app/KaTheme.h"
 #include "app/KaWindowSize.h"
 
@@ -194,6 +199,32 @@ private slots:
     const QColor edge = row.grab().toImage().pixelColor(a3->x(), a3->y() + a3->height() / 2);
     KaTheme::setDisplayOptions(qApp, KaTheme::DisplayOptions());
     QVERIFY2(edge.lightness() < 60, qPrintable(edge.name()));
+  }
+
+  // 「도면 ✕」 (보드 판 4): a closable view tab shows a clear muted ✕ that closes it; tabs that cannot close keep none.
+  void closableTabShowsAClearCrossInPaper() {
+    qApp->setProperty("kaPaperLook", true);
+    QTabWidget tabs;
+    tabs.setTabsClosable(true);
+    tabs.addTab(new QWidget, QStringLiteral("홈"));
+    tabs.tabBar()->setTabButton(0, QTabBar::RightSide, nullptr);
+    KaTabClose::follow(&tabs);
+    tabs.addTab(new QWidget, QStringLiteral("도면"));
+    tabs.setCurrentIndex(1);
+    auto* cross = qobject_cast<QToolButton*>(tabs.tabBar()->tabButton(1, QTabBar::RightSide));
+    QVERIFY(cross && cross->objectName() == QStringLiteral("viewTabClose"));
+    QVERIFY(!tabs.tabBar()->tabButton(0, QTabBar::RightSide));
+    QSignalSpy closing(&tabs, &QTabWidget::tabCloseRequested);
+    cross->click();
+    QCOMPARE(closing.count(), 1);
+    QCOMPARE(closing.first().first().toInt(), 1);
+    qApp->setProperty("kaPaperLook", QVariant());
+    QTabWidget stock;
+    stock.setTabsClosable(true);
+    KaTabClose::follow(&stock);
+    stock.addTab(new QWidget, QStringLiteral("도면"));
+    stock.setCurrentIndex(0);
+    QVERIFY(stock.tabBar()->tabButton(0, QTabBar::RightSide)->objectName() != QStringLiteral("viewTabClose"));
   }
 
   // 창 너비: 새 모양 windows come in three widths (S 440 · M 560 · L 860); stock keeps each window's own width.

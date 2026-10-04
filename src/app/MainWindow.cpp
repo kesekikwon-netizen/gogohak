@@ -13,6 +13,7 @@
 #include "KaUserError.h"
 #include "KaClosePrompt.h"
 #include "KaControlCsvBox.h"
+#include "KaTabClose.h"
 #include "core/EditBufferSummary.h"
 #include "KaCadImport.h"
 #include "KaIcons.h"
@@ -1069,6 +1070,7 @@ void MainWindow::buildUi() {
   }
   setupStrataShell();  // [P6] 인스펙터(유구 카드 포함)·배지·안내 띠·배경 카드·홈 「설정」 (MainWindowChrome.cpp)
   connect(m_viewTabs, &QTabWidget::tabCloseRequested, this, &MainWindow::onViewTabCloseRequested);
+  KaTabClose::follow(m_viewTabs);  // 새 모양 「도면 ✕」: a clear muted cross on closable tabs (2차 보드 판 4)
   connect(m_viewTabs, &QTabWidget::currentChanged, this, [this](int i) {
     if (!m_viewTabs) return;
     QWidget* page = m_viewTabs->widget(i);
