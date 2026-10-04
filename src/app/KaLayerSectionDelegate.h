@@ -20,6 +20,8 @@ class KaLayerSectionDelegate : public QStyledItemDelegate {
  public:
   enum class Section { None, Survey, Nearby, Basemap };
   static constexpr int kBandHeight = 16;
+  // 「조용한 도판」: a survey layer row's shape count, painted in mono after the name (the model fills it).
+  static constexpr int kCountRole = Qt::UserRole + 0x4b4c;
 
   KaLayerSectionDelegate(QAbstractItemDelegate* inner, QgsLayerTreeView* view);
 

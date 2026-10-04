@@ -21,6 +21,7 @@
 #include <qgsproject.h>
 #include <qgsvectorlayer.h>
 #include "app/KaLayerInformation.h"
+#include "app/KaLayerSectionDelegate.h"
 #include "app/KaTheme.h"
 #include <qgsfeature.h>
 #include <qgsgeometry.h>
@@ -102,8 +103,10 @@ private slots:
     QCOMPARE(model.data(row, Qt::DisplayRole).toString(), QStringLiteral("유구 (면)"));
     KaTheme::DisplayOptions paper; paper.paperLook = true; KaTheme::setDisplayOptions(nullptr, paper);
     const QString shown = model.data(row, Qt::DisplayRole).toString();
+    const QVariant count = model.data(row, KaLayerSectionDelegate::kCountRole);
     KaTheme::setDisplayOptions(nullptr, KaTheme::DisplayOptions());
-    QVERIFY2(shown.startsWith(QStringLiteral("유구 (면)")) && shown.endsWith(QStringLiteral("2")), qPrintable(shown));
+    QCOMPARE(shown, QStringLiteral("유구 (면)"));  // the count is painted apart, in mono
+    QCOMPARE(count.toLongLong(), 2LL);
   }
   // 유구 표지: in 새 모양 a survey layer's patch is a 20 × 14 square-cornered swatch of its own map symbol in a
   // 1 px ink frame, and the list makes room for it; stock keeps QGIS's square symbol icon.

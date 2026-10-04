@@ -4,6 +4,7 @@
 #include "core/LayerRole.h"
 
 #include <QAbstractItemView>
+#include <QApplication>
 #include <QFont>
 #include <QPainter>
 #include <QPen>
@@ -91,6 +92,25 @@ void KaLayerSectionDelegate::paint(QPainter* painter, const QStyleOptionViewItem
   const QStyleOptionViewItem moved = below(option, index);
   if (m_inner) m_inner->paint(painter, moved, index);
   else QStyledItemDelegate::paint(painter, moved, index);
+  const QVariant count = index.column() == 0 ? index.data(kCountRole) : QVariant();
+  if (!count.isValid()) return;
+  // The count sits 6 px after the name in 10 px mono, muted ink; it never runs past the column.
+  QStyleOptionViewItem item(moved);
+  initStyleOption(&item, index);
+  const QStyle* style = item.widget ? item.widget->style() : QApplication::style();
+  const QRect text = style->subElementRect(QStyle::SE_ItemViewItemText, &item, item.widget);
+  const int margin = style->pixelMetric(QStyle::PM_FocusFrameHMargin, nullptr, item.widget) + 1;
+  QFont mono(QStringLiteral("Consolas"));
+  mono.setStyleHint(QFont::Monospace);
+  mono.setPixelSize(10);
+  const QString digits = QString::number(count.toLongLong());
+  const int width = QFontMetrics(mono).horizontalAdvance(digits);
+  const int x = qMin(text.left() + margin + QFontMetrics(item.font).horizontalAdvance(item.text) + 6, text.right() - width);
+  painter->save();
+  painter->setFont(mono);
+  painter->setPen(option.palette.color(QPalette::PlaceholderText));
+  painter->drawText(QRect(x, text.top(), width + 1, text.height()), Qt::AlignLeft | Qt::AlignVCenter, digits);
+  painter->restore();
 }
 
 QSize KaLayerSectionDelegate::sizeHint(const QStyleOptionViewItem& option, const QModelIndex& index) const {
