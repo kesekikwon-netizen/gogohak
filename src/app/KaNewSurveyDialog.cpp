@@ -1,4 +1,5 @@
 #include "KaNewSurveyDialog.h"
+#include "KaLongitudeRuler.h"
 #include "KaWindowSize.h"
 
 #include "KaTheme.h"
@@ -96,7 +97,14 @@ KaNewSurveyDialog::KaNewSurveyDialog(const QString& currentWorkCrs, double mapLo
 
   form->addRow(QStringLiteral("조사명"), m_name);
   form->addRow(QString(), m_nameError);
-  form->addRow(QStringLiteral("작업 좌표계"), crsRow);
+  if (KaTheme::displayOptions().paperLook) {  // 「조용한 도판」: the longitude ruler above the two origins
+    auto* ruler = new KaLongitudeRuler(mapLongitude, this);
+    ruler->setObjectName(QStringLiteral("newSurveyLongitudeRuler"));
+    form->addRow(QStringLiteral("작업 좌표계"), ruler);
+    form->addRow(QString(), crsRow);
+  } else {
+    form->addRow(QStringLiteral("작업 좌표계"), crsRow);
+  }
   form->addRow(regions);
   form->addRow(m_suggestion);
   form->addRow(tip);

@@ -484,6 +484,7 @@ add_executable(ka-hgis
   src/app/KaHomeStatus.cpp
   src/app/KaHomeText.cpp
   src/app/KaNewSurveyDialog.cpp
+  src/app/KaLongitudeRuler.cpp
   src/app/KaRecoverySnapshots.cpp
   src/app/KaAppBar.cpp
   src/app/KaMapControls.cpp
@@ -560,6 +561,7 @@ add_executable(ka-hgis
   src/app/KaHomeStatus.h
   src/app/KaHomeText.h
   src/app/KaNewSurveyDialog.h
+  src/app/KaLongitudeRuler.h
   src/app/KaWindowSize.h
   src/app/KaRecoverySnapshots.h
   src/app/KaAppBar.h
@@ -1351,6 +1353,7 @@ if(KA_HGIS_BUILD_TESTS)
     src/app/KaHomeStatus.cpp src/app/KaHomeStatus.h
     src/app/KaHomeText.cpp
     src/app/KaNewSurveyDialog.cpp
+    src/app/KaLongitudeRuler.cpp
     src/app/KaRecoverySnapshots.cpp
     src/app/KaTheme.cpp src/app/KaThemeSheet.cpp src/app/KaThemeStyle.cpp)
   target_link_libraries(ka_home_tests PRIVATE ${KA_TEST_LIBS} Qt6::Network)
@@ -1872,6 +1875,13 @@ if(KA_HGIS_BUILD_TESTS)
   target_link_libraries(ka_sketch_measure_tests PRIVATE ka_core Qt6::Test Qt6::Widgets Qt6::Svg)
   target_include_directories(ka_sketch_measure_tests PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_BINARY_DIR}/generated)
   ka_add_qtest(sketch_measure ka_sketch_measure_tests)
+  add_executable(ka_longitude_ruler_tests tests/test_longitude_ruler.cpp src/app/KaLongitudeRuler.cpp src/app/KaLongitudeRuler.h
+    src/app/KaNewSurveyDialog.cpp src/app/KaNewSurveyDialog.h ${_ka_p1_font_sources} src/app/KaIcons.cpp src/app/KaTheme.cpp
+    src/app/KaThemeSheet.cpp src/app/KaThemeStyle.cpp)
+  set_target_properties(ka_longitude_ruler_tests PROPERTIES WIN32_EXECUTABLE FALSE)
+  target_link_libraries(ka_longitude_ruler_tests PRIVATE ka_core Qt6::Test Qt6::Widgets Qt6::Svg)
+  target_include_directories(ka_longitude_ruler_tests PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_BINARY_DIR}/generated)
+  ka_add_qtest(longitude_ruler ka_longitude_ruler_tests)
 endif()
 
 # ---- [P2 icons] outline glyph set: travels with KaIcons.cpp wherever that file is compiled ----
