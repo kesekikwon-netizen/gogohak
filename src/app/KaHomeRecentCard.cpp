@@ -41,6 +41,8 @@ QList<int> dotsFor(const RecentSurveys::Item& survey, const SurveyFacts::Facts& 
 
 KaHomeRecentCard::KaHomeRecentCard(QWidget* parent) : QFrame(parent) {
   setObjectName(QStringLiteral("startRecentCard"));
+  // 2차 보드 판 2: six plain columns with numbers, no icon column, the right-click hint under the table.
+  m_plate = KaTheme::displayOptions().paperLook;
   auto* rows = new QVBoxLayout(this);
   rows->setContentsMargins(0, 0, 0, 6);
   rows->setSpacing(0);
@@ -52,7 +54,7 @@ KaHomeRecentCard::KaHomeRecentCard(QWidget* parent) : QFrame(parent) {
   header->addWidget(m_count);
   header->addStretch(1);
   // Same look as the count; its own name so it can be found and restyled.
-  header->addWidget(label(QStringLiteral("오른쪽 클릭: 목록에서 제거"), "startRecentCount", this));
+  if (!m_plate) header->addWidget(label(QStringLiteral("오른쪽 클릭: 목록에서 제거"), "startRecentCount", this));
   m_filter = new QLineEdit(this);
   m_filter->setObjectName(QStringLiteral("startRecentFilter"));
   m_filter->setPlaceholderText(QStringLiteral("이름·폴더로 찾기"));
@@ -71,11 +73,15 @@ KaHomeRecentCard::KaHomeRecentCard(QWidget* parent) : QFrame(parent) {
   m_empty->setContentsMargins(18, 8, 18, 8);
   rows->addWidget(m_empty);
 
-  m_table = new QTableWidget(0, 4, this);
+  m_table = new QTableWidget(0, m_plate ? 6 : 4, this);
   m_table->setObjectName(QStringLiteral("recentSurveyList"));
   m_table->setAccessibleName(QStringLiteral("최근 조사 목록"));
-  m_table->setHorizontalHeaderLabels({QStringLiteral("조사"), QStringLiteral("상태"),
-                                      QStringLiteral("구역 · 유구 · 검수"), QStringLiteral("마지막 열림")});
+  if (m_plate)
+    m_table->setHorizontalHeaderLabels({QStringLiteral("조사"), QStringLiteral("상태"), QStringLiteral("조사구역"),
+                                        QStringLiteral("유구"), QStringLiteral("검수"), QStringLiteral("마지막 열림")});
+  else
+    m_table->setHorizontalHeaderLabels({QStringLiteral("조사"), QStringLiteral("상태"),
+                                        QStringLiteral("구역 · 유구 · 검수"), QStringLiteral("마지막 열림")});
   m_table->horizontalHeader()->setVisible(true);
   m_table->horizontalHeader()->setHighlightSections(false);
   m_table->horizontalHeader()->setSectionsClickable(false);
@@ -90,16 +96,22 @@ KaHomeRecentCard::KaHomeRecentCard(QWidget* parent) : QFrame(parent) {
   m_table->viewport()->setCursor(Qt::PointingHandCursor);  // a row opens on a click
   m_table->setContextMenuPolicy(Qt::CustomContextMenu);
   auto* delegate = new KaHomeRowDelegate(m_table);
-  for (int column : {SurveyColumn, StateColumn, DotsColumn}) m_table->setItemDelegateForColumn(column, delegate);
+  for (int column : {SurveyColumn, StateColumn, DotsColumn})
+    if (!m_plate || column != DotsColumn) m_table->setItemDelegateForColumn(column, delegate);
   auto* columns = m_table->horizontalHeader();
   columns->setSectionResizeMode(SurveyColumn, QHeaderView::Stretch);
-  columns->setSectionResizeMode(StateColumn, QHeaderView::ResizeToContents);
-  columns->setSectionResizeMode(DotsColumn, QHeaderView::ResizeToContents);
-  columns->setSectionResizeMode(WhenColumn, QHeaderView::ResizeToContents);
+  if (m_plate) columns->setDefaultAlignment(Qt::AlignLeft | Qt::AlignVCenter);
+  for (int column = StateColumn; column < m_table->columnCount(); ++column)
+    columns->setSectionResizeMode(column, QHeaderView::ResizeToContents);
   connect(m_table, &QTableWidget::cellActivated, this, [this](int row, int) { openRow(row); });
   connect(m_table, &QTableWidget::cellClicked, this, [this](int row, int) { openRow(row); });
   connect(m_table, &QTableWidget::customContextMenuRequested, this, &KaHomeRecentCard::showMenu);
   rows->addWidget(m_table, 1);
+  if (m_plate) {
+    auto* note = label(QStringLiteral("목록에서 빼려면 조사 위에서 오른쪽 단추를 누르세요."), "startRecentNote", this);
+    note->setContentsMargins(18, 8, 18, 4);
+    rows->addWidget(note);
+  }
 }
 
 void KaHomeRecentCard::setItems(const QVector<RecentSurveys::Item>& items, QSettings& settings) {
@@ -124,7 +136,8 @@ void KaHomeRecentCard::setItems(const QVector<RecentSurveys::Item>& items, QSett
     name->setData(kPathRole, survey.path);
     name->setData(kSnapshotRole, snapshot);
     name->setData(kFolderRole, KaHomeText::folder(survey.path));
-    name->setData(kThumbRole, survey.available ? QStringLiteral("survey_thumb") : QStringLiteral("missing"));
+    name->setData(kThumbRole, m_plate ? (survey.available ? QStringLiteral("none") : QStringLiteral("none-missing"))
+                              : survey.available ? QStringLiteral("survey_thumb") : QStringLiteral("missing"));
     name->setToolTip(tip);
     auto* chip = new QTableWidgetItem(state.text);
     chip->setData(kToneRole, state.tone);
@@ -139,11 +152,35 @@ void KaHomeRecentCard::setItems(const QVector<RecentSurveys::Item>& items, QSett
     when->setToolTip(tip);
     m_table->insertRow(row);
     int column = 0;
-    for (auto* item : {name, chip, dots, when}) m_table->setItem(row, column++, item);
+    if (m_plate) {
+      delete dots;
+      for (auto* item : {name, chip}) m_table->setItem(row, column++, item);
+      for (QTableWidgetItem* cell : plateCells(survey, facts)) m_table->setItem(row, column++, cell);
+      m_table->setItem(row, column, when);
+    } else {
+      for (auto* item : {name, chip, dots, when}) m_table->setItem(row, column++, item);
+    }
     m_table->setRowHeight(row, kRowHeight);
     ++row;
   }
   applyFilter(m_filter->text());
+}
+
+// 조사구역 · 유구 · 검수 as words and numbers: 「—」 when not counted, 「검수 전」 before a check.
+QList<QTableWidgetItem*> KaHomeRecentCard::plateCells(const RecentSurveys::Item& survey,
+                                                       const SurveyFacts::Facts& facts) const {
+  const bool counted = survey.available && facts.hasCounts();
+  auto* areas = new QTableWidgetItem(counted ? QString::number(facts.areas) : QStringLiteral("—"));
+  auto* features = new QTableWidgetItem(counted ? QString::number(facts.features) : QStringLiteral("—"));
+  for (auto* number : {areas, features}) number->setTextAlignment(Qt::AlignRight | Qt::AlignVCenter);
+  const bool checked = survey.available && facts.hasCheck();
+  auto* check = new QTableWidgetItem(!survey.available ? QStringLiteral("—")
+                                     : !checked ? QStringLiteral("검수 전")
+                                     : facts.errors + facts.warnings == 0
+                                         ? QStringLiteral("통과")
+                                         : QStringLiteral("오류 %1 · 주의 %2").arg(facts.errors).arg(facts.warnings));
+  check->setForeground(checked && facts.errors > 0 ? KaTheme::tokens().danger : KaTheme::tokens().inkMuted);
+  return {areas, features, check};
 }
 
 void KaHomeRecentCard::applyFilter(const QString& text) {

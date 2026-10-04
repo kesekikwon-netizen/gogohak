@@ -3,12 +3,17 @@
 #include "core/RecentSurveys.h"
 
 #include <QFrame>
+#include <QList>
 #include <QVector>
 
 class QLabel;
 class QLineEdit;
 class QSettings;
 class QTableWidget;
+class QTableWidgetItem;
+namespace SurveyFacts {
+struct Facts;
+}
 
 // 「최근 조사」 card of the home page: a header row and 48 px rows of
 // [survey thumb · name · folder] [state chip] [구역 · 유구 · 검수 dots] [last opened].
@@ -23,7 +28,7 @@ public:
   static constexpr int kPathRole = Qt::UserRole;          // survey path (column 0)
   static constexpr int kSnapshotRole = Qt::UserRole + 1;  // recovery copy path (column 0)
   static constexpr int kFolderRole = Qt::UserRole + 2;    // 「바탕 화면 › 광령리」 (column 0)
-  static constexpr int kThumbRole = Qt::UserRole + 3;     // glyph id: survey_thumb / missing (column 0)
+  static constexpr int kThumbRole = Qt::UserRole + 3;     // glyph id: survey_thumb / missing; 새 모양 none / none-missing (no icon)
   static constexpr int kToneRole = Qt::UserRole + 4;      // KaChip tone name (column 1)
   static constexpr int kDotsRole = Qt::UserRole + 5;      // QList<int> of Dot; empty = 「—」 (column 2)
   static constexpr int kRowHeight = 48;
@@ -41,9 +46,11 @@ private:
   void openRow(int row);
   void showMenu(const QPoint& pos);
   void applyFilter(const QString& text);
+  QList<QTableWidgetItem*> plateCells(const RecentSurveys::Item& survey, const SurveyFacts::Facts& facts) const;
 
   QLabel* m_empty = nullptr;
   QLabel* m_count = nullptr;
   QLineEdit* m_filter = nullptr;
   QTableWidget* m_table = nullptr;
+  bool m_plate = false;  // 새 모양: 조사 · 상태 · 조사구역 · 유구 · 검수 · 마지막 열림, no icon column
 };

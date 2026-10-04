@@ -9,10 +9,12 @@
 #include <QPushButton>
 #include <QSettings>
 #include <QStandardPaths>
+#include <QTableWidget>
 #include <QTemporaryDir>
 
 #include <qgsapplication.h>
 
+#include "app/KaHomeRecentCard.h"
 #include "app/KaStartPage.h"
 #include "app/KaTheme.h"
 #include "core/RecentSurveys.h"
@@ -102,6 +104,31 @@ private slots:
     KaStartPage page;
     page.reload();
     QVERIFY(page.findChild<QPushButton*>(QStringLiteral("startNewBtn"))->property("kaQuiet").toBool());
+  }
+
+  // 최근 조사: 조사 · 상태 · 조사구역 · 유구 · 검수 · 마지막 열림, numbers instead of dots, no icon column,
+  // and the right-click hint as a line under the table.
+  void recentTableHasTheBoardColumns() {
+    const QString path = touch(m_dir.filePath(QStringLiteral("d/광령리1.gpkg")));
+    {
+      QSettings st = RecentSurveys::userSettings();
+      RecentSurveys::remember(st, path, QStringLiteral("광령리1"));
+      SurveyFacts::rememberCounts(st, path, 1, 6, QStringLiteral("EPSG:5186"));
+      SurveyFacts::rememberCheck(st, path, 1, 3);
+    }
+    KaStartPage page;
+    page.reload();
+    auto* table = page.findChild<QTableWidget*>(QStringLiteral("recentSurveyList"));
+    QVERIFY(table);
+    QStringList headers;
+    for (int c = 0; c < table->columnCount(); ++c) headers << table->horizontalHeaderItem(c)->text();
+    QCOMPARE(headers, (QStringList{QStringLiteral("조사"), QStringLiteral("상태"), QStringLiteral("조사구역"),
+                                   QStringLiteral("유구"), QStringLiteral("검수"), QStringLiteral("마지막 열림")}));
+    QCOMPARE(table->item(0, 2)->text(), QStringLiteral("1"));
+    QCOMPARE(table->item(0, 3)->text(), QStringLiteral("6"));
+    QCOMPARE(table->item(0, 4)->text(), QStringLiteral("오류 1 · 주의 3"));
+    QCOMPARE(table->item(0, 0)->data(KaHomeRecentCard::kThumbRole).toString(), QStringLiteral("none"));
+    QVERIFY(page.findChild<QLabel*>(QStringLiteral("startRecentNote")));
   }
 
   void heroDrawsNoBand() {

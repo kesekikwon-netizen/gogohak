@@ -69,23 +69,26 @@ QSize KaHomeRowDelegate::sizeHint(const QStyleOptionViewItem& option, const QMod
 void KaHomeRowDelegate::paintSurvey(QPainter* painter, const QRect& rect, const QModelIndex& index,
                                     qreal dpr) const {
   const auto& t = KaTheme::tokens();
-  const bool missing = index.data(KaHomeRecentCard::kThumbRole).toString() == QLatin1String("missing");
+  const bool missing = index.data(KaHomeRecentCard::kThumbRole).toString().endsWith(QLatin1String("missing"));
   const QColor ink = missing ? t.inkMuted : t.ink;
   const QRect cell = rect.adjusted(kLeftInset, 0, -kCellInset, 0);
-  const QRect thumb(cell.left(), cell.top() + (cell.height() - kThumbHeight) / 2, kThumbWidth, kThumbHeight);
-  painter->setPen(QPen(t.border, 1.0));
-  painter->setBrush(t.altRow);
-  painter->drawRoundedRect(QRectF(thumb).adjusted(0.5, 0.5, -0.5, -0.5), 6.0, 6.0);
-  const QString glyphId = index.data(KaHomeRecentCard::kThumbRole).toString();
-  const QPixmap glyph = KaIcons::glyphPixmap(glyphId.isEmpty() ? QStringLiteral("survey_thumb") : glyphId, ink,
-                                             kThumbGlyphPx, dpr);
-  const QRect glyphBox(thumb.center().x() - kThumbGlyphPx / 2, thumb.center().y() - kThumbGlyphPx / 2,
-                       kThumbGlyphPx, kThumbGlyphPx);
-  painter->drawPixmap(glyphBox, glyph);
+  const bool plate = index.data(KaHomeRecentCard::kThumbRole).toString().startsWith(QLatin1String("none"));
+  const QRect thumb(cell.left(), cell.top() + (cell.height() - kThumbHeight) / 2, plate ? 0 : kThumbWidth, kThumbHeight);
+  if (!plate) {
+    painter->setPen(QPen(t.border, 1.0));
+    painter->setBrush(t.altRow);
+    painter->drawRoundedRect(QRectF(thumb).adjusted(0.5, 0.5, -0.5, -0.5), 6.0, 6.0);
+    const QString glyphId = index.data(KaHomeRecentCard::kThumbRole).toString();
+    const QPixmap glyph = KaIcons::glyphPixmap(glyphId.isEmpty() ? QStringLiteral("survey_thumb") : glyphId, ink,
+                                               kThumbGlyphPx, dpr);
+    const QRect glyphBox(thumb.center().x() - kThumbGlyphPx / 2, thumb.center().y() - kThumbGlyphPx / 2,
+                         kThumbGlyphPx, kThumbGlyphPx);
+    painter->drawPixmap(glyphBox, glyph);
+  }
 
-  const int textLeft = thumb.right() + 1 + kThumbGap;
+  const int textLeft = plate ? cell.left() : thumb.right() + 1 + kThumbGap;
   const QRect text(textLeft, cell.top(), cell.right() - textLeft + 1, cell.height());
-  const QFont nameFont = sized(painter->font(), 13, true);
+  const QFont nameFont = sized(painter->font(), plate ? 14 : 13, !plate);  // 2차 보드: the name in regular 14
   const QFont folderFont = sized(painter->font(), 12, false);  // folder line: 11 was hard to read
   const QFontMetrics nameFm(nameFont);
   const QFontMetrics folderFm(folderFont);
