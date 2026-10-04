@@ -540,6 +540,7 @@ add_executable(ka-hgis
   src/app/KaDrawingStudioPlate.cpp
   src/app/KaTabClose.cpp
   src/app/KaFileRowDelegate.cpp
+  src/app/KaStageRail.cpp
   src/app/KaPrintDialog.cpp
   src/app/KaPrintDialogPlate.cpp
   src/app/KaTilePreview.cpp
@@ -552,6 +553,7 @@ add_executable(ka-hgis
   src/app/KaDrawingStudioPlate.h
   src/app/KaTabClose.h
   src/app/KaFileRowDelegate.h
+  src/app/KaStageRail.h
   src/app/KaPrintDialog.h
   src/app/KaTilePreview.h
   src/app/MainWindow.h
@@ -1443,7 +1445,7 @@ if(KA_HGIS_BUILD_TESTS)
   ka_add_qtest(topographic_catalog ka_topographic_catalog_tests)
   add_executable(ka_topographic_browser_tests tests/test_topographic_browser.cpp
     data/providers/ngii.qrc
-    src/app/KaTopographicBrowser.cpp src/app/KaTopographicBrowser.h)
+    src/app/KaTopographicBrowser.cpp src/app/KaTopographicBrowser.h src/app/KaStageRail.cpp src/app/KaStageRail.h)
   target_include_directories(ka_topographic_browser_tests PRIVATE src)
   set_target_properties(ka_topographic_browser_tests PROPERTIES WIN32_EXECUTABLE FALSE)
   target_link_libraries(ka_topographic_browser_tests PRIVATE ka_core Qt6::Test Qt6::WebEngineWidgets Qt6::Network)
@@ -1467,7 +1469,7 @@ if(KA_HGIS_BUILD_TESTS)
   add_executable(ka_topographic_scope_tests tests/test_topographic_scope.cpp
     data/providers/ngii.qrc
     src/app/KaTopographicScopePanel.cpp src/app/KaTopographicScopePanel.h
-    src/app/KaTopographicBrowser.cpp src/app/KaTopographicBrowser.h
+    src/app/KaTopographicBrowser.cpp src/app/KaTopographicBrowser.h src/app/KaStageRail.cpp src/app/KaStageRail.h
     src/app/KaTopographicImportDialog.cpp src/app/KaTopographicImportDialog.h
     src/app/KaCrashGuard.cpp src/app/KaCrashGuard.h)
   target_link_libraries(ka_topographic_scope_tests PRIVATE ka_core Qt6::Test Qt6::WebEngineWidgets)
@@ -1501,7 +1503,7 @@ if(KA_HGIS_BUILD_TESTS)
 
   add_executable(ka_download_ui_tests tests/test_download_ui.cpp
     src/app/KaDownloadUi.cpp src/app/KaDownloadUi.h
-    src/app/KaTopographicBrowser.cpp src/app/KaTopographicBrowser.h
+    src/app/KaTopographicBrowser.cpp src/app/KaTopographicBrowser.h src/app/KaStageRail.cpp src/app/KaStageRail.h
     src/app/KaHeritageBrowser.cpp src/app/KaHeritageBrowser.h)
   target_link_libraries(ka_download_ui_tests PRIVATE ka_core Qt6::Test Qt6::WebEngineWidgets)
   set_target_properties(ka_download_ui_tests PROPERTIES WIN32_EXECUTABLE FALSE)
@@ -1532,6 +1534,13 @@ if(KA_HGIS_BUILD_TESTS)
   target_link_libraries(ka_drawing_plate_tests PRIVATE Qt6::Test Qt6::Widgets)
   set_target_properties(ka_drawing_plate_tests PROPERTIES WIN32_EXECUTABLE FALSE)
   ka_add_qtest(drawing_plate ka_drawing_plate_tests)
+  # 「조용한 도판」 받는 순서 rail of the download windows (board 5, no QGIS).
+  add_executable(ka_stage_rail_tests tests/test_stage_rail.cpp src/app/KaStageRail.cpp src/app/KaStageRail.h)
+  target_include_directories(ka_stage_rail_tests PRIVATE src)
+  target_link_libraries(ka_stage_rail_tests PRIVATE Qt6::Test Qt6::Widgets)
+  set_target_properties(ka_stage_rail_tests PROPERTIES WIN32_EXECUTABLE FALSE)
+  ka_add_qtest(stage_rail ka_stage_rail_tests)
+  set_tests_properties(stage_rail PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen" TIMEOUT 60)
   set_tests_properties(drawing_plate PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen" TIMEOUT 60)
   add_executable(ka_drawing_studio_tests tests/test_drawing_studio.cpp
     src/app/KaDrawingNorthArrow.cpp src/app/KaDrawingNorthArrow.h

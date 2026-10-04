@@ -9,6 +9,7 @@
 #include <QStringList>
 #include <QUrl>
 
+class KaStageRail;
 class QLabel;
 class QProgressBar;
 class QTabWidget;
@@ -80,6 +81,7 @@ private:
   QLabel* m_currentStage = nullptr;
   QLabel* m_transferSummary = nullptr;
   QLabel* m_stageTrail = nullptr;
+  KaStageRail* m_stageRail = nullptr;  // 새 모양: the board's 받는 순서 in place of m_stageTrail
   QProgressBar* m_progress = nullptr;
   QWidget* m_details = nullptr;
   QScrollArea* m_detailsScroll = nullptr;

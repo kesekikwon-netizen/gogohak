@@ -1,5 +1,6 @@
 #include "KaTopographicBrowser.h"
 #include "KaDownloadUi.h"
+#include "KaStageRail.h"
 #include "KaWindowGeometry.h"
 #include <QCoreApplication>
 #include <QDebug>
@@ -175,6 +176,7 @@ KaTopographicBrowser::KaTopographicBrowser(QWidget* parent, const QString& downl
   m_stageTrail=new QLabel(QStringLiteral("도엽 확인 → 로그인 → 신청 → 파일 준비 → 다운로드 → 지도에 올리기"),this);
   m_stageTrail->setObjectName(QStringLiteral("topographicStageTrail"));
   m_stageTrail->setWordWrap(true);detailsLayout->insertWidget(0,m_stageTrail);
+  m_stageRail=KaStageRail::replace(m_stageTrail);  // 새 모양: six steps on a line (2차 보드 판 5)
   m_currentStage=new QLabel(this);m_currentStage->setObjectName(QStringLiteral("topographicCurrentStage"));
   auto stageFont=m_currentStage->font();stageFont.setBold(true);m_currentStage->setFont(stageFont);
   m_currentStage->setWordWrap(true);m_currentStage->hide();statusLayout->addWidget(m_currentStage);
@@ -410,6 +412,7 @@ void KaTopographicBrowser::updateProgress() {
     QStringLiteral("파일 준비"),QStringLiteral("다운로드"),QStringLiteral("지도에 올리기")};
   const int phaseIndex=phases.indexOf(phase);
   m_currentStage->setText(QStringLiteral("[%1/6] %2").arg(phase==QStringLiteral("보관 자료 확인")?1:(phaseIndex<0?6:phaseIndex+1)).arg(phase));
+  if(m_stageRail)m_stageRail->setCurrent(completed?6:(phase==QStringLiteral("보관 자료 확인")?0:(phaseIndex<0?5:phaseIndex)));
   QString summary=m_officialRecords.isEmpty()?QStringLiteral("받을 도엽 수 확인 중"):
       QStringLiteral("도엽 수신 완료 %1/%2장").arg(m_sheetIndex).arg(m_officialRecords.size());
   if(m_officialRecords.isEmpty() && m_automationStage==QLatin1String("complete"))

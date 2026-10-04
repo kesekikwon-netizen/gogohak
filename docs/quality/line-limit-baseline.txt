@@ -15,7 +15,7 @@
 1110 src/app/KaSectionDrawingStudio.cpp
 636 src/app/KaTerrain3dLayoutStudio.cpp
 546 src/app/KaTerrain3dStudio.cpp
-1103 src/app/KaTopographicBrowser.cpp
+1106 src/app/KaTopographicBrowser.cpp
 996 src/app/KaTopographicImportDialog.cpp
 632 src/app/KaTopographicScopePanel.cpp
 524 src/app/KaVertexEditTool.cpp
