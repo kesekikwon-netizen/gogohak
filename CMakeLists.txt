@@ -454,7 +454,9 @@ add_executable(ka-hgis
   src/app/KaIconMetrics.h
   src/app/KaUserError.cpp
   src/app/KaSubmitDialog.cpp
+  src/app/KaSubmitDrawingStrip.cpp
   src/app/KaSubmitDialog.h
+  src/app/KaSubmitDrawingStrip.h
   src/app/KaSubmitFlow.cpp
   src/app/KaIcons.cpp
   src/app/KaCaptureMapTool.cpp
@@ -1258,7 +1260,8 @@ if(KA_HGIS_BUILD_TESTS)
   target_link_libraries(ka_submit_package_tests PRIVATE ka_core Qt6::Test)
   set_target_properties(ka_submit_package_tests PROPERTIES WIN32_EXECUTABLE FALSE)
   ka_add_qtest(submit_package ka_submit_package_tests)
-  add_executable(ka_submit_dialog_tests tests/test_submit_dialog.cpp src/app/KaSubmitDialog.cpp src/app/KaSubmitDialog.h)
+  add_executable(ka_submit_dialog_tests tests/test_submit_dialog.cpp src/app/KaSubmitDialog.cpp src/app/KaSubmitDialog.h
+    src/app/KaSubmitDrawingStrip.cpp src/app/KaSubmitDrawingStrip.h)
   target_link_libraries(ka_submit_dialog_tests PRIVATE ka_core Qt6::Test Qt6::Widgets)
   target_include_directories(ka_submit_dialog_tests PRIVATE ${CMAKE_SOURCE_DIR}/src)
   set_target_properties(ka_submit_dialog_tests PROPERTIES WIN32_EXECUTABLE FALSE)

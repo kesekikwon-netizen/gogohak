@@ -56,6 +56,7 @@ void MainWindow::openSubmitReview() {
   KaSubmitDialog dialog(this);
   const auto refresh = [this, &dialog]() {
     const bool rules = ensureChecklistRules();
+    dialog.setRulesTitle(m_checklist ? m_checklist->title() : QString());
     dialog.setResults(evaluateChecklist(), rules, rules ? QString() : QDir::toNativeSeparators(rulesPath()));
     statusBar()->showMessage(QStringLiteral("검수: 오류 %1 · 주의 %2")
                                  .arg(dialog.errorCount()).arg(dialog.warnCount()), 8000);

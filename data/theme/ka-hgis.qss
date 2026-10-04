@@ -1407,3 +1407,12 @@ QFrame#basemapQuickCard[kaPlate="true"] QToolButton { min-width: 0; min-height: 
   border-radius: 8px; background: @surface@; color: @ink@; font-size: 13px; }
 QFrame#basemapQuickCard[kaPlate="true"] QToolButton:checked { background: @sheetOnFace@; color: @sheetOnInk@; border-color: @sheetOnEdge@; }
 QFrame#basemapQuickCard[kaPlate="true"] QToolButton:enabled:focus { border-color: @focusRing@; }
+/* 검수·제출 (2차 보드 판 3, 새 모양 only): the result as a serif headline, the rules' name under it, and the
+   오류 · 주의 · 통과 counts at the top right between hairlines; the error count reads in the blocking red. */
+QLabel#submitHeadline { font-family: @titleFont@; font-weight: @titleWeight@; font-size: @bigNameSize@px; color: @ink@; }
+QLabel#submitSubline { color: @inkMuted@; font-size: 12px; }
+QFrame#submitCounts { border: none; border-top: 1px solid @border@; border-bottom: 1px solid @border@; }
+QFrame#submitCountRule { background: @border@; border: none; }
+QLabel#submitCountCaption { color: @inkMuted@; font-size: 11px; }
+QLabel#submitCountError, QLabel#submitCountWarn, QLabel#submitCountPass { color: @ink@; font-size: 18px; }
+QLabel#submitCountError { color: @danger@; }

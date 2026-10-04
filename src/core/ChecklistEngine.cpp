@@ -63,6 +63,9 @@ bool ChecklistEngine::loadRules(const QString& jsonPath) {
   if (rules.isEmpty()) return false;
   m_rules = rules;
   m_path = jsonPath;
+  const QString title = doc.object().value(QStringLiteral("title_ko")).toString();
+  const int version = doc.object().value(QStringLiteral("version")).toInt();
+  m_title = title.isEmpty() || version <= 0 ? title : QStringLiteral("%1 v%2").arg(title).arg(version);
   return true;
 }
 

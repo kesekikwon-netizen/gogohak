@@ -4,6 +4,7 @@
 #include <QDialog>
 #include <QVector>
 
+class KaSubmitDrawingStrip;
 class QLabel;
 class QPushButton;
 class QTreeWidget;
@@ -24,6 +25,8 @@ public:
   void setResults(const QVector<CheckResult>& results, bool rulesLoaded, const QString& rulesHint = {});
   // Selected vector layer for 「레이어 5179 변환」; empty disables the button with a hint.
   void setConvertLayerName(const QString& layerName);
+  // The rules' own name under the 새 모양 headline (ChecklistEngine::title()).
+  void setRulesTitle(const QString& title) { m_rulesTitle = title; }
 
   Choice choice() const { return m_choice; }
   // The row whose 「위치 보기」 or tool button was pressed (targets may be narrowed to one).
@@ -39,12 +42,13 @@ signals:
   void recheckRequested();
 
 private:
+  QWidget* buildPlateHead();
   void rebuild();
   void choose(Choice choice, const CheckResult& result = {});
   void addResultRow(QTreeWidgetItem* group, int index);
 
   QLabel* m_summary = nullptr;
-  QWidget* m_drawings = nullptr;  // 새 모양 필수 도면 5종 strip
+  KaSubmitDrawingStrip* m_drawings = nullptr;  // 새 모양 필수 도면 5종 strip
   QLabel* m_blockReason = nullptr;
   QTreeWidget* m_tree = nullptr;
   QPushButton* m_package = nullptr;
@@ -52,6 +56,11 @@ private:
   QVector<CheckResult> m_results;
   bool m_rulesLoaded = true;
   QString m_rulesHint;
+  QString m_rulesTitle;
+  bool m_plate = false;  // 새 모양 when the window opened
+  QLabel* m_headline = nullptr;
+  QLabel* m_subline = nullptr;
+  QLabel* m_counts[3] = {};  // 오류 · 주의 · 통과
   Choice m_choice = Choice::None;
   CheckResult m_chosen;
 };

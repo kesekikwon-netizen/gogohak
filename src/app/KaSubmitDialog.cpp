@@ -1,11 +1,13 @@
 #include "KaSubmitDialog.h"
+#include "KaSubmitDrawingStrip.h"
+#include "KaWindowSize.h"
 
 #include <QApplication>
+#include <QFrame>
 #include <QHBoxLayout>
 #include <QHash>
 #include <QHeaderView>
 #include <QLabel>
-#include <QPainter>
 #include <QPushButton>
 #include <QTreeWidget>
 #include <QVBoxLayout>
@@ -15,83 +17,17 @@
 namespace {
 constexpr int kMaxTargetRows = 30;
 constexpr int kTargetRole = Qt::UserRole + 1;
+const QColor kBlockingRow(0xF3, 0xDE, 0xDA);  // 새 모양: a blocking row on the danger wash (2차 보드)
 
-// 「조용한 도판」 필수 도면 5종 (2차 보드 검수 목록): a paper tile per drawing, ink-framed when its rule
-// passed, dashed with 「없음」 when it failed. Display only; the drawing rules decide. The strip exists
-// only in 새 모양, so it paints with the board's colours (this dialog does not link the theme).
-struct RequiredDrawing { const char* rule; const char* name; };
-constexpr RequiredDrawing kRequiredDrawings[] = {{"REQ_DRAWING_SURVEY_AREA", "조사구역도"},
-                                                 {"REQ_DRAWING_SITE_LOCATION", "유적위치도"},
-                                                 {"REQ_DRAWING_FEATURE_PLAN", "유구배치도"},
-                                                 {"REQ_DRAWING_FEATURE_DETAIL", "개별유구실측도"},
-                                                 {"REQ_DRAWING_SECTION", "층위도"}};
-
-class DrawingStrip final : public QWidget {
-public:
-  explicit DrawingStrip(QWidget* parent) : QWidget(parent) {
-    setObjectName(QStringLiteral("submitDrawingStrip"));
-    setFixedHeight(108);
-  }
-  void setResults(const QVector<CheckResult>& results) {
-    QStringList present, missing;
-    for (const RequiredDrawing& drawing : kRequiredDrawings) {
-      const auto found = std::find_if(results.cbegin(), results.cend(),
-                                      [&drawing](const CheckResult& r) { return r.id == QLatin1String(drawing.rule); });
-      if (found != results.cend()) (found->passed ? present : missing) << QString::fromUtf8(drawing.name);
-    }
-    setProperty("present", present);
-    setProperty("missing", missing);
-    setVisible(!present.isEmpty() || !missing.isEmpty());  // no rule file: no drawing state to show
-    update();
-  }
-
-protected:
-  void paintEvent(QPaintEvent*) override {
-    const QColor desk(0xF0, 0xEE, 0xE6), ink(0x14, 0x14, 0x13), edge(0xC2, 0xC0, 0xB6), muted(0x5E, 0x5D, 0x59),
-        caution(0x7A, 0x5A, 0x00);
-    QPainter p(this);
-    p.fillRect(rect(), desk);
-    const QStringList present = property("present").toStringList();
-    const QStringList missing = property("missing").toStringList();
-    constexpr int kTileW = 88, kTileH = 62;
-    const int count = int(std::size(kRequiredDrawings));
-    const int gap = qMax(8, (width() - count * kTileW) / (count + 1));
-    QFont font = p.font();
-    for (int i = 0; i < count; ++i) {
-      const QString name = QString::fromUtf8(kRequiredDrawings[i].name);
-      const QRect tile(gap + i * (kTileW + gap), 10, kTileW, kTileH);
-      const bool has = present.contains(name);
-      if (has) p.fillRect(tile, Qt::white);
-      p.setPen(has ? QPen(ink, 1) : QPen(edge, 1, Qt::DashLine));
-      p.setBrush(Qt::NoBrush);
-      p.drawRect(tile.adjusted(0, 0, -1, -1));
-      font.setPixelSize(12);
-      p.setFont(font);
-      p.setPen(ink);
-      p.drawText(QRect(tile.left() - 10, tile.bottom() + 4, kTileW + 20, 16), Qt::AlignCenter, name);
-      if (!missing.contains(name)) continue;
-      // 「없음」 with a caution triangle under the name.
-      font.setPixelSize(11);
-      p.setFont(font);
-      const QRect status(tile.left(), tile.bottom() + 20, kTileW, 14);
-      p.setRenderHint(QPainter::Antialiasing);
-      p.setPen(Qt::NoPen);
-      p.setBrush(caution);
-      const double cx = status.center().x() - 16, top = status.top() + 2;
-      p.drawPolygon(QPolygonF({QPointF(cx, top), QPointF(cx + 5, top + 9), QPointF(cx - 5, top + 9)}));
-      p.setRenderHint(QPainter::Antialiasing, false);
-      p.setPen(muted);
-      p.drawText(status.adjusted(10, 0, 0, 0), Qt::AlignCenter, QStringLiteral("없음"));
-    }
-  }
-};
 }  // namespace
 
 KaSubmitDialog::KaSubmitDialog(QWidget* parent) : QDialog(parent) {
   setObjectName(QStringLiteral("submitReviewDialog"));
   setWindowTitle(QStringLiteral("검수·제출"));
-  resize(820, 580);
+  resize(KaWindowSize::width(KaWindowSize::Large, 820), 600);  // 새 모양: the L window (860)
   auto* layout = new QVBoxLayout(this);
+  m_plate = qApp && qApp->property("kaPaperLook").toBool();
+  if (m_plate) layout->addWidget(buildPlateHead());
 
   auto* intro = new QLabel(
       QStringLiteral("제출 꾸러미 = EPSG:5179 SHP + 조사도면.pdf + MANIFEST.sha256 입니다. "
@@ -99,7 +35,9 @@ KaSubmitDialog::KaSubmitDialog(QWidget* parent) : QDialog(parent) {
                      "필수 도면 5종은 조사구역도·유적위치도·유구배치도·개별유구실측도·층위도입니다. "
                      "유적위치도·유구배치도·개별유구실측도는 「도면」에서 만든 용지로 확인합니다."),
       this);
+  intro->setObjectName(QStringLiteral("submitIntro"));
   intro->setWordWrap(true);
+  intro->setVisible(!m_plate);  // 새 모양: the headline and the drawing strip say it
   layout->addWidget(intro);
 
   m_summary = new QLabel(this);
@@ -107,9 +45,10 @@ KaSubmitDialog::KaSubmitDialog(QWidget* parent) : QDialog(parent) {
   QFont bold = m_summary->font();
   bold.setBold(true);
   m_summary->setFont(bold);
+  m_summary->setVisible(!m_plate);  // 새 모양: the counts at the top right
   layout->addWidget(m_summary);
-  if (qApp && qApp->property("kaPaperLook").toBool()) {
-    m_drawings = new DrawingStrip(this);
+  if (m_plate) {
+    m_drawings = new KaSubmitDrawingStrip(this);
     layout->addWidget(m_drawings);
   }
 
@@ -164,6 +103,50 @@ KaSubmitDialog::KaSubmitDialog(QWidget* parent) : QDialog(parent) {
   buttons->addWidget(close);
   layout->addLayout(buttons);
   setConvertLayerName({});
+}
+
+// 「조용한 도판」 (2차 보드 판 3): the result as a serif headline, the rules' name under it, 오류 · 주의 · 통과 counts.
+QWidget* KaSubmitDialog::buildPlateHead() {
+  auto* head = new QWidget(this);
+  auto* row = new QHBoxLayout(head);
+  row->setContentsMargins(0, 0, 0, 0);
+  row->setSpacing(24);
+  auto* words = new QVBoxLayout;
+  words->setSpacing(4);
+  m_headline = new QLabel(head);
+  m_headline->setObjectName(QStringLiteral("submitHeadline"));
+  m_headline->setWordWrap(true);
+  m_subline = new QLabel(head);
+  m_subline->setObjectName(QStringLiteral("submitSubline"));
+  m_subline->setWordWrap(true);
+  words->addWidget(m_headline);
+  words->addWidget(m_subline);
+  row->addLayout(words, 1);
+  auto* counts = new QFrame(head);
+  counts->setObjectName(QStringLiteral("submitCounts"));
+  auto* cells = new QHBoxLayout(counts);
+  cells->setContentsMargins(0, 0, 0, 0);
+  cells->setSpacing(0);
+  const char* cellNames[][2] = {{"오류", "submitCountError"}, {"주의", "submitCountWarn"}, {"통과", "submitCountPass"}};
+  for (int i = 0; i < 3; ++i) {
+    if (i > 0) {
+      auto* rule = new QFrame(counts);
+      rule->setObjectName(QStringLiteral("submitCountRule"));
+      rule->setFixedWidth(1);
+      cells->addWidget(rule);
+    }
+    auto* cell = new QVBoxLayout;
+    cell->setContentsMargins(12, 6, 24, 6);
+    auto* caption = new QLabel(QString::fromUtf8(cellNames[i][0]), counts);
+    caption->setObjectName(QStringLiteral("submitCountCaption"));
+    m_counts[i] = new QLabel(counts);
+    m_counts[i]->setObjectName(QString::fromLatin1(cellNames[i][1]));
+    cell->addWidget(caption);
+    cell->addWidget(m_counts[i]);
+    cells->addLayout(cell);
+  }
+  row->addWidget(counts, 0, Qt::AlignTop);
+  return head;
 }
 
 QString KaSubmitDialog::actionLabel(const QString& action) {
@@ -224,6 +207,8 @@ void KaSubmitDialog::addResultRow(QTreeWidgetItem* group, int index) {
   row->setToolTip(0, tip);
   row->setToolTip(1, r.fixKo);
   if (r.passed) return;
+  if (m_plate && r.severity == QLatin1String("error"))
+    for (int column = 0; column < 3; ++column) row->setBackground(column, kBlockingRow);
   for (int i = 0; i < r.targets.size() && i < kMaxTargetRows; ++i) {
     const CheckTarget& t = r.targets.at(i);
     auto* child = new QTreeWidgetItem(row);
@@ -242,9 +227,11 @@ void KaSubmitDialog::addResultRow(QTreeWidgetItem* group, int index) {
   auto* cell = new QWidget(m_tree);
   auto* cellLayout = new QHBoxLayout(cell);
   cellLayout->setContentsMargins(0, 0, 0, 0);
+  if (m_plate) cellLayout->addStretch(1);  // 새 모양: compact buttons at the right; the fix text keeps the width
   if (hasLayerTargets) {
     auto* go = new QPushButton(QStringLiteral("위치 보기"), cell);
     go->setObjectName(QStringLiteral("btnGoTo_%1").arg(r.id));
+    go->setFlat(m_plate);  // 새 모양: a word button beside the fix button
     connect(go, &QPushButton::clicked, this, [this, r]() { choose(Choice::GoToTargets, r); });
     cellLayout->addWidget(go);
   }
@@ -259,7 +246,7 @@ void KaSubmitDialog::addResultRow(QTreeWidgetItem* group, int index) {
 
 void KaSubmitDialog::rebuild() {
   m_tree->clear();
-  if (m_drawings) static_cast<DrawingStrip*>(m_drawings)->setResults(m_results);
+  if (m_drawings) m_drawings->setResults(m_results);
   const int errors = errorCount();
   const int warns = warnCount();
   const int passed = int(std::count_if(m_results.cbegin(), m_results.cend(),
@@ -292,6 +279,19 @@ void KaSubmitDialog::rebuild() {
   } else {
     m_blockReason->setText(warns > 0 ? QStringLiteral("오류가 없습니다. 주의 항목은 확인한 뒤 진행할 수 있습니다.")
                                      : QStringLiteral("오류와 주의 항목이 없습니다."));
+  }
+  if (m_plate) {
+    const bool noRules = !m_rulesLoaded || m_results.isEmpty();
+    m_headline->setText(noRules ? QStringLiteral("검수 규칙 파일을 찾지 못했습니다")
+                        : errors > 0 ? QStringLiteral("오류 %1건을 고쳐야 제출할 수 있습니다").arg(errors)
+                        : warns > 0  ? QStringLiteral("오류가 없습니다")
+                                     : QStringLiteral("오류와 주의 항목이 없습니다"));
+    m_subline->setText((m_rulesTitle.isEmpty() ? QString() : m_rulesTitle + QStringLiteral(" · ")) +
+                       (errors > 0 ? QStringLiteral("「위치 보기」나 옆 단추로 고칠 곳을 여세요.")
+                                   : QStringLiteral("주의 항목은 확인한 뒤 진행할 수 있습니다.")));
+    const int numbers[] = {errors, warns, passed};
+    for (int i = 0; i < 3; ++i) m_counts[i]->setText(QStringLiteral("%1 건").arg(numbers[i]));
+    m_blockReason->setVisible(noRules);  // only where the rule file was looked for
   }
   m_package->setEnabled(packageAllowed());
   m_package->setToolTip(packageAllowed()

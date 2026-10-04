@@ -2,8 +2,13 @@
 // missing rule file), and 「위치 보기」 / tool buttons report the chosen row.
 #include "app/KaSubmitDialog.h"
 
+#include <QFile>
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QJsonObject>
 #include <QLabel>
 #include <QPushButton>
+#include <QTemporaryDir>
 #include <QTreeWidget>
 #include <QtTest>
 
@@ -47,6 +52,68 @@ private slots:
     dialog.setResults({}, false);  // no rule file: no drawing state to show
     QVERIFY(strip->isHidden());
   }
+  // The rule file's own title and version name the check under the headline (2차 보드 검수·제출).
+  void rulesTitleNamesTheCheck() {
+    QTemporaryDir dir;
+    QFile file(dir.filePath(QStringLiteral("rules.json")));
+    QVERIFY(file.open(QIODevice::WriteOnly));
+    const QJsonObject rule{{QStringLiteral("id"), QStringLiteral("A")}, {QStringLiteral("severity"), QStringLiteral("error")},
+                           {QStringLiteral("message_ko"), QStringLiteral("a")},
+                           {QStringLiteral("check_type"), QStringLiteral("layer_nonempty:survey_area")}};
+    const QJsonObject root{{QStringLiteral("version"), 1}, {QStringLiteral("title_ko"), QStringLiteral("발굴 위치도면 유의사항 기반 검수")},
+                           {QStringLiteral("rules"), QJsonArray{rule}}};
+    file.write(QJsonDocument(root).toJson());
+    file.close();
+    ChecklistEngine engine;
+    QVERIFY(engine.loadRules(file.fileName()));
+    QCOMPARE(engine.title(), QStringLiteral("발굴 위치도면 유의사항 기반 검수 v1"));
+  }
+
+  // 「조용한 도판」 검수·제출 (2차 보드 판 3): the serif headline says what blocks, the counts sit top right and the
+  // rule title under the headline; a blocking row is red and 「위치 보기」 is a word button. Stock keeps its intro.
+  void paperHeadSaysWhatBlocks() {
+    {
+      KaSubmitDialog stock;
+      QVERIFY(!stock.findChild<QLabel*>(QStringLiteral("submitHeadline")));
+    }
+    qApp->setProperty("kaPaperLook", true);
+    KaSubmitDialog dialog;
+    qApp->setProperty("kaPaperLook", QVariant());
+    dialog.setRulesTitle(QStringLiteral("발굴 위치도면 유의사항 기반 검수 v1"));
+    CheckResult blocking = result(QStringLiteral("SPEC"), QStringLiteral("error"), false, QStringLiteral("edit_attributes"));
+    CheckTarget target;
+    target.layerId = QStringLiteral("f");
+    target.layerName = QStringLiteral("유구 (면)");
+    target.label = QStringLiteral("3호 수혈");
+    blocking.targets = {target};
+    dialog.setResults({blocking, result(QStringLiteral("W1"), QStringLiteral("warn"), false),
+                       result(QStringLiteral("W2"), QStringLiteral("warn"), false), result(QStringLiteral("P"), QStringLiteral("error"), true)},
+                      true);
+    const auto text = [&dialog](const char* name) {
+      auto* label = dialog.findChild<QLabel*>(QString::fromLatin1(name));
+      return label ? label->text() : QStringLiteral("(없음)");
+    };
+    QCOMPARE(text("submitHeadline"), QStringLiteral("오류 1건을 고쳐야 제출할 수 있습니다"));
+    QVERIFY(text("submitSubline").startsWith(QStringLiteral("발굴 위치도면 유의사항 기반 검수 v1")));
+    QCOMPARE(text("submitCountError"), QStringLiteral("1 건"));
+    QCOMPARE(text("submitCountWarn"), QStringLiteral("2 건"));
+    QCOMPARE(text("submitCountPass"), QStringLiteral("1 건"));
+    QVERIFY(dialog.findChild<QLabel*>(QStringLiteral("submitIntro"))->isHidden());
+    auto* tree = dialog.findChild<QTreeWidget*>(QStringLiteral("submitReviewTree"));
+    QCOMPARE(tree->topLevelItem(0)->child(0)->background(0).color(), QColor(0xF3, 0xDE, 0xDA));
+    QVERIFY(dialog.findChild<QPushButton*>(QStringLiteral("btnGoTo_SPEC"))->isFlat());
+    dialog.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&dialog));
+    auto* fix = dialog.findChild<QPushButton*>(QStringLiteral("btnAction_SPEC"));
+    QVERIFY2(fix->width() <= fix->sizeHint().width() + 4, qPrintable(QString::number(fix->width())));  // compact, at the right
+    dialog.setResults({result(QStringLiteral("W1"), QStringLiteral("warn"), false)}, true);
+    QCOMPARE(text("submitHeadline"), QStringLiteral("오류가 없습니다"));
+    dialog.setResults({result(QStringLiteral("P"), QStringLiteral("error"), true)}, true);
+    QCOMPARE(text("submitHeadline"), QStringLiteral("오류와 주의 항목이 없습니다"));
+    dialog.setResults({}, false);
+    QCOMPARE(text("submitHeadline"), QStringLiteral("검수 규칙 파일을 찾지 못했습니다"));
+  }
+
   void errorsBlockThePackage() {
     KaSubmitDialog dialog;
     auto* package = dialog.findChild<QPushButton*>(QStringLiteral("btnSubmitPackage"));

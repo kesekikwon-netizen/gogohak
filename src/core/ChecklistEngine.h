@@ -34,6 +34,8 @@ public:
   QVector<CheckResult> evaluate(const QJsonObject& projectState) const;
   int ruleCount() const { return m_rules.size(); }
   QString loadedPath() const { return m_path; }
+  // The rule file's title_ko and version, "발굴 위치도면 유의사항 기반 검수 v1"; empty without a title.
+  QString title() const { return m_title; }
   // Rules whose check_type has no evaluator. They always fail (fail-closed).
   QStringList unsupportedRuleIds() const;
   static bool isSupportedCheckType(const QString& checkType);
@@ -55,5 +57,6 @@ private:
   };
   QVector<Rule> m_rules;
   QString m_path;
+  QString m_title;
   static bool evalOne(const Rule& r, const QJsonObject& state, bool* supported);
 };
