@@ -1902,6 +1902,12 @@ target_sources(ka_core PRIVATE ${CMAKE_SOURCE_DIR}/src/core/SurveyFacts.cpp ${CM
 target_sources(ka-hgis PRIVATE ${_ka_p3_app_sources})
 if(KA_HGIS_BUILD_TESTS)
   target_sources(ka_home_tests PRIVATE ${_ka_p3_app_sources})
+  # The layer list shows a survey layer's feature count in 새 모양, so its test reads the display options.
+  foreach(_ka_layer_target IN ITEMS ka_layer_information_tests ka_layer_panel_tests)
+    target_sources(${_ka_layer_target} PRIVATE src/app/KaTheme.cpp src/app/KaThemeSheet.cpp src/app/KaThemeStyle.cpp
+      src/app/KaIcons.cpp ${_ka_p2_outline_sources} ${_ka_p1_font_sources})
+    target_include_directories(${_ka_layer_target} PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_BINARY_DIR}/generated)
+  endforeach()
   # Home cards, rows, badges and the compact hero (tests/test_home.cpp stays under 300 lines).
   add_executable(ka_home_cards_tests tests/test_home_cards.cpp
     src/app/KaStartPage.cpp src/app/KaStartHero.cpp src/app/KaSplashArt.cpp

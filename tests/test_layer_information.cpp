@@ -21,6 +21,9 @@
 #include <qgsproject.h>
 #include <qgsvectorlayer.h>
 #include "app/KaLayerInformation.h"
+#include "app/KaTheme.h"
+#include <qgsfeature.h>
+#include <qgsgeometry.h>
 #include "core/HeritageStyle.h"
 #include "core/LayerLabelControls.h"
 #include "core/LayerOps.h"
@@ -87,6 +90,21 @@ struct Sidebar {
 class LayerInformationTest : public QObject {
   Q_OBJECT
 private slots:
+  // 「조용한 도판」 도형 개수: in 새 모양 a survey layer's row ends with its feature count (stock: the plain name).
+  void surveyLayerRowShowsItsFeatureCountInPaper() {
+    QgsProject project;
+    auto* layer = add(project, project.layerTreeRoot()->addGroup(QStringLiteral("조사 데이터")), QStringLiteral("유구 (면)"));
+    LayerOps::markSurveyLayer(layer, QStringLiteral("feature_poly"));
+    QgsFeature f(layer->fields()); f.setGeometry(QgsGeometry::fromWkt(QStringLiteral("Polygon((0 0,1 0,1 1,0 0))")));
+    QgsFeatureList two; two << f << f; layer->dataProvider()->addFeatures(two);
+    KaLayerInformationModel model(&project, false);
+    const auto row = model.node2index(project.layerTreeRoot()->findLayer(layer->id()));
+    QCOMPARE(model.data(row, Qt::DisplayRole).toString(), QStringLiteral("유구 (면)"));
+    KaTheme::DisplayOptions paper; paper.paperLook = true; KaTheme::setDisplayOptions(nullptr, paper);
+    const QString shown = model.data(row, Qt::DisplayRole).toString();
+    KaTheme::setDisplayOptions(nullptr, KaTheme::DisplayOptions());
+    QVERIFY2(shown.startsWith(QStringLiteral("유구 (면)")) && shown.endsWith(QStringLiteral("2")), qPrintable(shown));
+  }
   void nativeModelSupportsSecondColumnWithoutBreakingTree() {
     QgsProject project;
     auto* group = project.layerTreeRoot()->addGroup(QStringLiteral("참조 지도"));

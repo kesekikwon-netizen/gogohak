@@ -1,4 +1,5 @@
 #include "KaLayerInformation.h"
+#include "KaTheme.h"
 #include "core/HeritageStyle.h"
 #include "core/LayerLabelControls.h"
 #include "core/LayerOps.h"
@@ -167,6 +168,13 @@ QVariant KaLayerInformationModel::data(const QModelIndex& item, int role) const 
       font.setItalic(false);
       return font;
     }
+  }
+  // 「조용한 도판」 도형 개수: a survey layer's row ends with how many shapes it holds.
+  if (item.column() == 0 && role == Qt::DisplayRole && KaTheme::displayOptions().paperLook) {
+    auto* leaf = qobject_cast<QgsLayerTreeLayer*>(index2node(item));
+    auto* vector = leaf ? qobject_cast<QgsVectorLayer*>(leaf->layer()) : nullptr;
+    if (vector && !LayerOps::layerKeyOf(vector).isEmpty() && vector->featureCount() > 0)
+      return QgsLayerTreeModel::data(item, role).toString() + QStringLiteral("  ") + QString::number(vector->featureCount());
   }
   if (item.column() == 0 && role == Qt::ToolTipRole) {
     // Rows whose map position is fixed by a user rule say so, instead of a drag
