@@ -1,4 +1,5 @@
 #include "MainWindow.h"
+#include "KaApiKeyDialog.h"
 #include "KaBeginnerRibbon.h"
 #include "KaCrashGuard.h"
 #include "KaDrawingStudio.h"
@@ -1775,40 +1776,10 @@ void MainWindow::setWorkCrs5187() {
 }
 
 void MainWindow::configureVworldKey() {
-  QDialog dlg(this);
-  dlg.setWindowTitle(QStringLiteral("API 키 입력"));
-  dlg.setMinimumWidth(460);
-  auto* form = new QFormLayout(&dlg);
-  form->setSpacing(12);
-  form->setContentsMargins(20, 20, 20, 16);
-  auto* vworldEdit = new QLineEdit(&dlg);
-  vworldEdit->setText(VworldSettings::loadApiKey());
-  vworldEdit->setPlaceholderText(QStringLiteral("vworld.kr 인증키"));
-  auto* vworldHint = new QLabel(
-      QStringLiteral("위성·지적·검색 공통 (SSOT: VWorld/ApiKey)"), &dlg);
-  vworldHint->setWordWrap(true);
-  auto* historyEdit = new QLineEdit(&dlg);
-  historyEdit->setText(VworldSettings::loadHistoryGisApiKey());
-  historyEdit->setPlaceholderText(QStringLiteral("hgis.history.go.kr 인증키"));
-  auto* historyHint = new QLabel(
-      QStringLiteral("1919 조선지형도 전용. VWorld 키로는 인증되지 않습니다.\n"
-                     "https://hgis.history.go.kr/api/intro.do"),
-      &dlg);
-  historyHint->setWordWrap(true);
-  historyHint->setOpenExternalLinks(true);
-  form->addRow(QStringLiteral("VWorld API 키"), vworldEdit);
-  form->addRow(vworldHint);
-  form->addRow(QStringLiteral("역사지리정보DB API 키"), historyEdit);
-  form->addRow(historyHint);
-  auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dlg);
-  buttons->button(QDialogButtonBox::Ok)->setText(QStringLiteral("저장"));
-  buttons->button(QDialogButtonBox::Cancel)->setText(QStringLiteral("취소"));
-  form->addRow(buttons);
-  connect(buttons, &QDialogButtonBox::accepted, &dlg, &QDialog::accept);
-  connect(buttons, &QDialogButtonBox::rejected, &dlg, &QDialog::reject);
+  KaApiKeyDialog dlg(VworldSettings::loadApiKey(), VworldSettings::loadHistoryGisApiKey(), this);
   if (dlg.exec() != QDialog::Accepted) return;
-  const QString key = vworldEdit->text().trimmed();
-  const QString historyKey = historyEdit->text().trimmed();
+  const QString key = dlg.vworldKey();
+  const QString historyKey = dlg.historyKey();
   VworldSettings::saveApiKey(key);
   VworldSettings::saveHistoryGisApiKey(historyKey);
   updateHistoricalMapButtons();

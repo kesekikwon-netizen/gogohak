@@ -5,10 +5,12 @@
 #include <QApplication>
 #include <QDir>
 #include <QLabel>
+#include <QLineEdit>
 #include <QMessageBox>
 #include <QPushButton>
 #include <QStandardPaths>
 
+#include "app/KaApiKeyDialog.h"
 #include "app/KaClosePrompt.h"
 #include "app/KaTheme.h"
 #include "app/KaUserError.h"
@@ -87,6 +89,31 @@ class TestWindowPlate : public QObject {
     KaUserError::dress(stock, QMessageBox::Warning, spec);
     QVERIFY(stock.text().contains(QStringLiteral("무엇이 안 됐나")));
     QCOMPARE(stock.icon(), QMessageBox::Warning);
+  }
+
+  // API 키 입력 (보드 판 5, 440): each name over its box and one plain sentence under it; the keys come back trimmed.
+  void apiKeysAreStackedWithPlainSentencesInPaper() {
+    paper(true);
+    KaApiKeyDialog dialog(QStringLiteral(" vworld-test "), QStringLiteral("history-test"));
+    dialog.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&dialog));
+    QCOMPARE(dialog.minimumWidth(), 440);
+    const auto text = [&dialog](const char* name) {
+      auto* label = dialog.findChild<QLabel*>(QString::fromLatin1(name));
+      return label ? label->text() : QStringLiteral("(없음)");
+    };
+    QCOMPARE(text("apiKeyVworldHint"), QStringLiteral("위성 · 지적 · 주소 찾기에 함께 씁니다."));
+    QCOMPARE(text("apiKeyHistoryHint"), QStringLiteral("1919 조선지형도 전용. VWorld 키로는 인증되지 않습니다."));
+    auto* name = dialog.findChild<QLabel*>(QStringLiteral("apiKeyVworldName"));
+    auto* box = dialog.findChild<QLineEdit*>(QStringLiteral("apiKeyVworld"));
+    QVERIFY(name && box);
+    QVERIFY2(name->geometry().bottom() < box->geometry().top() && name->x() == box->x(),
+             qPrintable(QStringLiteral("name %1,%2 box %3,%4").arg(name->x()).arg(name->geometry().bottom()).arg(box->x()).arg(box->y())));
+    QCOMPARE(dialog.vworldKey(), QStringLiteral("vworld-test"));
+    QCOMPARE(dialog.historyKey(), QStringLiteral("history-test"));
+    paper(false);
+    KaApiKeyDialog stock{QString(), QString()};
+    QVERIFY(!stock.findChild<QLabel*>(QStringLiteral("apiKeyVworldHint"))->text().contains(QStringLiteral("주소 찾기")));
   }
 
   // 「광령리1을」 · 「테스트를」 · 「광령리2를」: the object particle follows how the name ends.
