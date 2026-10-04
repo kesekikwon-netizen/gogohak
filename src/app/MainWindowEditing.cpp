@@ -10,6 +10,7 @@
 #include "KaFeatureCard.h"
 #include "KaFeatureFormDialog.h"
 #include "KaFeatureSelectTool.h"
+#include "KaRecordPlate.h"
 #include "KaLineColorDialog.h"
 #include "KaVertexEditTool.h"
 #include "KaMeasureMapTool.h"
@@ -677,6 +678,7 @@ void MainWindow::editFeatureAttributes(QgsVectorLayer* layer, const QgsFeature& 
       // [pkg K] F045: kind/period = preset combo (free text allowed); other text = line edit.
       row.editor = KaFeatureFormDialog::createValueEditor(&dlg, layer, name, cur.toString());
     }
+    row.editor->setProperty("kaRecordField", name);  // 새 모양 places it in its board section (KaRecordPlate)
     form->addRow(attributeFieldLabelKo(name), row.editor);
     rows.push_back(row);
   }
@@ -692,6 +694,7 @@ void MainWindow::editFeatureAttributes(QgsVectorLayer* layer, const QgsFeature& 
   form->addRow(buttons);
   connect(buttons, &QDialogButtonBox::accepted, &dlg, &QDialog::accept);
   connect(buttons, &QDialogButtonBox::rejected, &dlg, &QDialog::reject);
+  KaRecordPlate::arrange(&dlg, form);
   if (dlg.exec() != QDialog::Accepted) return;
 
   // Check every entry first: a bad number must not leave half of the fields changed.

@@ -534,6 +534,8 @@ add_executable(ka-hgis
   src/app/KaApiKeyDialog.cpp
   src/app/KaMenuCaption.cpp
   src/app/KaFormPlate.cpp
+  src/app/KaRecordPlate.cpp
+  src/app/KaElevationFigure.cpp
   src/app/KaControlPointDialog.cpp
   src/app/KaControlCsvBox.cpp
   src/app/KaProgressPlate.cpp
@@ -549,6 +551,8 @@ add_executable(ka-hgis
   src/app/KaApiKeyDialog.h
   src/app/KaMenuCaption.h
   src/app/KaFormPlate.h
+  src/app/KaRecordPlate.h
+  src/app/KaElevationFigure.h
   src/app/KaControlPointDialog.h
   src/app/KaControlCsvBox.h
   src/app/KaProgressPlate.h
@@ -2239,6 +2243,14 @@ if(KA_HGIS_BUILD_TESTS)
   target_include_directories(ka_window_plate_tests PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_BINARY_DIR}/generated)
   ka_add_qtest(window_plate ka_window_plate_tests)
   set_tests_properties(window_plate PROPERTIES ENVIRONMENT "PATH=${_ka_path_esc};QT_QPA_PLATFORM=offscreen" TIMEOUT 90)
+  # 「도형 속성」 (조사카드) in 새 모양 (board 5): leader sections, two to a row, the 표고 section picture (no QGIS).
+  add_executable(ka_record_plate_tests tests/test_record_plate.cpp src/app/KaRecordPlate.cpp src/app/KaRecordPlate.h
+    src/app/KaElevationFigure.cpp src/app/KaElevationFigure.h ${_ka_p5_theme_sources})
+  set_target_properties(ka_record_plate_tests PROPERTIES WIN32_EXECUTABLE FALSE)
+  target_link_libraries(ka_record_plate_tests PRIVATE Qt6::Test Qt6::Core Qt6::Gui Qt6::Widgets)
+  target_include_directories(ka_record_plate_tests PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_BINARY_DIR}/generated)
+  ka_add_qtest(record_plate ka_record_plate_tests)
+  set_tests_properties(record_plate PROPERTIES ENVIRONMENT "PATH=${_ka_path_esc};QT_QPA_PLATFORM=offscreen" TIMEOUT 90)
   # Three-pane splitter, F10 fold and the rail inset (tests/test_shell.cpp is at its 300-line limit).
   add_executable(ka_shell_focus_tests tests/test_shell_focus.cpp
     src/app/KaShellFocus.cpp src/app/KaShellFocus.h

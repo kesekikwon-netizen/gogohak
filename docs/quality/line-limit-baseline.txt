@@ -23,7 +23,7 @@
 652 src/app/MainWindow.h
 881 src/app/MainWindowAlign.cpp
 478 src/app/MainWindowContextMenus.cpp
-1510 src/app/MainWindowEditing.cpp
+1513 src/app/MainWindowEditing.cpp
 552 src/app/MainWindowExport.cpp
 502 src/app/MainWindowOffline.cpp
 696 src/app/MainWindowOverlay.cpp
