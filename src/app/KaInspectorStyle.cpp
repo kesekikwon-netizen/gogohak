@@ -1,11 +1,13 @@
 #include "KaInspectorStyle.h"
 
 #include "KaStylePalette.h"
+#include "KaSymbolSwatch.h"
 #include "KaTheme.h"
 #include "core/FeaturePresets.h"
 #include "core/LayerOps.h"
 #include "core/LayerStyleKinds.h"
 
+#include <QBoxLayout>
 #include <QCheckBox>
 #include <QDoubleSpinBox>
 #include <QFormLayout>
@@ -37,12 +39,18 @@ KaInspectorStyle::KaInspectorStyle(QWidget* parent) : QWidget(parent) {
   form->setContentsMargins(0, 0, 0, 0);
   form->setVerticalSpacing(8);
   form->setRowWrapPolicy(QFormLayout::WrapAllRows);  // labels above: the swatches fit the 272 px panel
-  m_layerName = new QLabel(m_controls);
+  auto* nameRow = new QWidget(m_controls);
+  auto* nameLine = new QHBoxLayout(nameRow);
+  nameLine->setContentsMargins(0, 0, 0, 0);
+  nameLine->setSpacing(8);
+  m_layerSwatch = new QLabel(nameRow);  // 새 모양: the layer's swatch before its name (refresh)
+  m_layerSwatch->setObjectName(QStringLiteral("inspectorStyleLayerSwatch"));
+  m_layerSwatch->hide();
+  m_layerName = new QLabel(nameRow);
   m_layerName->setWordWrap(true);
-  QFont bold = m_layerName->font();
-  bold.setBold(true);
-  m_layerName->setFont(bold);
-  form->addRow(m_layerName);
+  nameLine->addWidget(m_layerSwatch, 0, Qt::AlignVCenter);
+  nameLine->addWidget(m_layerName, 1);
+  form->addRow(nameRow);
   auto* grid = new QGridLayout;
   grid->setSpacing(4);
   const QList<QColor> colors = KaStylePalette::colors();
@@ -68,15 +76,24 @@ KaInspectorStyle::KaInspectorStyle(QWidget* parent) : QWidget(parent) {
     connect(check, &QCheckBox::toggled, this, [this, check](bool on) { setOff(check == m_noFillCheck, on); });
     form->addRow(check);
   }
-  m_widthLabel = new QLabel(m_controls);
-  m_width = new QDoubleSpinBox(m_controls);
+  // 굵기: the label above a full-width box; in 새 모양 the label at the left, a small box at the right (refresh).
+  auto* widthRow = new QWidget(m_controls);
+  m_widthLine = new QBoxLayout(QBoxLayout::TopToBottom, widthRow);
+  m_widthLine->setContentsMargins(0, 0, 0, 0);
+  m_widthLine->setSpacing(8);
+  m_widthLabel = new QLabel(widthRow);
+  m_widthLabel->setObjectName(QStringLiteral("inspectorStyleWidthLabel"));
+  m_width = new QDoubleSpinBox(widthRow);
   m_width->setObjectName(QStringLiteral("inspectorStyleWidth"));
   m_width->setRange(0.2, 12.0);
   m_width->setSingleStep(0.2);
   m_width->setDecimals(1);
   m_width->setSuffix(QStringLiteral(" mm"));
   connect(m_width, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, &KaInspectorStyle::setWidth);
-  form->addRow(m_widthLabel, m_width);
+  m_widthLine->addWidget(m_widthLabel);
+  m_widthLine->addStretch(1);
+  m_widthLine->addWidget(m_width);
+  form->addRow(widthRow);
   m_note = new QLabel(m_controls);
   m_note->setWordWrap(true);
   m_note->setStyleSheet(QStringLiteral("color: %1;").arg(KaTheme::tokens().inkMuted.name()));
@@ -114,6 +131,15 @@ void KaInspectorStyle::setLayer(QgsVectorLayer* layer) {
 
 void KaInspectorStyle::refresh() {
   if (!m_layer) return;
+  const bool plate = KaTheme::displayOptions().paperLook;  // read here: 「새 모양」 may be switched while running
+  const QPixmap swatch = plate ? KaSymbolSwatch::ofLayer(m_layer) : QPixmap();
+  m_layerSwatch->setPixmap(swatch);
+  m_layerSwatch->setVisible(!swatch.isNull());
+  QFont name = m_layerName->font();
+  name.setBold(!plate);
+  m_layerName->setFont(name);
+  m_widthLine->setDirection(plate ? QBoxLayout::LeftToRight : QBoxLayout::TopToBottom);
+  m_width->setMaximumWidth(plate ? 96 : QWIDGETSIZE_MAX);
   readLayerStyle();
   const bool automatic = FeaturePresets::isPresetStyled(m_layer) || LayerStyleKinds::isByKind(m_layer);
   {

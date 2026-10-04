@@ -2,17 +2,16 @@
 // it, and one 「자동 계산」 head over the 면적·둘레 ledger. The stock look keeps the layer kind at the right.
 #include "KaFeatureCard.h"
 #include "KaIcons.h"
+#include "KaSymbolSwatch.h"
 #include "KaTheme.h"
 
 #include <QHBoxLayout>
 #include <QLabel>
-#include <QPainter>
 
 #include <qgsexpressioncontextutils.h>
 #include <qgsrendercontext.h>
 #include <qgsrenderer.h>
 #include <qgssymbol.h>
-#include <qgssymbollayerutils.h>
 #include <qgsvectorlayer.h>
 
 namespace {
@@ -27,12 +26,8 @@ QPixmap featureSwatch(QgsVectorLayer* layer, const QgsFeature& feature) {
   std::unique_ptr<QgsFeatureRenderer> copy(renderer->clone());  // rendering state stays off the layer's renderer
   copy->startRender(context, layer->fields());
   const QgsSymbolList symbols = copy->originalSymbolsForFeature(feature, context);
-  QPixmap patch = symbols.isEmpty() ? QPixmap() : QgsSymbolLayerUtils::symbolPreviewPixmap(symbols.first(), QSize(20, 14), 0);
+  const QPixmap patch = KaSymbolSwatch::framed(symbols.value(0));
   copy->stopRender(context);
-  if (patch.isNull()) return {};
-  QPainter painter(&patch);
-  painter.setPen(QPen(KaTheme::tokens().ink, 1));
-  painter.drawRect(0, 0, 19, 13);
   return patch;
 }
 

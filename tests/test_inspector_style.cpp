@@ -5,6 +5,7 @@
 
 #include <QCheckBox>
 #include <QDoubleSpinBox>
+#include <QLabel>
 #include <QPushButton>
 #include <QStandardPaths>
 #include <memory>
@@ -17,6 +18,7 @@
 #include <qgsvectorlayer.h>
 
 #include "app/KaInspectorStyle.h"
+#include "app/KaTheme.h"
 #include "core/LayerOps.h"
 
 namespace {
@@ -54,6 +56,37 @@ class TestInspectorStyle : public QObject {
  private slots:
   // Both boxes on would hide the shape (applySimpleVectorStyle then draws a grey hairline for good):
   // turning one on turns the other off, and the width box shows what the map draws.
+  // 「조용한 도판」 스타일 탭 (2차 보드 판 3 B9): the layer's swatch before its name, and 「외곽선 굵기」 at the left
+  // with a small box at the right; the stock look keeps the label above a full-width box.
+  void plateTabHasASwatchAndTheWidthBeside() {
+    auto layer = surveyLayer(QStringLiteral("Polygon"), QStringLiteral("feature_poly"));
+    LayerOps::applySimpleVectorStyle(layer.get(), QColor(0x25, 0x63, 0xEB, 50), QColor(0x25, 0x63, 0xEB), 1.8);
+    KaTheme::DisplayOptions paper;
+    paper.paperLook = true;
+    KaTheme::setDisplayOptions(nullptr, paper);
+    KaInspectorStyle style;
+    style.resize(272, 420);
+    style.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&style));
+    style.setLayer(layer.get());
+    QCoreApplication::processEvents();
+    auto* swatchHead = style.findChild<QLabel*>(QStringLiteral("inspectorStyleLayerSwatch"));
+    auto* label = style.findChild<QLabel*>(QStringLiteral("inspectorStyleWidthLabel"));
+    auto* width = style.findChild<QDoubleSpinBox*>(QStringLiteral("inspectorStyleWidth"));
+    QVERIFY(swatchHead && label && width);
+    const bool shown = swatchHead->isVisible() && swatchHead->pixmap().size() == QSize(20, 14);
+    const int paperGap = qAbs(label->mapTo(&style, label->rect().center()).y() - width->mapTo(&style, width->rect().center()).y());
+    const int paperBox = width->width();
+    KaTheme::setDisplayOptions(nullptr, KaTheme::DisplayOptions());
+    style.setLayer(layer.get());
+    QCoreApplication::processEvents();
+    QVERIFY(shown);
+    QVERIFY2(paperGap < 6, qPrintable(QString::number(paperGap)));  // one row
+    QVERIFY2(paperBox <= 120, qPrintable(QString::number(paperBox)));
+    QVERIFY(swatchHead->isHidden());
+    QVERIFY(label->mapTo(&style, QPoint(0, label->height())).y() <= width->mapTo(&style, QPoint()).y());  // above
+  }
+
   void bothBoxesNeverHideTheShape() {
     auto layer = surveyLayer(QStringLiteral("Polygon"), QStringLiteral("feature_poly"));
     LayerOps::applySimpleVectorStyle(layer.get(), QColor(0x25, 0x63, 0xEB, 50), QColor(0x25, 0x63, 0xEB), 1.8);

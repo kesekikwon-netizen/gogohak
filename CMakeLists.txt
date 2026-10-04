@@ -1983,7 +1983,8 @@ endif()
 set(_ka_p4_list_sources
   ${CMAKE_SOURCE_DIR}/src/app/KaLayerInformationView.cpp
   ${CMAKE_SOURCE_DIR}/src/app/KaLayerSectionDelegate.cpp ${CMAKE_SOURCE_DIR}/src/app/KaLayerSectionDelegate.h)
-set(_ka_p4_card_sources ${CMAKE_SOURCE_DIR}/src/app/KaFeatureCardEditors.cpp ${CMAKE_SOURCE_DIR}/src/app/KaFeatureCardPlate.cpp)
+set(_ka_p4_card_sources ${CMAKE_SOURCE_DIR}/src/app/KaFeatureCardEditors.cpp ${CMAKE_SOURCE_DIR}/src/app/KaFeatureCardPlate.cpp
+  ${CMAKE_SOURCE_DIR}/src/app/KaSymbolSwatch.cpp ${CMAKE_SOURCE_DIR}/src/app/KaSymbolSwatch.h)
 set(_ka_p4_panel_sources
   ${CMAKE_SOURCE_DIR}/src/app/KaLayerListChrome.cpp ${CMAKE_SOURCE_DIR}/src/app/KaLayerListChrome.h
   ${CMAKE_SOURCE_DIR}/src/app/KaInspectorPanel.cpp ${CMAKE_SOURCE_DIR}/src/app/KaInspectorPanel.h
@@ -2051,7 +2052,7 @@ if(KA_HGIS_BUILD_TESTS)
     ENVIRONMENT "GDAL_DATA=${OSGEO4W_ROOT}/apps/gdal-dev/share/gdal;PATH=${_ka_path_esc};QGIS_PREFIX_PATH=${QGIS_PREFIX_PATH};QT_QPA_PLATFORM=offscreen" TIMEOUT 90)
   # The 스타일 tab alone: both check boxes, point layers, a change made elsewhere.
   add_executable(ka_inspector_style_tests tests/test_inspector_style.cpp
-    src/app/KaInspectorStyle.cpp src/app/KaInspectorStyle.h ${_ka_p4_theme_sources})
+    src/app/KaInspectorStyle.cpp src/app/KaInspectorStyle.h src/app/KaSymbolSwatch.cpp src/app/KaSymbolSwatch.h ${_ka_p4_theme_sources})
   target_link_libraries(ka_inspector_style_tests PRIVATE ${KA_TEST_LIBS})
   target_include_directories(ka_inspector_style_tests PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_BINARY_DIR}/generated)
   target_compile_definitions(ka_inspector_style_tests PRIVATE ${KA_TEST_DEFS})

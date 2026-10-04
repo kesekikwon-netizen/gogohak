@@ -6,6 +6,7 @@
 #include <QPointer>
 #include <QWidget>
 
+class QBoxLayout;
 class QCheckBox;
 class QDoubleSpinBox;
 class QLabel;
@@ -43,6 +44,8 @@ class KaInspectorStyle : public QWidget {
   QLabel* m_sentence = nullptr;
   QWidget* m_controls = nullptr;
   QLabel* m_layerName = nullptr;
+  QLabel* m_layerSwatch = nullptr;
+  QBoxLayout* m_widthLine = nullptr;
   QList<QPushButton*> m_swatches;
   QCheckBox* m_noFillCheck = nullptr;
   QCheckBox* m_noStrokeCheck = nullptr;
