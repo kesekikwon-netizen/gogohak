@@ -539,6 +539,7 @@ add_executable(ka-hgis
   src/app/KaProgressPlate.cpp
   src/app/KaDrawingStudioPlate.cpp
   src/app/KaTabClose.cpp
+  src/app/KaFileRowDelegate.cpp
   src/app/KaPrintDialog.cpp
   src/app/KaPrintDialogPlate.cpp
   src/app/KaTilePreview.cpp
@@ -550,6 +551,7 @@ add_executable(ka-hgis
   src/app/KaProgressPlate.h
   src/app/KaDrawingStudioPlate.h
   src/app/KaTabClose.h
+  src/app/KaFileRowDelegate.h
   src/app/KaPrintDialog.h
   src/app/KaTilePreview.h
   src/app/MainWindow.h
@@ -1525,7 +1527,7 @@ if(KA_HGIS_BUILD_TESTS)
   ka_add_qtest(print_plate ka_print_plate_tests)
   # 「조용한 도판」 도면 (board 4): the output buttons at the foot of the right panel (no QGIS).
   add_executable(ka_drawing_plate_tests tests/test_drawing_plate.cpp
-    src/app/KaDrawingStudioPlate.cpp src/app/KaDrawingStudioPlate.h)
+    src/app/KaDrawingStudioPlate.cpp src/app/KaDrawingStudioPlate.h src/app/KaFileRowDelegate.cpp src/app/KaFileRowDelegate.h)
   target_include_directories(ka_drawing_plate_tests PRIVATE src)
   target_link_libraries(ka_drawing_plate_tests PRIVATE Qt6::Test Qt6::Widgets)
   set_target_properties(ka_drawing_plate_tests PROPERTIES WIN32_EXECUTABLE FALSE)

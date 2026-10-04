@@ -1,4 +1,5 @@
 #include "KaFileBrowserPanel.h"
+#include "KaFileRowDelegate.h"
 
 #include <QDir>
 #include <QDrag>
@@ -33,6 +34,7 @@ KaFileListView::KaFileListView(QWidget* parent) : QListWidget(parent) {
   setSelectionMode(QAbstractItemView::ExtendedSelection);
   setUniformItemSizes(true);
   setIconSize(QSize(0, 0));
+  setItemDelegate(new KaFileRowDelegate(this));  // 새 모양: mark · name · extension apart (2차 보드 판 4)
 }
 
 void KaFileListView::startDrag(Qt::DropActions) {

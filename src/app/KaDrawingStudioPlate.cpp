@@ -1,10 +1,27 @@
 #include "KaDrawingStudioPlate.h"
 
 #include <QApplication>
+#include <QEvent>
 #include <QHBoxLayout>
 #include <QScrollArea>
 #include <QToolButton>
 #include <QVBoxLayout>
+
+namespace {
+bool paperLook() { return qApp && qApp->property("kaPaperLook").toBool(); }
+
+// Rewrites the set word whenever the look changes (KaTheme sends StyleChange to every widget on a switch).
+class SetWordFollower final : public QObject {
+public:
+  using QObject::QObject;
+  bool eventFilter(QObject* watched, QEvent* event) override {
+    if (event->type() == QEvent::StyleChange)
+      if (auto* button = qobject_cast<QToolButton*>(watched))
+        button->setText(paperLook() ? QStringLiteral("세트 ▾") : QStringLiteral("세트"));
+    return false;
+  }
+};
+}  // namespace
 
 namespace KaDrawingStudioPlate {
 
@@ -53,6 +70,11 @@ QWidget* bottomStrip(QWidget* strip) {
     first = false;
   }
   return strip;
+}
+
+void setWord(QToolButton* button) {
+  button->setText(paperLook() ? QStringLiteral("세트 ▾") : QStringLiteral("세트"));
+  button->installEventFilter(new SetWordFollower(button));
 }
 
 }  // namespace KaDrawingStudioPlate

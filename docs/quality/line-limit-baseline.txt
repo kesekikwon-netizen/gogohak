@@ -7,7 +7,7 @@
 471 src/app/KaCaptureMapTool.cpp
 3903 src/app/KaDrawingStudio.cpp
 499 src/app/KaFeatureSelectTool.cpp
-381 src/app/KaFileBrowserPanel.cpp
+383 src/app/KaFileBrowserPanel.cpp
 1538 src/app/KaHeritageBrowser.cpp
 1120 src/app/KaIcons.cpp
 504 src/app/KaMeasureMapTool.cpp

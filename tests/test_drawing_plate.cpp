@@ -5,11 +5,13 @@
 #include <QApplication>
 #include <QFrame>
 #include <QHBoxLayout>
+#include <QListWidget>
 #include <QScrollArea>
 #include <QToolButton>
 #include <QVBoxLayout>
 
 #include "app/KaDrawingStudioPlate.h"
+#include "app/KaFileRowDelegate.h"
 
 namespace {
 // The panel as KaDrawingStudio builds it: a scrolling side with a card whose row holds the two output buttons.
@@ -92,6 +94,41 @@ private slots:
     std::unique_ptr<QWidget> stock(strip());
     KaDrawingStudioPlate::bottomStrip(stock.get());
     QCOMPARE(stock->layout()->spacing(), 22);
+  }
+
+  // 「세트 ▾」 (보드 판 4): the layer-set word shows its list mark in 새 모양 and follows a switch of the look.
+  void setWordShowsItsListMarkAndFollowsTheLook() {
+    QToolButton word;
+    qApp->setProperty("kaPaperLook", true);
+    KaDrawingStudioPlate::setWord(&word);
+    QCOMPARE(word.text(), QStringLiteral("세트 ▾"));
+    qApp->setProperty("kaPaperLook", false);
+    QEvent restyle(QEvent::StyleChange);
+    QApplication::sendEvent(&word, &restyle);
+    QCOMPARE(word.text(), QStringLiteral("세트"));
+  }
+
+  // 파일함 목록 (보드 판 4): a folder or file mark, the name, and a file's extension set apart at the right in mono;
+  // rows 24 px. Stock keeps the plain 「[폴더] 이름」 rows.
+  void fileRowsShowNameAndExtensionApartInPaper() {
+    using Parts = QPair<QString, QString>;
+    QCOMPARE(KaFileRowDelegate::parts(QStringLiteral("[폴더] 광령리1"), true), Parts(QStringLiteral("광령리1"), QString()));
+    QCOMPARE(KaFileRowDelegate::parts(QStringLiteral("광령리_측량_0923.dxf"), false),
+             Parts(QStringLiteral("광령리_측량_0923"), QStringLiteral(".dxf")));
+    QCOMPARE(KaFileRowDelegate::parts(QStringLiteral("C:\\"), true), Parts(QStringLiteral("C:\\"), QString()));
+    QCOMPARE(KaFileRowDelegate::parts(QStringLiteral("README"), false), Parts(QStringLiteral("README"), QString()));
+    QListWidget list;
+    auto* delegate = new KaFileRowDelegate(&list);
+    list.setItemDelegate(delegate);
+    list.addItem(QStringLiteral("광령리_측량_0923.dxf"));
+    QStyleOptionViewItem option;
+    option.initFrom(&list);
+    const QModelIndex row = list.model()->index(0, 0);
+    const int stockHeight = delegate->sizeHint(option, row).height();
+    qApp->setProperty("kaPaperLook", true);
+    QCOMPARE(delegate->sizeHint(option, row).height(), 24);
+    qApp->setProperty("kaPaperLook", QVariant());
+    QCOMPARE(delegate->sizeHint(option, row).height(), stockHeight);
   }
 
   void stockKeepsTheButtonsInTheirCard() {

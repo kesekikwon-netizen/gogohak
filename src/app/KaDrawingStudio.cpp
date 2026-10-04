@@ -795,7 +795,7 @@ void KaDrawingStudio::buildUi() {
   // Named layer sets (map themes). Applied only when the user picks one here.
   auto* layerSetBtn = new QToolButton(layerBox);
   layerSetBtn->setObjectName(QStringLiteral("layoutLayerSetBtn"));
-  layerSetBtn->setText(QStringLiteral("세트"));
+  KaDrawingStudioPlate::setWord(layerSetBtn);  // 「세트」, 「세트 ▾」 in 새 모양 (2차 보드 판 4)
   layerSetBtn->setFocusPolicy(Qt::NoFocus);
   layerSetBtn->setPopupMode(QToolButton::InstantPopup);
   layerSetBtn->setToolTip(QStringLiteral(
