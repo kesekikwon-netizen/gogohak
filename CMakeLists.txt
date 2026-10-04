@@ -479,6 +479,7 @@ add_executable(ka-hgis
   src/app/KaImageView.cpp
   src/app/KaAlignImageDetail.cpp
   src/app/KaStartPage.cpp
+  src/app/KaHomeTitleBlock.cpp
   src/app/KaStartHero.cpp
   src/app/KaHomeRecentCard.cpp
   src/app/KaHomeStatus.cpp
@@ -557,6 +558,7 @@ add_executable(ka-hgis
   src/app/KaAlignMapTool.h
   src/app/KaImageView.h
   src/app/KaStartPage.h
+  src/app/KaHomeTitleBlock.h
   src/app/KaStartHero.h
   src/app/KaHomeRecentCard.h
   src/app/KaHomeStatus.h
@@ -1347,7 +1349,7 @@ if(KA_HGIS_BUILD_TESTS)
   set_target_properties(ka_layer_roles_tests ka_layer_styles_tests ka_layer_edits_tests ka_layer_panel_tests ka_layer_tree_undo_tests PROPERTIES WIN32_EXECUTABLE FALSE)
   set_tests_properties(layer_roles layer_styles layer_edits layer_panel layer_tree_undo PROPERTIES TIMEOUT 90)
   add_executable(ka_home_tests tests/test_home.cpp
-    src/app/KaStartPage.cpp src/app/KaStartPage.h
+    src/app/KaStartPage.cpp src/app/KaStartPage.h src/app/KaHomeTitleBlock.cpp src/app/KaHomeTitleBlock.h
     src/app/KaStartHero.cpp src/app/KaStartHero.h
     src/app/KaSplashArt.cpp
     src/app/KaHomeRecentCard.cpp src/app/KaHomeRecentCard.h
@@ -1931,7 +1933,7 @@ if(KA_HGIS_BUILD_TESTS)
   endforeach()
   # Home cards, rows, badges and the compact hero (tests/test_home.cpp stays under 300 lines).
   add_executable(ka_home_cards_tests tests/test_home_cards.cpp
-    src/app/KaStartPage.cpp src/app/KaStartHero.cpp src/app/KaSplashArt.cpp
+    src/app/KaStartPage.cpp src/app/KaStartHero.cpp src/app/KaSplashArt.cpp src/app/KaHomeTitleBlock.cpp
     src/app/KaHomeRecentCard.cpp src/app/KaHomeStatus.cpp src/app/KaHomeText.cpp
     src/app/KaRecoverySnapshots.cpp
     src/app/KaTheme.cpp src/app/KaThemeSheet.cpp src/app/KaThemeStyle.cpp src/app/KaIcons.cpp
@@ -1942,6 +1944,19 @@ if(KA_HGIS_BUILD_TESTS)
   set_target_properties(ka_home_cards_tests PROPERTIES WIN32_EXECUTABLE FALSE)
   ka_add_qtest(home_cards ka_home_cards_tests)
   set_tests_properties(home_cards PROPERTIES TIMEOUT 90)
+  # 「조용한 도판」 home: title block, quiet 새 조사, no hero band (test_home_cards.cpp is at 300 lines).
+  add_executable(ka_home_plate_tests tests/test_home_plate.cpp
+    src/app/KaStartPage.cpp src/app/KaStartHero.cpp src/app/KaSplashArt.cpp src/app/KaHomeTitleBlock.cpp
+    src/app/KaHomeRecentCard.cpp src/app/KaHomeStatus.cpp src/app/KaHomeText.cpp
+    src/app/KaRecoverySnapshots.cpp
+    src/app/KaTheme.cpp src/app/KaThemeSheet.cpp src/app/KaThemeStyle.cpp src/app/KaIcons.cpp
+    ${_ka_p3_app_sources} ${_ka_p1_chip_sources} ${_ka_p1_font_sources} ${_ka_p2_outline_sources})
+  target_link_libraries(ka_home_plate_tests PRIVATE ${KA_TEST_LIBS} Qt6::Network)
+  target_include_directories(ka_home_plate_tests PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_BINARY_DIR}/generated)
+  target_compile_definitions(ka_home_plate_tests PRIVATE ${KA_TEST_DEFS})
+  set_target_properties(ka_home_plate_tests PROPERTIES WIN32_EXECUTABLE FALSE)
+  ka_add_qtest(home_plate ka_home_plate_tests)
+  set_tests_properties(home_plate PROPERTIES TIMEOUT 90)
   # SurveyFacts records and the GDAL probe (no QGIS).
   add_executable(ka_survey_facts_tests tests/test_survey_facts.cpp)
   target_link_libraries(ka_survey_facts_tests PRIVATE ka_core Qt6::Test)

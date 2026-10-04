@@ -54,22 +54,18 @@ void KaStartHero::paintEvent(QPaintEvent*) {
   painter.setRenderHint(QPainter::Antialiasing);
   QPainterPath outline;
   outline.addRoundedRect(band, kRadius, kRadius);
-  const bool paper = KaTheme::displayOptions().paperLook;
-  if (paper) {
-    painter.fillPath(outline, KaTheme::tokens().rail);  // a paper band with slate text
-  } else {
-    // Darker than the notice's card, so light text keeps 4.5:1 across the band.
-    QLinearGradient blue(band.topLeft(), band.bottomRight());
-    blue.setColorAt(0.0, KaSplashPalette::kMid);
-    blue.setColorAt(1.0, KaSplashPalette::kDeep);
-    painter.fillPath(outline, blue);
-  }
+  if (KaTheme::displayOptions().paperLook) return;  // 2차 보드: no band, no contour picture; the page is the ground
+  // Darker than the notice's card, so light text keeps 4.5:1 across the band.
+  QLinearGradient blue(band.topLeft(), band.bottomRight());
+  blue.setColorAt(0.0, KaSplashPalette::kMid);
+  blue.setColorAt(1.0, KaSplashPalette::kDeep);
+  painter.fillPath(outline, blue);
 
   const qreal dpr = devicePixelRatioF();
   if (m_texture.isNull() || !qFuzzyCompare(m_texture.devicePixelRatioF(), dpr)) {
     const QPointF summit(band.width() * 0.60, band.height() * 0.42);
     m_texture = QPixmap::fromImage(
-        KaSplashArt::contours(band.size(), dpr, summit, kHillUnit, 0.0, paper ? KaTheme::tokens().ink : QColor(Qt::white)));
+        KaSplashArt::contours(band.size(), dpr, summit, kHillUnit, 0.0, QColor(Qt::white)));
   }
   painter.save();
   painter.setClipPath(outline);

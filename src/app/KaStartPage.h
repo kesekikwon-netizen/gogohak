@@ -11,6 +11,7 @@ class KaChip;
 class KaHomeConnectionCard;
 class KaHomeGuideCard;
 class KaHomeRecentCard;
+class KaHomeTitleBlock;
 class QLabel;
 class QPushButton;
 class QResizeEvent;
@@ -65,6 +66,7 @@ private:
   KaHomeGuideCard* m_guide = nullptr;
   KaHomeConnectionCard* m_connection = nullptr;
   QWidget* m_continue = nullptr;
+  KaHomeTitleBlock* m_titleBlock = nullptr;  // 새 모양: 「이어서 작업」 as a title block instead of the card
   KaChip* m_badge = nullptr;
   QLabel* m_continueName = nullptr;
   QLabel* m_continuePath = nullptr;

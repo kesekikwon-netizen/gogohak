@@ -215,7 +215,7 @@ void MainWindow::recordSurveyFacts() {
   const int features = featureTotal(project, QStringLiteral("feature_poly")) +
                        featureTotal(project, QStringLiteral("feature_line"));
   QSettings st = RecentSurveys::userSettings();
-  SurveyFacts::rememberCounts(st, m_surveyPath, areas, features);
+  SurveyFacts::rememberCounts(st, m_surveyPath, areas, features, project->crs().authid());
 #endif
 }
 

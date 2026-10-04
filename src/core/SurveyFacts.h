@@ -26,6 +26,7 @@ struct Facts {
   qint64 checkedAtMs = 0;
   qint64 countedAtMs = 0;
   qint64 packagedAtMs = 0;
+  QString workCrs;      // "EPSG:5186" when the last save wrote it; empty = unknown
   bool hasCounts() const { return known && areas >= 0 && features >= 0; }
   bool hasCheck() const { return known && checkedAtMs > 0; }
 };
@@ -36,7 +37,8 @@ constexpr int kMaxProbes = 12;   // GPKG files counted per home visit
 // The record for path, or an all-unknown Facts when there is none or the file changed.
 Facts lookup(QSettings& settings, const QString& path);
 // Keeps the other fields of an existing record and refreshes the fingerprint.
-void rememberCounts(QSettings& settings, const QString& path, int areas, int features);
+void rememberCounts(QSettings& settings, const QString& path, int areas, int features,
+                    const QString& workCrs = {});
 void rememberCheck(QSettings& settings, const QString& path, int errors, int warnings);
 void markPackaged(QSettings& settings, const QString& path);
 void forget(QSettings& settings, const QString& path);

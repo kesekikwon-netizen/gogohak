@@ -68,6 +68,7 @@ Stored read(QSettings& settings, const QString& key) {
   out.facts.checkedAtMs = f.at(6).toLongLong();
   out.facts.countedAtMs = f.at(7).toLongLong();
   out.facts.packagedAtMs = f.at(8).toLongLong();
+  if (f.size() > 9) out.facts.workCrs = f.at(9);  // older records have nine fields
   return out;
 }
 
@@ -77,7 +78,7 @@ void write(QSettings& settings, const QString& key, const QString& path, const S
   const QStringList f{QString::number(now.exists ? now.size : -1), QString::number(now.exists ? now.modifiedMs : 0),
                       QString::number(facts.areas), QString::number(facts.features), QString::number(facts.errors),
                       QString::number(facts.warnings), QString::number(facts.checkedAtMs),
-                      QString::number(facts.countedAtMs), QString::number(facts.packagedAtMs)};
+                      QString::number(facts.countedAtMs), QString::number(facts.packagedAtMs), facts.workCrs};
   settings.setValue(entryPrefix() + key, f.join(QLatin1Char('\t')));
   QStringList order = settings.value(orderKey()).toStringList();
   order.removeAll(key);
@@ -106,13 +107,14 @@ Facts lookup(QSettings& settings, const QString& path) {
   return facts;
 }
 
-void rememberCounts(QSettings& settings, const QString& path, int areas, int features) {
+void rememberCounts(QSettings& settings, const QString& path, int areas, int features, const QString& workCrs) {
   const QString key = keyFor(path);
   // Our own save just changed the file: the check and package fields stay.
   Facts facts = read(settings, key).facts;
   facts.areas = qMax(0, areas);
   facts.features = qMax(0, features);
   facts.countedAtMs = nowMs();
+  if (!workCrs.isEmpty()) facts.workCrs = workCrs;
   write(settings, key, path, facts);
 }
 

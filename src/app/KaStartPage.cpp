@@ -3,6 +3,7 @@
 #include "KaHomeConnectionCard.h"
 #include "KaHomeGuideCard.h"
 #include "KaHomeRecentCard.h"
+#include "KaHomeTitleBlock.h"
 #include "KaHomeText.h"
 #include "KaIcons.h"
 #include "KaRecoverySnapshots.h"
@@ -21,6 +22,7 @@
 #include <QScrollArea>
 #include <QSettings>
 #include <QShowEvent>
+#include <QStyle>
 #include <QTimer>
 #include <QUrl>
 #include <QVBoxLayout>
@@ -127,7 +129,11 @@ QWidget* KaStartPage::buildHero() {
   text->addLayout(actions);
   text->addStretch(1);
   row->addLayout(text, 1);
-
+  if (KaTheme::displayOptions().paperLook) {  // 2차 보드: the continue survey as a title block
+    m_titleBlock = new KaHomeTitleBlock(hero);
+    row->addWidget(m_titleBlock, 3, Qt::AlignVCenter);
+    m_continue = m_titleBlock;
+  }
   auto* card = new QFrame(hero);
   card->setObjectName(QStringLiteral("startContinueCard"));
   card->setMinimumWidth(300);
@@ -174,6 +180,15 @@ QWidget* KaStartPage::buildHero() {
     if (!m_continueTarget.isEmpty()) emit recentOpened(m_continueTarget);
   });
   lines->addWidget(m_resume);  // full card width
+  if (m_titleBlock) {
+    m_resume = m_titleBlock->resumeButton();
+    connect(m_resume, &QPushButton::clicked, this, [this]() {
+      if (!m_continueTarget.isEmpty()) emit recentOpened(m_continueTarget);
+    });
+    m_titleBlock->addNote(m_recovery);  // the recovery note moves under the cells; the card stays hidden
+    card->hide();
+    return hero;
+  }
   m_continue = card;
   row->addWidget(card, 0, Qt::AlignVCenter);
   return hero;
@@ -228,7 +243,16 @@ void KaStartPage::reload() {
   m_recoverySnapshot = last ? KaRecoverySnapshots::unsavedSnapshotFor(st, last->path) : QString();
   // Read-only record of the continue survey; the steps and 「제출 준비」 follow it.
   if (m_guide) m_guide->setFacts(last ? last->name : QString(), last ? SurveyFacts::lookup(st, last->path) : SurveyFacts::Facts{});
-  if (last) {
+  if (auto* start = findChild<QPushButton*>(QStringLiteral("startNewBtn"))) {  // one main button per view
+    const bool quiet = m_titleBlock && last;
+    start->setProperty("kaQuiet", quiet);
+    start->setIcon(KaIcons::icon(QStringLiteral("new"), quiet ? KaTheme::tokens().ink : KaTheme::tokens().heroButtonText));
+    start->style()->unpolish(start);
+    start->style()->polish(start);
+  }
+  if (m_titleBlock && last)
+    m_titleBlock->setSurvey(*last, SurveyFacts::lookup(st, last->path), !m_recoverySnapshot.isEmpty());
+  else if (last) {
     m_continueName->setText(last->name);
     m_continuePath->setText(m_continuePath->fontMetrics().elidedText(
         last->path, Qt::ElideMiddle, 260));  // '/' reads as a path; '\' shows as ₩ in Malgun

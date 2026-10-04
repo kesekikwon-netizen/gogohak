@@ -1359,3 +1359,16 @@ QToolButton#northSwatch:enabled:checked {
 QLabel#kaControlMeta { color: @inkMuted@; font-size: 12px; }
 QLabel#kaControlX, QLabel#kaControlY, QLabel#kaControlZ { font-family: @monoFont@; font-size: 13px; color: @ink@; }
 QFrame#kaLeader { border: none; border-bottom: 1px dotted @borderStrong@; background: transparent; }
+/* 「조용한 도판」 홈 (2차 보드 판 2): 「이어서 작업」 is a title block in an ink frame; 「새 조사」 is quiet
+   while there is a survey to continue (one main button per view). These objects exist only in 새 모양. */
+QFrame#startTitleBlock { background: @surface@; border: 1px solid @ink@; border-radius: 0; }
+QFrame#startTitleRule { background: @border@; border: none; }
+QLabel#startTitleTag, QLabel#startCellCaption { color: @inkMuted@; font-size: 11px; }
+QLabel#startTitleState { color: @inkMuted@; font-size: 12px; }
+QLabel#startTitleState[kaTone="needsYou"] { color: @ink@; }
+QLabel#startTitleName { color: @ink@; font-family: @titleFont@; font-weight: @titleWeight@; font-size: 40px; }
+QLabel#startCellFolder, QLabel#startCellWhen, QLabel#startCellCrs, QLabel#startCellAreas, QLabel#startCellFeatures,
+QLabel#startCellCheck { color: @ink@; font-size: 14px; }
+QLabel#startCellCheck[kaTone="block"] { color: @danger@; }
+QPushButton#startNewBtn[kaQuiet="true"] { background: transparent; color: @ink@; border: 1px solid @borderStrong@; font-weight: 400; }
+QPushButton#startNewBtn[kaQuiet="true"]:enabled:hover { background: @hover@; border-color: @borderStrong@; }
