@@ -94,3 +94,4 @@
 8464 tests/test_workflow.cpp
 321 tests/test_survey_point_dialogs.cpp
 354 src/app/KaStartPage.cpp
+301 src/app/KaSubmitFlow.cpp

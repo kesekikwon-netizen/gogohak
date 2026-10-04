@@ -2,6 +2,7 @@
 // error remains or the rule file is missing; the check runs before any file dialog. Saving happens
 // only when the user picks 「저장하고 만들기」.
 #include "MainWindow.h"
+#include "KaProgressPlate.h"
 #include "KaSubmitDialog.h"
 #include "KaUserError.h"
 #include "core/ChecklistEngine.h"
@@ -159,6 +160,7 @@ void MainWindow::makeSubmitPackage() {
   progress.setMinimumDuration(0);
   progress.setAutoClose(false);
   progress.setAutoReset(false);
+  KaProgressPlate::dress(&progress);  // 새 모양: 440, a thin bar, the board's muted line (2차 보드 판 5)
   progress.show();
   SubmitPackageInfo info;
   info.surveyName = surveyName;
@@ -166,7 +168,7 @@ void MainWindow::makeSubmitPackage() {
   info.unsavedEditsIncluded = unsaved;
   info.progress = [&progress](int done, int total, const QString& step) {
     progress.setMaximum(std::max(1, total));
-    progress.setLabelText(QStringLiteral("제출 꾸러미: %1").arg(step));
+    progress.setLabelText(KaProgressPlate::packageLabel(step));
     progress.setValue(std::min(done, total));
     return !progress.wasCanceled();
   };

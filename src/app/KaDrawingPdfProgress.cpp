@@ -1,4 +1,5 @@
 #include "KaDrawingPdfProgress.h"
+#include "KaProgressPlate.h"
 
 #include <QCoreApplication>
 #include <QFile>
@@ -18,6 +19,7 @@ KaDrawingPdfProgress::KaDrawingPdfProgress(QWidget* parent, const QString& title
   m_dialog->setCancelButtonText(QStringLiteral("취소"));
   m_dialog->setLabelText(QStringLiteral("준비하는 중…"));
   m_dialog->setMinimumWidth(380);
+  KaProgressPlate::dress(m_dialog);  // 새 모양: 440, a thin bar, the note as a muted line (2차 보드 판 5)
   m_dialog->show();
 }
 
@@ -31,7 +33,7 @@ KaDrawingPdfProgress::~KaDrawingPdfProgress() {
 bool KaDrawingPdfProgress::step(const QString& text) {
   if (m_cancelled) return false;
   if (!m_dialog) return true;
-  m_dialog->setLabelText(text);
+  m_dialog->setLabelText(KaProgressPlate::label(text));
   if (!m_dialog->isVisible()) m_dialog->show();
   // Paint the step and deliver a queued 취소 click. The dialog is application
   // modal, so the drawing cannot be edited while this runs.

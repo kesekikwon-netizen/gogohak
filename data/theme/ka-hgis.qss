@@ -1501,3 +1501,6 @@ QDialog#heritageRegionDialog[kaPlate="true"] QLabel#heritagePledgeNote { font-si
 QLabel#heritageNearbyHead { font-size: 11px; color: @inkMuted@; }
 QFrame#heritageNearbyRule { background: @border@; border: none; }
 QDialog#heritageRegionDialog[kaPlate="true"] QGroupBox#heritageNearbyGroup { border: none; margin: 0; padding: 0; }
+/* PDF 내보내기 · 제출 꾸러미 만드는 중 (2차 보드 판 5): a 4 px ink bar on a light track, square ends, no figure. */
+QProgressDialog[kaPlate="true"] QProgressBar { min-height: 4px; max-height: 4px; border: none; border-radius: 0; background: @border@; }
+QProgressDialog[kaPlate="true"] QProgressBar::chunk { background: @ink@; border-radius: 0; }

@@ -8,6 +8,8 @@
 #include <QPageLayout>
 #include <QPainter>
 #include <QPdfWriter>
+#include <QProgressBar>
+#include <QProgressDialog>
 #include <QPushButton>
 #include <QRadioButton>
 #include <QRegularExpression>
@@ -15,6 +17,7 @@
 #include <QTemporaryDir>
 
 #include "app/KaPrintDialog.h"
+#include "app/KaProgressPlate.h"
 
 namespace {
 QString makePdf(const QString& path, const QSizeF& mm) {
@@ -172,6 +175,30 @@ private slots:
     auto* warning = dialog.findChild<QLabel*>(QStringLiteral("printWarning"));
     warning->resize(300, 40);
     QCOMPARE(warning->grab().toImage().pixelColor(8, 20), QColor(0xF6, 0xEC, 0xC8));
+  }
+
+  // 「PDF 내보내기」「제출 꾸러미 만드는 중」 (보드 판 5, 440): the step in ink with its note as a muted line under it and a
+  // thin bar without its own figure; stock keeps the plain text and its bar.
+  void progressWindowsAreQuietInPaper() {
+    qApp->setProperty("kaPaperLook", true);
+    QProgressDialog dialog;
+    KaProgressPlate::dress(&dialog);
+    QVERIFY(dialog.property("kaPlate").toBool());
+    QCOMPARE(dialog.minimumWidth(), 440);
+    QVERIFY(!dialog.findChild<QProgressBar*>()->isTextVisible());
+    const QString text = KaProgressPlate::label(QStringLiteral("제출 꾸러미: 조사도면.pdf"),
+                                                QStringLiteral("파일만 만듭니다. 지도에는 올리지 않습니다."));
+    QVERIFY2(text.startsWith(QStringLiteral("제출 꾸러미: 조사도면.pdf<br>")), qPrintable(text));
+    QVERIFY(text.contains(QStringLiteral("파일만 만듭니다. 지도에는 올리지 않습니다.</span>")));
+    QVERIFY(KaProgressPlate::label(QStringLiteral("PDF를 그리는 중…") + QLatin1Char(0x0A) + QStringLiteral("취소하면 …"))
+                .contains(QStringLiteral("<br><span")));
+    qApp->setProperty("kaPaperLook", QVariant());
+    QProgressDialog stock;
+    KaProgressPlate::dress(&stock);
+    QVERIFY(!stock.property("kaPlate").toBool());
+    QCOMPARE(KaProgressPlate::label(QStringLiteral("제출 꾸러미: 조사도면.pdf"), QStringLiteral("파일만 만듭니다.")),
+             QStringLiteral("제출 꾸러미: 조사도면.pdf"));
+    QCOMPARE(KaProgressPlate::packageLabel(QStringLiteral("조사도면.pdf")), QStringLiteral("제출 꾸러미: 조사도면.pdf"));
   }
 
   // The preview lies on the oat desk of the board (#F0EEE6), not the stock grey.
