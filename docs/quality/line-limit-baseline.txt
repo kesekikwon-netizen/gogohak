@@ -11,7 +11,7 @@
 1538 src/app/KaHeritageBrowser.cpp
 1120 src/app/KaIcons.cpp
 504 src/app/KaMeasureMapTool.cpp
-668 src/app/KaPrintDialog.cpp
+669 src/app/KaPrintDialog.cpp
 1110 src/app/KaSectionDrawingStudio.cpp
 636 src/app/KaTerrain3dLayoutStudio.cpp
 546 src/app/KaTerrain3dStudio.cpp
@@ -44,7 +44,7 @@
 393 src/core/KaPortableRuntime.cpp
 357 src/core/KaSafeQgis.cpp
 2920 src/core/LayerOps.cpp
-469 src/core/LayerOps.h
+473 src/core/LayerOps.h
 1667 src/core/LayoutService.cpp
 411 src/core/LocationSearch.cpp
 382 src/core/PaleoLandformService.cpp

@@ -1458,6 +1458,17 @@ if(KA_HGIS_BUILD_TESTS)
   set_target_properties(ka_startup_splash_tests PROPERTIES WIN32_EXECUTABLE FALSE)
   ka_add_qtest(startup_splash ka_startup_splash_tests)
   set_tests_properties(startup_splash PROPERTIES TIMEOUT 45)
+  # 새 모양 지층 시작 화면 (tests/test_startup_splash.cpp stays under 300 lines).
+  add_executable(ka_startup_strata_tests tests/test_startup_strata.cpp
+    data/theme/icons.qrc
+    src/app/KaStartupSplash.cpp src/app/KaStartupSplash.h
+    src/app/KaSplashPalette.h src/app/KaSplashCredits.cpp src/app/KaSplashCredits.h src/app/KaSplashArt.cpp src/app/KaSplashArt.h
+    src/app/KaSplashStrata.cpp src/app/KaSplashStrata.h)
+  target_include_directories(ka_startup_strata_tests PRIVATE src)
+  target_link_libraries(ka_startup_strata_tests PRIVATE Qt6::Test Qt6::Widgets)
+  set_target_properties(ka_startup_strata_tests PROPERTIES WIN32_EXECUTABLE FALSE)
+  ka_add_qtest(startup_strata ka_startup_strata_tests)
+  set_tests_properties(startup_strata PROPERTIES TIMEOUT 45)
 
   add_executable(ka_download_ui_tests tests/test_download_ui.cpp
     src/app/KaDownloadUi.cpp src/app/KaDownloadUi.h
@@ -2066,6 +2077,18 @@ if(KA_HGIS_BUILD_TESTS)
   set_target_properties(ka_feature_card_fields_tests PROPERTIES WIN32_EXECUTABLE FALSE)
   ka_add_qtest(feature_card_fields ka_feature_card_fields_tests)
   set_tests_properties(feature_card_fields PROPERTIES
+    ENVIRONMENT "GDAL_DATA=${OSGEO4W_ROOT}/apps/gdal-dev/share/gdal;PATH=${_ka_path_esc};QGIS_PREFIX_PATH=${QGIS_PREFIX_PATH};QT_QPA_PLATFORM=offscreen" TIMEOUT 90)
+  # 새 모양 기록 카드 (2차 보드 판 3); tests/test_feature_card_fields.cpp stays under 300 lines.
+  add_executable(ka_feature_card_plate_tests tests/test_feature_card_plate.cpp
+    src/app/KaFeatureCard.cpp src/app/KaFeatureCard.h src/app/KaFeatureCardEdit.cpp ${_ka_p4_card_sources}
+    src/app/KaFeatureFormDialog.cpp src/app/KaFeatureFormDialog.h
+    ${_ka_p1_chip_sources} ${_ka_p4_theme_sources})
+  target_link_libraries(ka_feature_card_plate_tests PRIVATE ${KA_TEST_LIBS})
+  target_include_directories(ka_feature_card_plate_tests PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_BINARY_DIR}/generated)
+  target_compile_definitions(ka_feature_card_plate_tests PRIVATE ${KA_TEST_DEFS})
+  set_target_properties(ka_feature_card_plate_tests PROPERTIES WIN32_EXECUTABLE FALSE)
+  ka_add_qtest(feature_card_plate ka_feature_card_plate_tests)
+  set_tests_properties(feature_card_plate PROPERTIES
     ENVIRONMENT "GDAL_DATA=${OSGEO4W_ROOT}/apps/gdal-dev/share/gdal;PATH=${_ka_path_esc};QGIS_PREFIX_PATH=${QGIS_PREFIX_PATH};QT_QPA_PLATFORM=offscreen" TIMEOUT 90)
   # The 스타일 tab alone: both check boxes, point layers, a change made elsewhere.
   add_executable(ka_inspector_style_tests tests/test_inspector_style.cpp
