@@ -13,6 +13,7 @@
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QLineEdit>
+#include <QPlainTextEdit>
 #include <QPushButton>
 #include <QSignalBlocker>
 #include <algorithm>
@@ -218,6 +219,12 @@ bool KaFeatureFormDialog::applyTo(QgsVectorLayer* layer, QString* errorOut) cons
 QWidget* KaFeatureFormDialog::createValueEditor(QWidget* parent, const QgsVectorLayer* layer, const QString& field,
                                                 const QString& current) {
   if (isChoiceField(field)) return makeChoiceCombo(parent, layer, field, current);
+  if (field == QLatin1String("note") && qApp && qApp->property("kaPaperLook").toBool()) {
+    auto* lines = new QPlainTextEdit(current, parent);  // 새 모양 (보드 판 5): 비고 takes several lines
+    lines->setFixedHeight(72);
+    lines->setTabChangesFocus(true);
+    return lines;
+  }
   auto* edit = new QLineEdit(parent);
   edit->setText(current);
   edit->setPlaceholderText(placeholderFor(field));
@@ -233,5 +240,6 @@ QString KaFeatureFormDialog::valueEditorText(const QWidget* editor) {
     return FeatureRecord::canonicalValue(qobject_cast<const QgsVectorLayer*>(layer.data()), field, text);
   }
   if (const auto* edit = qobject_cast<const QLineEdit*>(editor)) return edit->text().trimmed();
+  if (const auto* lines = qobject_cast<const QPlainTextEdit*>(editor)) return lines->toPlainText().trimmed();
   return {};
 }

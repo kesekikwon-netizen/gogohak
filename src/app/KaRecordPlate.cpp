@@ -60,7 +60,9 @@ QHBoxLayout* cell(const Entry& entry) {
   line->setSpacing(0);
   entry.word->setFixedWidth(96);
   entry.word->setProperty("kaFormWord", true);
-  line->addWidget(entry.word);
+  const bool lines = entry.box->inherits("QPlainTextEdit");  // 비고: the word stays at the first line
+  if (lines) entry.word->setContentsMargins(0, 6, 0, 0);
+  line->addWidget(entry.word, 0, lines ? Qt::AlignTop : Qt::Alignment());
   line->addWidget(entry.box, 1);
   return line;
 }

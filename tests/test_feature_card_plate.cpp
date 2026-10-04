@@ -7,6 +7,7 @@
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QLineEdit>
+#include <QPlainTextEdit>
 #include <memory>
 
 #include "app/KaFeatureCard.h"
@@ -247,6 +248,24 @@ class TestFeatureCardPlate : public QObject {
     KaFeatureFormDialog stock(layer.get(), nullptr, firstId(layer.get()));
     QVERIFY(!stock.findChild<QLabel*>(QStringLiteral("kaFeatureFormNumberFilled")));
     QVERIFY(stock.findChild<QLabel*>(QStringLiteral("kaFeatureFormTip"))->text().startsWith(QStringLiteral("선택입니다")));
+  }
+
+  // 도형 속성 (보드 판 5): 비고 is a 72 px box of several lines in paper, read back with its line breaks;
+  // other fields and the stock look keep one-line boxes.
+  void noteIsSeveralLinesInPaper() {
+    const QString note = QStringLiteral("바닥에서 숯이 나옴.") + QLatin1Char(0x0A) + QStringLiteral("북벽 일부는 깨짐.");
+    qApp->setProperty("kaPaperLook", true);
+    std::unique_ptr<QWidget> box(KaFeatureFormDialog::createValueEditor(nullptr, nullptr, QStringLiteral("note"), note));
+    std::unique_ptr<QWidget> number(KaFeatureFormDialog::createValueEditor(nullptr, nullptr, QStringLiteral("feature_no"), {}));
+    qApp->setProperty("kaPaperLook", QVariant());
+    auto* lines = qobject_cast<QPlainTextEdit*>(box.get());
+    QVERIFY(lines);
+    QCOMPARE(lines->height(), 72);
+    QVERIFY(lines->tabChangesFocus());  // Tab still moves to the next box
+    QCOMPARE(KaFeatureFormDialog::valueEditorText(lines), note);
+    QVERIFY(qobject_cast<QLineEdit*>(number.get()));
+    std::unique_ptr<QWidget> stock(KaFeatureFormDialog::createValueEditor(nullptr, nullptr, QStringLiteral("note"), note));
+    QVERIFY(qobject_cast<QLineEdit*>(stock.get()));
   }
 };
 
