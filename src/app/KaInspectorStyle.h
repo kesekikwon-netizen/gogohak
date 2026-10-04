@@ -29,6 +29,9 @@ class KaInspectorStyle : public QWidget {
   // After a colour or width went onto the layer: the window marks the survey unsaved.
   void styleApplied(QgsVectorLayer* layer);
 
+ protected:
+  void changeEvent(QEvent* event) override;
+
  private:
   void readLayerStyle();  // the layer's look right now: another window may have changed it
   void refresh();         // boxes, width and swatches show what the map draws

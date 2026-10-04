@@ -1411,11 +1411,18 @@ QFrame#basemapQuickCard[kaPlate="true"] QToolButton:enabled:focus { border-color
    오류 · 주의 · 통과 counts at the top right between hairlines; the error count reads in the blocking red. */
 QLabel#submitHeadline { font-family: @titleFont@; font-weight: @titleWeight@; font-size: @bigNameSize@px; color: @ink@; }
 QLabel#submitSubline { color: @inkMuted@; font-size: 12px; }
-QFrame#submitCounts { border: none; border-top: 1px solid @border@; border-bottom: 1px solid @border@; }
+QFrame#submitCounts { border: none; border-top: 1px solid @plateRule@; border-bottom: 1px solid @border@; }
 QFrame#submitCountRule { background: @border@; border: none; }
 QLabel#submitCountCaption { color: @inkMuted@; font-size: 11px; }
-QLabel#submitCountError, QLabel#submitCountWarn, QLabel#submitCountPass { color: @ink@; font-size: 18px; }
+QLabel#submitCountError, QLabel#submitCountWarn, QLabel#submitCountPass { color: @ink@; font-family: @monoFont@; font-size: 20px; }
 QLabel#submitCountError { color: @danger@; }
+QLabel#submitCountError[zero="true"] { color: @ink@; }
+QLabel#submitCountUnit { color: @inkMuted@; font-size: 12px; }
+QLabel#submitPackageLine { color: @inkMuted@; font-family: @monoFont@; font-size: 11px; }
+/* The row buttons are 24 px; 「위치 보기」 is a word button beside the fix button. */
+QTreeWidget#submitReviewTree[kaPlate="true"] QPushButton { min-height: 22px; max-height: 24px; padding: 0 8px; font-size: 12px; }
+QTreeWidget#submitReviewTree[kaPlate="true"] QPushButton:flat { border: 1px solid transparent; background: transparent; }
+QTreeWidget#submitReviewTree[kaPlate="true"] QPushButton:flat:hover { text-decoration: underline; }
 /* 기록 카드 (2차 보드 판 3 B1, 새 모양): no box on the panel, the record line under the name muted, one 「자동 계산」
    head over an ink rule, and the 면적·둘레 figures on hairlines instead of boxes. */
 QFrame#kaFeatureCard[kaPlate="true"] { border: none; background: transparent; }

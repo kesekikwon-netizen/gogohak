@@ -132,7 +132,7 @@ class TestFeatureCardFields : public QObject {
     const QString boxFace = box ? at(box, QPoint(4, box->height() / 2)) : QString();
     const QString cardEdge = at(card, QPoint(0, card->height() / 2));
     KaTheme::setDisplayOptions(qApp, KaTheme::DisplayOptions());
-    QVERIFY(swatch && swatch->isVisible() && swatch->pixmap().size() == QSize(20, 14));
+    QVERIFY(swatch && swatch->isVisible() && swatch->pixmap().size() == QSize(28, 20));  // spec 4.1: 유구 표지 28 × 20
     QVERIFY(sub && sub->isVisible());
     QCOMPARE(sub->text(), QStringLiteral("유구 면 · 주거지 · 청동기"));
     QVERIFY(!card->findChild<QLabel*>(QStringLiteral("kaFeatureCardKind"))->isVisible());
@@ -170,6 +170,34 @@ class TestFeatureCardFields : public QObject {
     QCOMPARE(sub, QStringLiteral("지적도 · 참조 자료"));
     QCOMPARE(jibun, QStringLiteral("1616-1"));
     QCOMPARE(jimok, QStringLiteral("과"));
+    parcels.dataProvider()->changeAttributeValues({{firstId(&parcels), {{parcels.fields().lookupField(QStringLiteral("JIBUN")), QString()}}}});
+    KaTheme::setDisplayOptions(nullptr, paper);
+    card.setFeature(&parcels, firstId(&parcels));
+    const QString emptyJibun = text("kaLockedJibun");
+    KaTheme::setDisplayOptions(nullptr, KaTheme::DisplayOptions());
+    QCOMPARE(emptyJibun, QStringLiteral("—"));  // nothing recorded reads as a dash, not a blank
+  }
+
+  // 「새 모양」 switched while a record is shown (화면 보기): the card is rebuilt in the other look at once.
+  void cardFollowsALiveSwitch() {
+    auto layer = recordedFeature();
+    KaFeatureCard card;
+    card.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&card));
+    card.setFeature(layer.get(), firstId(layer.get()));
+    QVERIFY(!card.findChild<QFrame*>(QStringLiteral("kaMeasureHead")));
+    KaTheme::DisplayOptions paper;
+    paper.paperLook = true;
+    KaTheme::setDisplayOptions(qApp, paper);
+    QCoreApplication::processEvents();
+    const bool headIn = card.findChild<QFrame*>(QStringLiteral("kaMeasureHead")) != nullptr;
+    const bool swatchIn = card.findChild<QLabel*>(QStringLiteral("kaFeatureCardSwatch"))->isVisibleTo(&card);
+    KaTheme::setDisplayOptions(qApp, KaTheme::DisplayOptions());
+    QCoreApplication::processEvents();
+    QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
+    QVERIFY(headIn && swatchIn);
+    QVERIFY(!card.findChild<QFrame*>(QStringLiteral("kaMeasureHead")));
+    QVERIFY(!card.findChild<QLabel*>(QStringLiteral("kaFeatureCardSwatch"))->isVisibleTo(&card));
   }
 
   // 시대 띠: under 시대 the card shows the ten period cells with the recorded one marked (새 모양 only).

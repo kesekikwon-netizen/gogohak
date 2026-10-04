@@ -1,6 +1,5 @@
 #include "KaSubmitDialog.h"
 #include "KaSubmitDrawingStrip.h"
-#include "KaWindowSize.h"
 
 #include <QApplication>
 #include <QFrame>
@@ -24,7 +23,7 @@ const QColor kBlockingRow(0xF3, 0xDE, 0xDA);  // 새 모양: a blocking row on t
 KaSubmitDialog::KaSubmitDialog(QWidget* parent) : QDialog(parent) {
   setObjectName(QStringLiteral("submitReviewDialog"));
   setWindowTitle(QStringLiteral("검수·제출"));
-  resize(KaWindowSize::width(KaWindowSize::Large, 820), 600);  // 새 모양: the L window (860)
+  resize(820, 580);
   auto* layout = new QVBoxLayout(this);
   m_plate = qApp && qApp->property("kaPaperLook").toBool();
   if (m_plate) layout->addWidget(buildPlateHead());
@@ -54,6 +53,7 @@ KaSubmitDialog::KaSubmitDialog(QWidget* parent) : QDialog(parent) {
 
   m_tree = new QTreeWidget(this);
   m_tree->setObjectName(QStringLiteral("submitReviewTree"));
+  m_tree->setProperty("kaPlate", m_plate);  // 새 모양: 24 px row buttons, 「위치 보기」 a word button (QSS)
   m_tree->setColumnCount(3);
   m_tree->setHeaderLabels({QStringLiteral("항목"), QStringLiteral("고치는 법"), QString()});
   m_tree->header()->setSectionResizeMode(0, QHeaderView::Stretch);
@@ -75,6 +75,7 @@ KaSubmitDialog::KaSubmitDialog(QWidget* parent) : QDialog(parent) {
     choose(Choice::GoToTargets, one);
   });
   layout->addWidget(m_tree, 1);
+  if (m_plate) layout->addWidget(buildPlateFoot());
 
   m_blockReason = new QLabel(this);
   m_blockReason->setObjectName(QStringLiteral("submitBlockReason"));
@@ -103,50 +104,6 @@ KaSubmitDialog::KaSubmitDialog(QWidget* parent) : QDialog(parent) {
   buttons->addWidget(close);
   layout->addLayout(buttons);
   setConvertLayerName({});
-}
-
-// 「조용한 도판」 (2차 보드 판 3): the result as a serif headline, the rules' name under it, 오류 · 주의 · 통과 counts.
-QWidget* KaSubmitDialog::buildPlateHead() {
-  auto* head = new QWidget(this);
-  auto* row = new QHBoxLayout(head);
-  row->setContentsMargins(0, 0, 0, 0);
-  row->setSpacing(24);
-  auto* words = new QVBoxLayout;
-  words->setSpacing(4);
-  m_headline = new QLabel(head);
-  m_headline->setObjectName(QStringLiteral("submitHeadline"));
-  m_headline->setWordWrap(true);
-  m_subline = new QLabel(head);
-  m_subline->setObjectName(QStringLiteral("submitSubline"));
-  m_subline->setWordWrap(true);
-  words->addWidget(m_headline);
-  words->addWidget(m_subline);
-  row->addLayout(words, 1);
-  auto* counts = new QFrame(head);
-  counts->setObjectName(QStringLiteral("submitCounts"));
-  auto* cells = new QHBoxLayout(counts);
-  cells->setContentsMargins(0, 0, 0, 0);
-  cells->setSpacing(0);
-  const char* cellNames[][2] = {{"오류", "submitCountError"}, {"주의", "submitCountWarn"}, {"통과", "submitCountPass"}};
-  for (int i = 0; i < 3; ++i) {
-    if (i > 0) {
-      auto* rule = new QFrame(counts);
-      rule->setObjectName(QStringLiteral("submitCountRule"));
-      rule->setFixedWidth(1);
-      cells->addWidget(rule);
-    }
-    auto* cell = new QVBoxLayout;
-    cell->setContentsMargins(12, 6, 24, 6);
-    auto* caption = new QLabel(QString::fromUtf8(cellNames[i][0]), counts);
-    caption->setObjectName(QStringLiteral("submitCountCaption"));
-    m_counts[i] = new QLabel(counts);
-    m_counts[i]->setObjectName(QString::fromLatin1(cellNames[i][1]));
-    cell->addWidget(caption);
-    cell->addWidget(m_counts[i]);
-    cells->addLayout(cell);
-  }
-  row->addWidget(counts, 0, Qt::AlignTop);
-  return head;
 }
 
 QString KaSubmitDialog::actionLabel(const QString& action) {
@@ -280,19 +237,7 @@ void KaSubmitDialog::rebuild() {
     m_blockReason->setText(warns > 0 ? QStringLiteral("오류가 없습니다. 주의 항목은 확인한 뒤 진행할 수 있습니다.")
                                      : QStringLiteral("오류와 주의 항목이 없습니다."));
   }
-  if (m_plate) {
-    const bool noRules = !m_rulesLoaded || m_results.isEmpty();
-    m_headline->setText(noRules ? QStringLiteral("검수 규칙 파일을 찾지 못했습니다")
-                        : errors > 0 ? QStringLiteral("오류 %1건을 고쳐야 제출할 수 있습니다").arg(errors)
-                        : warns > 0  ? QStringLiteral("오류가 없습니다")
-                                     : QStringLiteral("오류와 주의 항목이 없습니다"));
-    m_subline->setText((m_rulesTitle.isEmpty() ? QString() : m_rulesTitle + QStringLiteral(" · ")) +
-                       (errors > 0 ? QStringLiteral("「위치 보기」나 옆 단추로 고칠 곳을 여세요.")
-                                   : QStringLiteral("주의 항목은 확인한 뒤 진행할 수 있습니다.")));
-    const int numbers[] = {errors, warns, passed};
-    for (int i = 0; i < 3; ++i) m_counts[i]->setText(QStringLiteral("%1 건").arg(numbers[i]));
-    m_blockReason->setVisible(noRules);  // only where the rule file was looked for
-  }
+  if (m_plate) showPlateResult(errors, warns, passed);
   m_package->setEnabled(packageAllowed());
   m_package->setToolTip(packageAllowed()
                             ? QStringLiteral("검수 결과와 함께 5179 SHP·조사도면.pdf·MANIFEST를 새 폴더에 만듭니다.")

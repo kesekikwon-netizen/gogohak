@@ -10,6 +10,7 @@
 #include <QBoxLayout>
 #include <QCheckBox>
 #include <QDoubleSpinBox>
+#include <QEvent>
 #include <QFormLayout>
 #include <QGridLayout>
 #include <QLabel>
@@ -84,6 +85,7 @@ KaInspectorStyle::KaInspectorStyle(QWidget* parent) : QWidget(parent) {
   m_widthLabel = new QLabel(widthRow);
   m_widthLabel->setObjectName(QStringLiteral("inspectorStyleWidthLabel"));
   m_width = new QDoubleSpinBox(widthRow);
+  m_widthLabel->setBuddy(m_width);  // readers hear the label on the box
   m_width->setObjectName(QStringLiteral("inspectorStyleWidth"));
   m_width->setRange(0.2, 12.0);
   m_width->setSingleStep(0.2);
@@ -101,6 +103,11 @@ KaInspectorStyle::KaInspectorStyle(QWidget* parent) : QWidget(parent) {
   column->addWidget(m_controls);
   column->addStretch(1);
   setLayer(nullptr);
+}
+
+void KaInspectorStyle::changeEvent(QEvent* event) {
+  QWidget::changeEvent(event);
+  if (event->type() == QEvent::StyleChange) refresh();  // 「새 모양」 switched while the tab is shown
 }
 
 bool KaInspectorStyle::isPoint() const {

@@ -75,6 +75,7 @@ signals:
 
 protected:
   bool eventFilter(QObject* watched, QEvent* event) override;  // 메모 commits on focus-out
+  void changeEvent(QEvent* event) override;  // 새 모양 switched while shown: rows rebuilt, KaFeatureCardPlate.cpp
 
 private:
   void watchLayer(QgsVectorLayer* layer);
@@ -98,6 +99,7 @@ private:
   QString m_numberField;
   bool m_readOnly = false;  // reference/cadastral layer: the editors show the record, never write it
   bool m_followsSelection = false;
+  bool m_builtPlate = false;  // the look the editors were built in
 
   QLabel* m_title = nullptr;
   QWidget* m_header = nullptr;

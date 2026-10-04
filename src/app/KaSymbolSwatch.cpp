@@ -11,13 +11,13 @@
 
 namespace KaSymbolSwatch {
 
-QPixmap framed(QgsSymbol* symbol) {
+QPixmap framed(QgsSymbol* symbol, const QSize& size) {
   if (!symbol) return {};
-  QPixmap patch = QgsSymbolLayerUtils::symbolPreviewPixmap(symbol, QSize(20, 14), 0);
+  QPixmap patch = QgsSymbolLayerUtils::symbolPreviewPixmap(symbol, size, 0);
   if (patch.isNull()) return {};
   QPainter painter(&patch);
   painter.setPen(QPen(KaTheme::tokens().ink, 1));
-  painter.drawRect(0, 0, 19, 13);
+  painter.drawRect(0, 0, size.width() - 1, size.height() - 1);
   return patch;
 }
 

@@ -95,9 +95,13 @@ private slots:
     };
     QCOMPARE(text("submitHeadline"), QStringLiteral("오류 1건을 고쳐야 제출할 수 있습니다"));
     QVERIFY(text("submitSubline").startsWith(QStringLiteral("발굴 위치도면 유의사항 기반 검수 v1")));
-    QCOMPARE(text("submitCountError"), QStringLiteral("1 건"));
-    QCOMPARE(text("submitCountWarn"), QStringLiteral("2 건"));
-    QCOMPARE(text("submitCountPass"), QStringLiteral("1 건"));
+    QCOMPARE(text("submitCountError"), QStringLiteral("1"));  // mono figures; 「건」 is its own faint label
+    QCOMPARE(text("submitCountWarn"), QStringLiteral("2"));
+    QCOMPARE(text("submitCountPass"), QStringLiteral("1"));
+    QVERIFY(!dialog.findChild<QLabel*>(QStringLiteral("submitCountError"))->property("zero").toBool());
+    QCOMPARE(text("submitPackageLine"), QStringLiteral("EPSG:5179 SHP · 조사도면.pdf · MANIFEST.sha256"));
+    QCOMPARE(dialog.size(), QSize(820, 580));  // the built size stays (spec: 검수·제출 820 × 580)
+    QVERIFY(dialog.findChild<QTreeWidget*>(QStringLiteral("submitReviewTree"))->property("kaPlate").toBool());
     QVERIFY(dialog.findChild<QLabel*>(QStringLiteral("submitIntro"))->isHidden());
     auto* tree = dialog.findChild<QTreeWidget*>(QStringLiteral("submitReviewTree"));
     QCOMPARE(tree->topLevelItem(0)->child(0)->background(0).color(), QColor(0xF3, 0xDE, 0xDA));
@@ -106,12 +110,17 @@ private slots:
     QVERIFY(QTest::qWaitForWindowExposed(&dialog));
     auto* fix = dialog.findChild<QPushButton*>(QStringLiteral("btnAction_SPEC"));
     QVERIFY2(fix->width() <= fix->sizeHint().width() + 4, qPrintable(QString::number(fix->width())));  // compact, at the right
+    QVERIFY(text("submitSubline").endsWith(QStringLiteral("「위치 보기」나 옆 단추로 고칠 곳을 여세요.")));
     dialog.setResults({result(QStringLiteral("W1"), QStringLiteral("warn"), false)}, true);
     QCOMPARE(text("submitHeadline"), QStringLiteral("오류가 없습니다"));
+    QVERIFY(text("submitSubline").endsWith(QStringLiteral("주의 항목은 확인한 뒤 진행할 수 있습니다.")));
+    QVERIFY(dialog.findChild<QLabel*>(QStringLiteral("submitCountError"))->property("zero").toBool());
     dialog.setResults({result(QStringLiteral("P"), QStringLiteral("error"), true)}, true);
     QCOMPARE(text("submitHeadline"), QStringLiteral("오류와 주의 항목이 없습니다"));
+    QCOMPARE(text("submitSubline"), QStringLiteral("발굴 위치도면 유의사항 기반 검수 v1"));  // nothing left to do
     dialog.setResults({}, false);
     QCOMPARE(text("submitHeadline"), QStringLiteral("검수 규칙 파일을 찾지 못했습니다"));
+    QVERIFY(!text("submitSubline").contains(QStringLiteral("진행")));  // never 「go ahead」 while blocked
   }
 
   void errorsBlockThePackage() {

@@ -54,8 +54,6 @@ QPushButton* swatch(KaInspectorStyle& style, int index) {
 class TestInspectorStyle : public QObject {
   Q_OBJECT
  private slots:
-  // Both boxes on would hide the shape (applySimpleVectorStyle then draws a grey hairline for good):
-  // turning one on turns the other off, and the width box shows what the map draws.
   // 「조용한 도판」 스타일 탭 (2차 보드 판 3 B9): the layer's swatch before its name, and 「외곽선 굵기」 at the left
   // with a small box at the right; the stock look keeps the label above a full-width box.
   void plateTabHasASwatchAndTheWidthBeside() {
@@ -85,8 +83,32 @@ class TestInspectorStyle : public QObject {
     QVERIFY2(paperBox <= 120, qPrintable(QString::number(paperBox)));
     QVERIFY(swatchHead->isHidden());
     QVERIFY(label->mapTo(&style, QPoint(0, label->height())).y() <= width->mapTo(&style, QPoint()).y());  // above
+    QCOMPARE(label->buddy(), static_cast<QWidget*>(width));  // readers hear 「외곽선 굵기」 on the box
   }
 
+  // 「새 모양」 switched while the tab is shown (화면 보기): the tab follows without picking the layer again.
+  void tabFollowsALiveSwitch() {
+    auto layer = surveyLayer(QStringLiteral("Polygon"), QStringLiteral("feature_poly"));
+    LayerOps::applySimpleVectorStyle(layer.get(), QColor(0x25, 0x63, 0xEB, 50), QColor(0x25, 0x63, 0xEB), 1.8);
+    KaInspectorStyle style;
+    style.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&style));
+    style.setLayer(layer.get());
+    auto* swatchHead = style.findChild<QLabel*>(QStringLiteral("inspectorStyleLayerSwatch"));
+    QVERIFY(swatchHead->isHidden());
+    KaTheme::DisplayOptions paper;
+    paper.paperLook = true;
+    KaTheme::setDisplayOptions(qApp, paper);
+    QCoreApplication::processEvents();
+    const bool shown = !swatchHead->isHidden();
+    KaTheme::setDisplayOptions(qApp, KaTheme::DisplayOptions());
+    QCoreApplication::processEvents();
+    QVERIFY(shown);
+    QVERIFY(swatchHead->isHidden());
+  }
+
+  // Both boxes on would hide the shape (applySimpleVectorStyle then draws a grey hairline for good):
+  // turning one on turns the other off, and the width box shows what the map draws.
   void bothBoxesNeverHideTheShape() {
     auto layer = surveyLayer(QStringLiteral("Polygon"), QStringLiteral("feature_poly"));
     LayerOps::applySimpleVectorStyle(layer.get(), QColor(0x25, 0x63, 0xEB, 50), QColor(0x25, 0x63, 0xEB), 1.8);

@@ -6,6 +6,7 @@
 #include <QFrame>
 #include <QHBoxLayout>
 #include <QHeaderView>
+#include <QPushButton>
 #include <QRegularExpression>
 #include <QToolButton>
 #include <QTreeWidget>
@@ -163,6 +164,29 @@ private slots:
     QCOMPARE(at(QPoint(head->sectionSize(0) / 2, 0)), ground);  // no top edge
     QCOMPARE(at(QPoint(0, head->height() / 2)), ground);        // no side edge
     QCOMPARE(at(QPoint(head->sectionSize(0) / 2, head->height() - 1)), KaTheme::tokens().border.name());  // the one line
+  }
+
+  // 검수·제출 (2차 보드 판 3): in a result row 「위치 보기」 is a word (no box) beside the 24 px fix button.
+  void submitRowGoToIsAWord() {
+    KaTheme::DisplayOptions paper;
+    paper.paperLook = true;
+    KaTheme::setDisplayOptions(qApp, paper);
+    QTreeWidget tree;
+    tree.setObjectName(QStringLiteral("submitReviewTree"));
+    tree.setProperty("kaPlate", true);
+    tree.setColumnCount(2);
+    auto* row = new QTreeWidgetItem(&tree, {QStringLiteral("종류·시대가 빈 유구가 있습니다.")});
+    auto* go = new QPushButton(QStringLiteral("위치 보기"));
+    go->setFlat(true);
+    tree.setItemWidget(row, 1, go);
+    tree.resize(400, 120);
+    tree.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&tree));
+    const QImage image = tree.viewport()->grab().toImage();
+    const QPoint left = go->mapTo(tree.viewport(), QPoint(0, go->height() / 2)) * image.devicePixelRatio();
+    const QPoint beside = go->mapTo(tree.viewport(), QPoint(-3, go->height() / 2)) * image.devicePixelRatio();
+    QCOMPARE(image.pixelColor(left).name(), image.pixelColor(beside).name());  // no edge on the word button
+    QVERIFY2(go->height() <= 24, qPrintable(QString::number(go->height())));
   }
 };
 

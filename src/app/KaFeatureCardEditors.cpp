@@ -136,6 +136,7 @@ void KaFeatureCard::buildEditors() {
   };
   const Qgis::GeometryType gt = m_layer->geometryType();
   const bool plate = KaTheme::displayOptions().paperLook;
+  m_builtPlate = plate;
   const auto addLedger = [this, gt, plate] {
     if (plate && (gt == Qgis::GeometryType::Polygon || gt == Qgis::GeometryType::Line))
       m_form->addRow(measureHead(m_body));  // 수치 대장: one 「자동 계산」 head over the figures

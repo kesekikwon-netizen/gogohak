@@ -9,6 +9,7 @@
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QRegularExpression>
+#include <QTimer>
 
 #include <qgsexpressioncontextutils.h>
 #include <qgsrendercontext.h>
@@ -18,7 +19,7 @@
 
 namespace {
 
-// The symbol this feature is drawn with on the map, 20 × 14 in a 1 px ink frame like the layer list's 유구 표지.
+// The symbol this feature is drawn with on the map, 28 × 20 in a 1 px ink frame (the layer list's is 20 × 14).
 QPixmap featureSwatch(QgsVectorLayer* layer, const QgsFeature& feature) {
   QgsFeatureRenderer* renderer = layer ? layer->renderer() : nullptr;
   if (!renderer) return {};
@@ -28,7 +29,7 @@ QPixmap featureSwatch(QgsVectorLayer* layer, const QgsFeature& feature) {
   std::unique_ptr<QgsFeatureRenderer> copy(renderer->clone());  // rendering state stays off the layer's renderer
   copy->startRender(context, layer->fields());
   const QgsSymbolList symbols = copy->originalSymbolsForFeature(feature, context);
-  const QPixmap patch = KaSymbolSwatch::framed(symbols.value(0));
+  const QPixmap patch = KaSymbolSwatch::framed(symbols.value(0), QSize(28, 20));  // spec 4.1: 유구 표지 28 × 20
   copy->stopRender(context);
   return patch;
 }
@@ -41,6 +42,18 @@ std::pair<QString, QString> splitJibun(const QString& jibun) {
 }
 
 }  // namespace
+
+void KaFeatureCard::changeEvent(QEvent* event) {
+  QFrame::changeEvent(event);
+  // 「새 모양」 switched while a record is shown (화면 보기): the rows are built for one look, so build them again on
+  // the next turn (the application is still restyling every widget now).
+  if (event->type() != QEvent::StyleChange) return;
+  QTimer::singleShot(0, this, [this] {
+    if (!hasFeature() || !m_body || m_builtPlate == KaTheme::displayOptions().paperLook) return;
+    buildEditors();
+    refresh();
+  });
+}
 
 void KaFeatureCard::addLockedRows() {
   for (const auto& [label, slot, name] : {std::tuple{"지번", &m_lockedJibun, "kaLockedJibun"},
@@ -62,7 +75,7 @@ void KaFeatureCard::addLockedRows() {
 QString KaFeatureCard::fillLockedRows(const QgsFeature& feature) {
   if (!m_lockedJibun || !m_lockedJimok) return {};
   const auto [jibun, jimok] = splitJibun(feature.attribute(QStringLiteral("JIBUN")).toString());
-  m_lockedJibun->setText(jibun);
+  m_lockedJibun->setText(jibun.isEmpty() ? QStringLiteral("—") : jibun);
   m_lockedJimok->setText(jimok.isEmpty() ? QStringLiteral("—") : jimok);
   return jibun;
 }

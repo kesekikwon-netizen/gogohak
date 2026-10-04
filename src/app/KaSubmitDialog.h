@@ -42,7 +42,9 @@ signals:
   void recheckRequested();
 
 private:
-  QWidget* buildPlateHead();
+  QWidget* buildPlateHead();  // KaSubmitDialogPlate.cpp: 새 모양 headline, rules' name, counts
+  QWidget* buildPlateFoot();  // KaSubmitDialogPlate.cpp: what the package holds, in mono
+  void showPlateResult(int errors, int warns, int passed);  // KaSubmitDialogPlate.cpp
   void rebuild();
   void choose(Choice choice, const CheckResult& result = {});
   void addResultRow(QTreeWidgetItem* group, int index);

@@ -89,6 +89,7 @@ KaFeatureCard::KaFeatureCard(QWidget* parent) : QFrame(parent) {
   headerLine->setSpacing(8);
   m_swatch = new QLabel(m_header);
   m_swatch->setObjectName(QStringLiteral("kaFeatureCardSwatch"));
+  m_swatch->setContentsMargins(0, 0, 2, 0);  // 10 px to the name (spec 4.1)
   m_swatch->hide();
   headerLine->addWidget(m_swatch, 0, Qt::AlignVCenter);
   m_name = new QLabel(m_header);
