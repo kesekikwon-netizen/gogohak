@@ -2,6 +2,8 @@
 // the head) and a chosen row is oat with no accent bar. The stock look keeps its accent bar and no rules.
 #include <QtTest>
 #include <QApplication>
+#include <QHBoxLayout>
+#include <QPushButton>
 #include <QRegularExpression>
 #include "app/KaTheme.h"
 #include "app/KaWindowSize.h"
@@ -155,6 +157,43 @@ private slots:
     KaTheme::setDisplayOptions(qApp, paper);
     QCOMPARE(both(tip), (QStringList{QStringLiteral("#faf9f5"), KaTheme::tokens().ink.name()}));
     QCOMPARE(captured(hover), KaTheme::tokens().desk.name());
+  }
+
+  // 설계 2.4: tooltip text is the 12 px Caption in 새 모양; stock keeps the UI size.
+  void tooltipTextIsTheCaptionSizeInPaper() {
+    const QRegularExpression size(QStringLiteral("(?m)^QToolTip \\{[^}]*font-size: (\\d+)px;"));
+    const QString stock = size.match(qApp->styleSheet()).captured(1);
+    KaTheme::DisplayOptions paper;
+    paper.paperLook = true;
+    KaTheme::setDisplayOptions(qApp, paper);
+    const QString plate = size.match(qApp->styleSheet()).captured(1);
+    KaTheme::setDisplayOptions(qApp, KaTheme::DisplayOptions());
+    QCOMPARE(stock, QStringLiteral("13"));
+    QCOMPARE(plate, QStringLiteral("12"));
+  }
+
+  // 「A4 | A3」 joined: the chosen A3 keeps a whole ink outline, its left edge included (보드).
+  void joinedSheetWordsKeepTheChosenOutline() {
+    KaTheme::DisplayOptions paper;
+    paper.paperLook = true;
+    KaTheme::setDisplayOptions(qApp, paper);
+    QWidget row;
+    auto* line = new QHBoxLayout(&row);
+    line->setSpacing(0);
+    auto* a4 = new QPushButton(QStringLiteral("A4"), &row);
+    auto* a3 = new QPushButton(QStringLiteral("A3"), &row);
+    a4->setObjectName(QStringLiteral("printSheetA4"));
+    a3->setObjectName(QStringLiteral("printSheetA3"));
+    for (QPushButton* word : {a4, a3}) {
+      word->setCheckable(true);
+      line->addWidget(word);
+    }
+    a3->setChecked(true);
+    row.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&row));
+    const QColor edge = row.grab().toImage().pixelColor(a3->x(), a3->y() + a3->height() / 2);
+    KaTheme::setDisplayOptions(qApp, KaTheme::DisplayOptions());
+    QVERIFY2(edge.lightness() < 60, qPrintable(edge.name()));
   }
 
   // 창 너비: 새 모양 windows come in three widths (S 440 · M 560 · L 860); stock keeps each window's own width.

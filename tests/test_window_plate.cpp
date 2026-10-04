@@ -67,6 +67,22 @@ class TestWindowPlate : public QObject {
     QCOMPARE(sentencePx, 12);
   }
 
+  // 「저장 안 함」 throws work away, so it reads in the danger colour; the window is the small 440 width.
+  void closePromptDiscardIsDangerAndTheBoxIsSmall() {
+    KaTheme::DisplayOptions options;
+    options.paperLook = true;
+    KaTheme::setDisplayOptions(qApp, options);
+    QMessageBox box;
+    KaClosePrompt::dress(box, QStringLiteral("C:/조사/광령리1.gpkg"), 2);
+    box.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&box));
+    const QColor discard = box.button(QMessageBox::Discard)->palette().color(QPalette::ButtonText);
+    const int width = box.width();
+    KaTheme::setDisplayOptions(qApp, KaTheme::DisplayOptions());
+    QCOMPARE(discard, QColor(0xA3, 0x3B, 0x3B));
+    QVERIFY2(width >= 440, qPrintable(QString::number(width)));
+  }
+
   // 오류 알림 (보드 판 5): what failed as the serif heading, why and how as plain sentences under it, no icon;
   // stock keeps the three bold-headed parts.
   void errorAlertSaysWhatThenWhyAndHowInPaper() {

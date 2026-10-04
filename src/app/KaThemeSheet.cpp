@@ -114,6 +114,9 @@ QHash<QString, QString> replacementTable() {
   values.insert(QStringLiteral("tipEdge"), (paper ? c.ink : c.border).name());
   values.insert(QStringLiteral("tipRadius"), paper ? QStringLiteral("4") : QStringLiteral("0"));
   values.insert(QStringLiteral("tipPad"), paper ? QStringLiteral("6px 8px") : QStringLiteral("6px 10px"));
+  // 설계 2.4: the 12 px Caption in 새 모양 unless 큰 글자 asks for the larger UI size.
+  values.insert(QStringLiteral("tipSize"),
+                QString::number(paper && !displayOptions().largeText ? 12 : uiFontSize()));
   values.insert(QStringLiteral("menuPad"), paper ? QStringLiteral("4") : QStringLiteral("6"));
   values.insert(QStringLiteral("menuItemPad"), paper ? QStringLiteral("6px 12px") : QStringLiteral("8px 16px"));
   values.insert(QStringLiteral("menuItemMin"), paper ? QStringLiteral("20") : QStringLiteral("22"));

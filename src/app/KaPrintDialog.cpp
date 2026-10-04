@@ -245,6 +245,7 @@ KaPrintDialog::KaPrintDialog(const QString& pdfPath, const QString& title, doubl
     m_print->setEnabled(false);
     m_properties->setEnabled(false);
     m_savePdf->setEnabled(false);
+    refreshPlate();
     return;
   }
   rebuild();

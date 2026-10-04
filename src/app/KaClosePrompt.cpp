@@ -4,6 +4,8 @@
 #include "KaTheme.h"
 
 #include <QFileInfo>
+#include <QPushButton>
+#include <QStyle>
 
 namespace KaClosePrompt {
 
@@ -31,6 +33,10 @@ void dress(QMessageBox& box, const QString& surveyPath, int unsavedFeatures) {
     return;
   }
   box.setProperty("kaPlate", true);  // the question in the serif Heading (QSS)
+  QAbstractButton* discard = box.button(QMessageBox::Discard);
+  discard->setObjectName(QStringLiteral("closePromptDiscard"));  // danger text (QSS)
+  discard->style()->unpolish(discard);  // the box styled its buttons when it made them, before the name
+  discard->style()->polish(discard);
   box.setIcon(QMessageBox::NoIcon);
   box.setText(QStringLiteral("%1 저장할까요?").arg(withObjectParticle(file.completeBaseName())));
   box.setInformativeText(

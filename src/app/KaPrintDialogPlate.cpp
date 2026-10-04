@@ -94,11 +94,15 @@ void KaPrintDialog::arrangePlate(QVBoxLayout* root, QHBoxLayout* pickRow, QHBoxL
     auto* word = new QPushButton(sheet == SheetA4 ? QStringLiteral("A4") : QStringLiteral("A3"), this);
     word->setObjectName(sheet == SheetA4 ? QStringLiteral("printSheetA4") : QStringLiteral("printSheetA3"));
     word->setCheckable(true);
+    word->setAutoDefault(false);  // Enter stays 「인쇄」
     word->setChecked(m_sheet->currentIndex() == int(sheet));
     words->addButton(word, int(sheet));
     joined->addWidget(word);
   }
   paperRow->insertLayout(0, joined);
+  setTabOrder(m_output, words->button(SheetA4));  // where the hidden list stood
+  setTabOrder(words->button(SheetA4), words->button(SheetA3));
+  setTabOrder(words->button(SheetA3), m_overlap);
   connect(words, &QButtonGroup::idClicked, m_sheet, &QComboBox::setCurrentIndex);
   connect(m_sheet, &QComboBox::currentIndexChanged, words, [words](int index) {
     if (QAbstractButton* word = words->button(index)) word->setChecked(true);
@@ -118,7 +122,7 @@ void KaPrintDialog::arrangePlate(QVBoxLayout* root, QHBoxLayout* pickRow, QHBoxL
   left->setSpacing(0);
   left->addLayout(m_form);
   left->addStretch(1);
-  left->addWidget(buildLedger());
+  left->addWidget(m_ledger = buildLedger());
 
   // Right: 「미리보기」 and what is shown, the two-line hint, the preview, then what this print leaves out.
   auto* right = new QVBoxLayout;
@@ -179,6 +183,13 @@ QWidget* KaPrintDialog::buildLedger() {
 
 void KaPrintDialog::refreshPlate() {
   if (!m_plate) return;
+  if (m_drawingMm.isEmpty()) {  // nothing can be printed: only the reason stays, no empty rows or bars
+    for (QWidget* idle : {m_ledger, static_cast<QWidget*>(m_previewHead), static_cast<QWidget*>(m_warning),
+                          static_cast<QWidget*>(m_skipNote), static_cast<QWidget*>(m_pickHint),
+                          static_cast<QWidget*>(m_pickAll)})
+      idle->hide();
+    return;
+  }
   const bool tiled = isTiled();
   const bool planned = tiled && m_plan.ok;
   const QString sheet = m_sheet->currentText();

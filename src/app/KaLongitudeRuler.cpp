@@ -19,6 +19,7 @@ constexpr double kZoneBase = 11;
 constexpr double kNameBase = 31;
 constexpr double kAxisY = 52.5;
 constexpr double kDegreeBase = 74;
+const QColor kTick(0x87, 0x86, 0x7F);  // the board's town ticks
 
 struct Place {
   const char* name;
@@ -72,6 +73,8 @@ void KaLongitudeRuler::paintEvent(QPaintEvent*) {
   p.setPen(t.ink);
   for (const Place& place : kPlaces)
     write(QString::fromUtf8(place.name), pixel(place.longitude), kNameBase, place.anchor);
+  p.setPen(QPen(kTick, 1));  // each town stands on a tick down to the axis
+  for (const Place& place : kPlaces) p.drawLine(QPointF(pixel(place.longitude), 36), QPointF(pixel(place.longitude), kAxisY));
   // The axis with a tick every tenth of a degree (half and whole degrees longer), the boundary full height.
   p.setPen(QPen(t.ink, 1));
   p.drawLine(QPointF(0, kAxisY), QPointF(width(), kAxisY));
@@ -93,7 +96,8 @@ void KaLongitudeRuler::paintEvent(QPaintEvent*) {
     else if (degree == int(kBoundary)) write(label, boundary + 6.5, kDegreeBase, Qt::AlignLeft);
     else write(label, pixel(degree), kDegreeBase, Qt::AlignHCenter);
   }
-  if (!std::isfinite(m_centre)) return;
+  // A centre off the ruler (울릉도, 백령도) gets no mark rather than one pinned to an edge.
+  if (!std::isfinite(m_centre) || m_centre < kWest || m_centre > kEast) return;
   const double cx = std::floor(xFor(m_centre)) + 0.5;
   p.setPen(QPen(t.accent, 1));
   p.drawLine(QPointF(cx, 16), QPointF(cx, 42));

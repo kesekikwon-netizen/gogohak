@@ -1029,7 +1029,7 @@ QToolTip {
   border-radius: @tipRadius@px;
   padding: @tipPad@;
   font-family: "Malgun Gothic", "Segoe UI";
-  font-size: @uiFontSize@px;
+  font-size: @tipSize@px;
 }
 
 /* A flat scroll bar: the Fusion track width (14 px), an 8 px thumb and no arrow
@@ -1433,8 +1433,11 @@ QFrame#kaMeasureHead QLabel#kaMeasureAuto { color: @inkMuted@; font-size: 11px; 
 QFrame#kaMeasureField[kaPlate="true"] { background: transparent; border: none; border-bottom: 1px solid @border@; border-radius: 0; }
 /* 알림 창 (2차 보드 판 5, 설계 2.4 Dialog, 새 모양): the question or outcome in the 20 px serif Heading, the one
    sentence under it 12 px muted; no icon disc (set in code). */
-QMessageBox[kaPlate="true"] QLabel#qt_msgbox_label { font-family: @titleFont@; font-weight: @titleWeight@; font-size: 20px; color: @ink@; }
+QMessageBox[kaPlate="true"] QLabel#qt_msgbox_label { font-family: @titleFont@; font-weight: @titleWeight@; font-size: 20px; color: @ink@; min-width: 397px; }
 QMessageBox[kaPlate="true"] QLabel#qt_msgbox_informativelabel { font-size: 12px; color: @inkMuted@; }
+/* The question's 397 px plus the box's 43 px of margins make the S 440 window. 「저장 안 함」 throws the unsaved
+   work away: danger text (2차 보드 판 5 조사 닫기). */
+QMessageBox[kaPlate="true"] QPushButton#closePromptDiscard { color: @danger@; }
 /* 새 조사 (2차 보드 판 5): the caption over the ruler, the origins set left with 「추천」 in clay inside, and the
    three sentences at 12 px: the zone in ink, the boundary rule and the later change muted. */
 QDialog[kaPlate="true"] QLabel#newSurveyCrsCaption { font-size: 12px; color: @inkMuted@; }
@@ -1452,8 +1455,11 @@ QFrame#printLedger QLabel { font-size: 12px; color: @ink@; }
 QLabel#printPreviewHead, QLabel#printPickHint { font-size: 11px; color: @inkMuted@; }
 QLabel#printSkipNote { font-size: 12px; color: @ink@; }
 QPushButton#printProperties[kaPlate="true"], QPushButton#printPickAll[kaPlate="true"] { min-height: 22px; padding: 0 8px; font-size: 12px; }
-QPushButton#printSheetA4 { min-height: 30px; padding: 0 12px; border-top-right-radius: 0; border-bottom-right-radius: 0; }
+QPushButton#printSheetA4 { min-height: 30px; padding: 0 12px; border-top-right-radius: 0; border-bottom-right-radius: 0; border-right: none; }
 QPushButton#printSheetA3 { min-height: 30px; padding: 0 12px; border-top-left-radius: 0; border-bottom-left-radius: 0; border-left: none; }
+/* the shared edge belongs to the chosen word, so it keeps a whole ink outline */
+QPushButton#printSheetA4:checked { border-right: 1px solid @tabMark@; }
+QPushButton#printSheetA3:checked { border-left: 1px solid @tabMark@; }
 /* API 키 입력 (2차 보드 판 5): the key names and the sentences under the boxes, 12 px muted. */
 QDialog#apiKeyDialog[kaPlate="true"] QLabel { font-size: 12px; color: @inkMuted@; }
 /* 격자 원점 (2차 보드 판 5): the note and the X·Y words 12 px muted, 「지도 가운데」「좌표계 원점 (0, 0)」 as small words. */

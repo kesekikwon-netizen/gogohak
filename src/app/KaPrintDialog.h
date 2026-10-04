@@ -118,6 +118,7 @@ private:
   QPushButton* m_print = nullptr;
   QPushButton* m_savePdf = nullptr;
   bool m_plate = false;  // 새 모양 when the window was built
+  QWidget* m_ledger = nullptr;
   QLabel* m_previewHead = nullptr;
   QLabel* m_skipNote = nullptr;
   QLabel* m_ledgerSheet = nullptr;

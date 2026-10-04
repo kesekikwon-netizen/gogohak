@@ -114,6 +114,32 @@ private slots:
     QVERIFY(dialog.findChild<QPushButton*>(QStringLiteral("printPickAll"))->isVisibleTo(&dialog));
   }
 
+  // 「A4 | A3」 never become the window's default button (Enter prints), and Tab reaches them before 「인쇄」.
+  void sheetWordsStayOutOfTheDefaultAndInTabOrder() {
+    QTemporaryDir dir;
+    const QString source = makePdf(dir.filePath(QStringLiteral("drawing.pdf")), QSizeF(841, 594));
+    qApp->setProperty("kaPaperLook", true);
+    KaPrintDialog dialog(source, QStringLiteral("시험 도면"));
+    dialog.setTiled(true);
+    auto* a4 = dialog.findChild<QPushButton*>(QStringLiteral("printSheetA4"));
+    auto* a3 = dialog.findChild<QPushButton*>(QStringLiteral("printSheetA3"));
+    QVERIFY(!a4->autoDefault() && !a3->autoDefault());
+    QWidget* next = dialog.findChild<QComboBox*>(QStringLiteral("printOutput"));
+    while (next && next != a4 && next->objectName() != QLatin1String("printStart")) next = next->nextInFocusChain();
+    QCOMPARE(next, static_cast<QWidget*>(a4));
+  }
+
+  // A drawing that cannot be read leaves no empty ledger rows, heading or warning bar, only the reason.
+  void unreadableDrawingShowsOnlyTheReason() {
+    QTemporaryDir dir;
+    qApp->setProperty("kaPaperLook", true);
+    KaPrintDialog dialog(dir.filePath(QStringLiteral("없는 도면.pdf")), QStringLiteral("시험 도면"));
+    QVERIFY(!dialog.findChild<QWidget*>(QStringLiteral("printLedger"))->isVisibleTo(&dialog));
+    QVERIFY(!dialog.findChild<QLabel*>(QStringLiteral("printPreviewHead"))->isVisibleTo(&dialog));
+    QVERIFY(!dialog.findChild<QLabel*>(QStringLiteral("printWarning"))->isVisibleTo(&dialog));
+    QVERIFY(dialog.findChild<QLabel*>(QStringLiteral("printSummary"))->isVisibleTo(&dialog));
+  }
+
   // The settings column is the board's 380 px, but never so narrow that a 「방법」 line is cut off.
   void methodLinesAreNeverCut() {
     QTemporaryDir dir;

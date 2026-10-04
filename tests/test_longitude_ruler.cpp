@@ -1,5 +1,5 @@
-// 「조용한 도판」 새 조사: a longitude ruler above the two origin buttons — 124°–132°E, the 128° line between
-// 중부원점 and 동부원점, place ticks and a clay mark at the map centre. 새 모양 only; display only.
+// 「조용한 도판」 새 조사: a longitude ruler above the two origin buttons — 126°–130°E, the 128° line between
+// 중부원점 and 동부원점, towns with ticks down to the axis and a clay mark at the map centre. 새 모양 only; display only.
 #include <QtTest>
 #include <QLabel>
 #include <QPushButton>
@@ -90,6 +90,33 @@ private slots:
       for (int x = 0; x < image.width(); ++x)
         if (qAbs(x - boundary) > 2 && image.pixelColor(x, y).lightness() < 60) ++words;
     QVERIFY2(words > 40, qPrintable(QString::number(words)));
+  }
+
+  // Each town stands on a grey tick down to the axis (보드: #87867F, y 36 → axis), so 강릉 and 울산 show their place.
+  void townsStandOnTicks() {
+    KaLongitudeRuler ruler(std::numeric_limits<double>::quiet_NaN());
+    ruler.resize(512, ruler.height());
+    const QImage image = ruler.grab().toImage();
+    for (double longitude : {128.60, 128.90, 129.31})
+      QCOMPARE(image.pixelColor(qRound(ruler.xFor(longitude)), 44), QColor(0x87, 0x86, 0x7F));
+  }
+
+  // A map centre off the 126°–130° ruler (울릉도 130.9°, 백령도 124.7°) draws no clay mark at an edge.
+  void centreOffTheRulerIsNotMarked() {
+    KaTheme::DisplayOptions paper;
+    paper.paperLook = true;
+    KaTheme::setDisplayOptions(qApp, paper);
+    for (double centre : {130.9, 124.7}) {
+      KaLongitudeRuler ruler(centre);
+      ruler.resize(512, ruler.height());
+      const QImage image = ruler.grab().toImage();
+      int clay = 0;
+      for (int y = 0; y < image.height(); ++y)
+        for (int x = 0; x < image.width(); ++x)
+          if (image.pixelColor(x, y).red() > image.pixelColor(x, y).green() + 40) ++clay;
+      QCOMPARE(clay, 0);
+    }
+    KaTheme::setDisplayOptions(qApp, KaTheme::DisplayOptions());
   }
 };
 
