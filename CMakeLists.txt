@@ -534,12 +534,14 @@ add_executable(ka-hgis
   src/app/KaApiKeyDialog.cpp
   src/app/KaMenuCaption.cpp
   src/app/KaFormPlate.cpp
+  src/app/KaControlPointDialog.cpp
   src/app/KaPrintDialog.cpp
   src/app/KaPrintDialogPlate.cpp
   src/app/KaTilePreview.cpp
   src/app/KaApiKeyDialog.h
   src/app/KaMenuCaption.h
   src/app/KaFormPlate.h
+  src/app/KaControlPointDialog.h
   src/app/KaPrintDialog.h
   src/app/KaTilePreview.h
   src/app/MainWindow.h
@@ -2173,6 +2175,7 @@ if(KA_HGIS_BUILD_TESTS)
   # 「조용한 도판」 windows (board 5): message boxes with a serif question and no icon disc (no QGIS).
   add_executable(ka_window_plate_tests tests/test_window_plate.cpp src/app/KaApiKeyDialog.cpp src/app/KaApiKeyDialog.h
     src/app/KaMenuCaption.cpp src/app/KaMenuCaption.h src/app/KaFormPlate.cpp src/app/KaFormPlate.h
+    src/app/KaControlPointDialog.cpp src/app/KaControlPointDialog.h
     src/app/KaClosePrompt.cpp src/app/KaClosePrompt.h src/app/KaHomeText.cpp src/app/KaHomeText.h
     src/app/KaUserError.cpp src/app/KaUserError.h ${_ka_p5_theme_sources})
   set_target_properties(ka_window_plate_tests PROPERTIES WIN32_EXECUTABLE FALSE)

@@ -1,4 +1,5 @@
 #include "MainWindow.h"
+#include "KaControlPointDialog.h"
 #include "KaAttributeMapTool.h"
 #include "KaCaptureMapTool.h"
 #include "KaCrashGuard.h"
@@ -1383,50 +1384,17 @@ void MainWindow::clipOverlappingLayers() {
 }
 
 void MainWindow::addControlPoint() {
-  QDialog dlg(this);
-  dlg.setWindowTitle(QStringLiteral("GPS 기준점"));
-  auto* form = new QFormLayout(&dlg);
-  auto* id = new QLineEdit(&dlg);
-  auto* x = new QLineEdit(&dlg);
-  auto* y = new QLineEdit(&dlg);
-  auto* z = new QLineEdit(&dlg);
-  z->setPlaceholderText(QStringLiteral("비워 두면 표고 없이 넣습니다"));
-  auto* datum = new QLineEdit(QStringLiteral("세계측지계"), &dlg);
-  auto* ell = new QLineEdit(QStringLiteral("GRS80"), &dlg);
-  auto* proj = new QLineEdit(QStringLiteral("TM/UTM-K"), &dlg);
-  auto* origin = new QLineEdit(&dlg);
-  auto* acc = new QLineEdit(QStringLiteral("1.0"), &dlg);
-  auto* pdop = new QLineEdit(QStringLiteral("1.5"), &dlg);
-  auto* fix = new QLineEdit(QStringLiteral("RTK"), &dlg);
-  auto* axisHint = new QLabel(LayerOps::controlPointAxisHint(), &dlg);
-  axisHint->setWordWrap(true);
-  form->addRow(axisHint);
-  form->addRow(QStringLiteral("점ID"), id);
-  form->addRow(QStringLiteral("X (동쪽)"), x);
-  form->addRow(QStringLiteral("Y (북쪽)"), y);
-  auto* swapAxes = new QCheckBox(QStringLiteral("X·Y 교환 (측량 X=북, Y=동)"), &dlg);
-  form->addRow(swapAxes);
-  form->addRow(QStringLiteral("Z (표고 m, 선택)"), z);
-  form->addRow(QStringLiteral("측지기준계"), datum);
-  form->addRow(QStringLiteral("타원체"), ell);
-  form->addRow(QStringLiteral("투영"), proj);
-  form->addRow(QStringLiteral("원점"), origin);
-  form->addRow(attributeFieldLabelKo(QStringLiteral("accuracy_m")), acc);
-  form->addRow(QStringLiteral("PDOP"), pdop);
-  form->addRow(attributeFieldLabelKo(QStringLiteral("fix_type")), fix);
-  auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dlg);
-  form->addRow(buttons);
-  connect(buttons, &QDialogButtonBox::accepted, &dlg, &QDialog::accept);
-  connect(buttons, &QDialogButtonBox::rejected, &dlg, &QDialog::reject);
+  KaControlPointDialog dlg(LayerOps::controlPointAxisHint(), attributeFieldLabelKo(QStringLiteral("accuracy_m")),
+                           attributeFieldLabelKo(QStringLiteral("fix_type")), this);
   if (dlg.exec() != QDialog::Accepted) return;
   bool xOk = false;
   bool yOk = false;
   bool zOk = true;
-  const double xv = x->text().trimmed().toDouble(&xOk);
-  const double yv = y->text().trimmed().toDouble(&yOk);
-  const QString zText = z->text().trimmed();
+  const double xv = dlg.xText().trimmed().toDouble(&xOk);
+  const double yv = dlg.yText().trimmed().toDouble(&yOk);
+  const QString zText = dlg.zText().trimmed();
   const double zv = zText.isEmpty() ? 0.0 : zText.toDouble(&zOk);
-  if (id->text().trimmed().isEmpty() || !xOk || !yOk || !zOk) {
+  if (dlg.pointId().trimmed().isEmpty() || !xOk || !yOk || !zOk) {
     KaUserError::warn(this, {
         QStringLiteral("GPS 기준점"),
         QStringLiteral("기준점을 넣지 않았습니다."),
@@ -1435,7 +1403,7 @@ void MainWindow::addControlPoint() {
     });
     return;
   }
-  bool swap = swapAxes->isChecked();
+  bool swap = dlg.swapAxes();
 #if KA_HGIS_HAS_QGIS
   const auto suggestion = LayerOps::suggestControlPointAxisSwap(QgsProject::instance(), xv, yv);
   if (suggestion.ok && !suggestion.summary.isEmpty()) {
@@ -1453,24 +1421,24 @@ void MainWindow::addControlPoint() {
   }
 #endif
   const QgsPointXY mapXy = LayerOps::controlPointMapXy(xv, yv, swap);
-  m_stubHasMeta = !datum->text().isEmpty() && !ell->text().isEmpty() && !proj->text().isEmpty();
+  m_stubHasMeta = !dlg.datum().isEmpty() && !dlg.ellipsoid().isEmpty() && !dlg.projection().isEmpty();
 #if KA_HGIS_HAS_QGIS
   auto* layer = ensureDomainLayerForEdit(QStringLiteral("control_points"), QStringLiteral("GPS기준점"));
   if (!layer) return;
   QgsFeature f(layer->fields());
-  f.setAttribute(QStringLiteral("point_id"), id->text().trimmed());
+  f.setAttribute(QStringLiteral("point_id"), dlg.pointId().trimmed());
   f.setAttribute(QStringLiteral("x"), mapXy.x());
   f.setAttribute(QStringLiteral("y"), mapXy.y());
   if (!zText.isEmpty() && layer->fields().indexOf(QStringLiteral("z")) >= 0)
     f.setAttribute(QStringLiteral("z"), zv);
-  f.setAttribute(QStringLiteral("datum"), datum->text());
-  f.setAttribute(QStringLiteral("ellipsoid"), ell->text());
-  f.setAttribute(QStringLiteral("projection"), proj->text());
-  f.setAttribute(QStringLiteral("origin"), origin->text());
-  f.setAttribute(QStringLiteral("accuracy"), acc->text());
-  f.setAttribute(QStringLiteral("accuracy_m"), acc->text().toDouble());
-  f.setAttribute(QStringLiteral("pdop"), pdop->text().toDouble());
-  f.setAttribute(QStringLiteral("fix_type"), fix->text());
+  f.setAttribute(QStringLiteral("datum"), dlg.datum());
+  f.setAttribute(QStringLiteral("ellipsoid"), dlg.ellipsoid());
+  f.setAttribute(QStringLiteral("projection"), dlg.projection());
+  f.setAttribute(QStringLiteral("origin"), dlg.origin());
+  f.setAttribute(QStringLiteral("accuracy"), dlg.accuracy());
+  f.setAttribute(QStringLiteral("accuracy_m"), dlg.accuracy().toDouble());
+  f.setAttribute(QStringLiteral("pdop"), dlg.pdop().toDouble());
+  f.setAttribute(QStringLiteral("fix_type"), dlg.fix());
   f.setGeometry(QgsGeometry::fromPointXY(mapXy));
   FeatureRecord::stampNew(f);  // [pkg K] F054 audit fields
   // Into the edit buffer like a drawn shape: Ctrl+Z takes it back, 저장 writes it, and an
@@ -1481,7 +1449,7 @@ void MainWindow::addControlPoint() {
       }, &addError)) {
     KaUserError::warn(this, {
         QStringLiteral("GPS 기준점"),
-        QStringLiteral("기준점 「%1」을 넣지 못했습니다.").arg(id->text().trimmed()),
+        QStringLiteral("기준점 「%1」을 넣지 못했습니다.").arg(dlg.pointId().trimmed()),
         addError,
         QStringLiteral("같은 파일을 연 다른 프로그램을 닫은 뒤 다시 넣으세요."),
     });
@@ -1492,7 +1460,7 @@ void MainWindow::addControlPoint() {
   m_stubGcp = static_cast<int>(layer->featureCount());
   statusBar()->showMessage(
       QStringLiteral("기준점 %1을 넣었습니다 (모두 %2개). Ctrl+Z로 되돌리고, 「저장」(Ctrl+S)으로 파일에 씁니다.")
-          .arg(id->text().trimmed())
+          .arg(dlg.pointId().trimmed())
           .arg(m_stubGcp),
       6000);
 #else

@@ -6,6 +6,7 @@
 #include <QDialog>
 #include <QFormLayout>
 #include <QDir>
+#include <QFontDatabase>
 #include <QLabel>
 #include <QLineEdit>
 #include <QMenu>
@@ -17,6 +18,7 @@
 
 #include "app/KaApiKeyDialog.h"
 #include "app/KaClosePrompt.h"
+#include "app/KaControlPointDialog.h"
 #include "app/KaFormPlate.h"
 #include "app/KaMenuCaption.h"
 #include "app/KaTheme.h"
@@ -193,6 +195,39 @@ class TestWindowPlate : public QObject {
     QVERIFY(!qobject_cast<QLabel*>(plain->itemAt(0, QFormLayout::LabelRole)->widget())->property("kaFormWord").isValid());
   }
 
+  // GPS 기준점 (보드 판 5, 440): the axis note in three lines, then 「위치」「측량 기준」「수신」 sections, the basis
+  // and receiver values side by side under small captions; the values read back as typed.
+  void controlPointWindowHasTheBoardSectionsInPaper() {
+    const QString hint = QStringLiteral("이 프로그램은 X를 동쪽, Y를 북쪽으로 읽습니다. 한국 측량 성과표는 흔히 X=북쪽, Y=동쪽입니다. "
+                                        "그 값이면 X·Y 교환을 고르세요.");
+    paper(true);
+    KaControlPointDialog dialog(hint, QStringLiteral("정확도(m)"), QStringLiteral("수신상태"));
+    dialog.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&dialog));
+    QCOMPARE(dialog.minimumWidth(), 440);
+    QCOMPARE(dialog.findChild<QLabel*>(QStringLiteral("controlPointHint"))->text().count(QLatin1Char(0x0A)), 2);
+    QStringList sections;
+    for (QLabel* label : dialog.findChildren<QLabel*>(QStringLiteral("controlPointSection"))) sections << label->text();
+    QCOMPARE(sections, (QStringList{QStringLiteral("위치"), QStringLiteral("측량 기준"), QStringLiteral("수신")}));
+    const auto box = [&dialog](const char* name) { return dialog.findChild<QLineEdit*>(QString::fromLatin1(name)); };
+    QCOMPARE(box("controlPointX")->width(), 176);
+    for (const char* name : {"controlPointEllipsoid", "controlPointProjection", "controlPointOrigin"})
+      QCOMPARE(box(name)->y(), box("controlPointDatum")->y());  // side by side
+    QCOMPARE(box("controlPointFix")->y(), box("controlPointAccuracy")->y());
+    box("controlPointId")->setText(QStringLiteral(" GCP4 "));
+    box("controlPointX")->setText(QStringLiteral("147958.65"));
+    QCOMPARE(dialog.pointId(), QStringLiteral(" GCP4 "));
+    QCOMPARE(dialog.xText(), QStringLiteral("147958.65"));
+    QCOMPARE(dialog.datum(), QStringLiteral("세계측지계"));
+    QCOMPARE(dialog.fix(), QStringLiteral("RTK"));
+    const QString out = qEnvironmentVariable("KA_HGIS_QA_OUTPUT_DIR");  // a picture for a look
+    if (!out.isEmpty()) QVERIFY(dialog.grab().save(QDir(out).filePath(QStringLiteral("control-point-paper.png"))));
+    paper(false);
+    KaControlPointDialog stock(hint, QStringLiteral("정확도(m)"), QStringLiteral("수신상태"));
+    QVERIFY(stock.findChildren<QLabel*>(QStringLiteral("controlPointSection")).isEmpty());
+    QVERIFY(!stock.findChild<QLabel*>(QStringLiteral("controlPointHint"))->text().contains(QLatin1Char(0x0A)));
+  }
+
   // 「광령리1을」 · 「테스트를」 · 「광령리2를」: the object particle follows how the name ends.
   void objectParticleFollowsTheName() {
     QCOMPARE(KaClosePrompt::withObjectParticle(QStringLiteral("광령리1")), QStringLiteral("광령리1을"));
@@ -205,6 +240,13 @@ class TestWindowPlate : public QObject {
 
 int main(int argc, char** argv) {
   QApplication app(argc, argv);
+#ifdef Q_OS_WIN
+  if (QGuiApplication::platformName() == QLatin1String("offscreen")) {  // Korean for the QA pictures
+    const QDir windows(qEnvironmentVariable("WINDIR", QStringLiteral("C:/Windows")));
+    for (const QString& file : {QStringLiteral("malgun.ttf"), QStringLiteral("malgunbd.ttf")})
+      QFontDatabase::addApplicationFont(windows.filePath(QStringLiteral("Fonts/") + file));
+  }
+#endif
   KaTheme::apply(&app);
   TestWindowPlate test;
   return QTest::qExec(&test, argc, argv);
