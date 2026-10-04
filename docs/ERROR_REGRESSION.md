@@ -5,6 +5,7 @@
 
 | 증상 | 원인 | 재발 방지 |
 | --- | --- | --- |
+| 새 모양 홈 「이어서 작업」 표제란 아래 복구 사본 줄이 왼쪽에 붙고 아래 테두리에 걸림 | 표제란으로 옮긴 복구 줄(`startRecoveryNote`)을 여백 없이 칸 아래에 바로 넣음(2026-10-04). | `KaHomeTitleBlock::addNote`가 칸과 같은 24 px 안쪽, 위아래 8 px 줄에 넣는다. 시험: home_plate `recoveryLineSitsInsideTheBlock` |
 | 「1919 조선지형도를 올리지 못했습니다」 (Tile layer or tile matrix set not found), 알림에 API 키가 그대로 보임 | 국사편찬위원회 서버가 GetCapabilities에 절반쯤 HTTP 400(GWC configuration out of synch)을 돌려줌(2026-10-04, 6번 중 3번). 앱은 두 번만 시도했고 두 번째 층 이름 `map1919`는 서버에 없음. 오류 글에 URI(키 포함)를 그대로 씀. | 서버에 있는 `history:map1919`만 4번 시도(`historyGisMap1919Uris`), 실패 글은 쉬운 한국어 + 키 [가림](`historyGisFailureText`). 시험: cadastral `historyGis1919_retriesTheRealLayerAndHidesTheKeyWhenItFails` |
 | 오류 창이 원인·해결 없이 한 줄만 뜸 | QMessageBox/notify가 짧은 본문만 씀. 해결 단추는 지적 로그인 정도만. | KaUserError what/why/how + 선택 단추. 상위 20곳. 시험: user_error (ormatBody_containsWhatWhyHow, warn_withAction_returnsActionChosen, warn_withoutAction_returnsDismissed). 표: docs/user/error-message-standard-p4-2.md |
 | 위성/지적 버튼을 눌러도 지도가 안 보임 | 공식 WMTS URI가 `isValid()`만 통과하고 타일은 실패. 폴백 xdworld를 안 탐. 지적 WMS를 5186/5179로 먼저 열어 `Cannot calculate extent`. | 위성은 xdworld를 먼저. 지적은 `cadastralWmsCrsCandidates()`가 **4326→3857→900913만**. 5186/5187/5179 금지. 테스트: `cadastralWmsCrs_neverStartsWithWorkCrs5179`, `addVworldSatellite_allowsEmptyKeyViaPublicTiles` |

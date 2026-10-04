@@ -17,6 +17,7 @@
 #include "app/KaChip.h"
 #include "app/KaHomeConnectionCard.h"
 #include "app/KaHomeRecentCard.h"
+#include "app/KaRecoverySnapshots.h"
 #include "app/KaStartPage.h"
 #include "app/KaTheme.h"
 #include "core/RecentSurveys.h"
@@ -211,6 +212,38 @@ private slots:
     KaTheme::setDisplayOptions(qApp, paper);
     QTRY_VERIFY(page.findChild<QFrame*>(QStringLiteral("startTitleBlock")));
     QCOMPARE(text(page, "startTitleName"), QStringLiteral("광령리1"));
+  }
+
+  // 복구 사본 줄 (2차 보드 견본 상태): a padded row inside the title block, not flush on its left and bottom edges.
+  void recoveryLineSitsInsideTheBlock() {
+    const QString path = touch(m_dir.filePath(QStringLiteral("g/광령리1.gpkg")));
+    const QString copy = touch(m_dir.filePath(QStringLiteral("g/recovery/광령리1-복구.gpkg")));
+    {
+      QSettings st = RecentSurveys::userSettings();
+      RecentSurveys::remember(st, path, QStringLiteral("광령리1"));
+      KaRecoverySnapshots::rememberUnsaved(st, path, copy);
+    }
+    KaStartPage page;
+    page.resize(1600, 900);
+    page.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&page));
+    auto* block = page.findChild<QFrame*>(QStringLiteral("startTitleBlock"));
+    auto* note = page.findChild<QLabel*>(QStringLiteral("startRecoveryNote"));
+    QVERIFY(block && note);
+    QTRY_VERIFY(note->isVisible());
+    const QRect inBlock(note->mapTo(block, QPoint()), note->size());
+    QVERIFY2(inBlock.left() >= 24, qPrintable(QString::number(inBlock.left())));
+    QVERIFY2(block->height() - 1 - inBlock.bottom() >= 6, qPrintable(QStringLiteral("%1 %2").arg(inBlock.bottom()).arg(block->height())));
+    // 「● 저장 안 됨」: the dot is the attention clay, the words ink (2차 보드).
+    auto* state = block->findChild<QLabel*>(QStringLiteral("startTitleState"));
+    const QImage mark = state->grab().toImage();
+    int clay = 0;
+    for (int y = 0; y < mark.height(); ++y)
+      for (int x = 0; x < mark.width(); ++x) {
+        const QColor c = mark.pixelColor(x, y);
+        if (qAbs(c.red() - 0xD9) < 30 && qAbs(c.green() - 0x77) < 30 && qAbs(c.blue() - 0x57) < 30) ++clay;
+      }
+    QVERIFY2(clay >= 6, qPrintable(QString::number(clay)));
   }
 
   void heroDrawsNoBand() {

@@ -42,6 +42,7 @@ KaHomeTitleBlock::KaHomeTitleBlock(QWidget* parent) : QFrame(parent) {
   tagRow->addWidget(label(QStringLiteral("이어서 작업"), "startTitleTag", this));
   tagRow->addStretch(1);
   m_state = label(QString(), "startTitleState", this);
+  m_state->setTextFormat(Qt::RichText);
   tagRow->addWidget(m_state);
   head->addLayout(tagRow);
   m_name = label(QString(), "startTitleName", this);
@@ -85,7 +86,10 @@ QLabel* KaHomeTitleBlock::cell(const char* caption, const char* name, QLayout* r
 
 void KaHomeTitleBlock::addNote(QWidget* note) {
   m_left->addWidget(rule(Qt::Horizontal, this));
-  m_left->addWidget(note);
+  auto* row = new QHBoxLayout;
+  row->setContentsMargins(24, 8, 16, 8);  // 2차 보드: a row under the cells, in from the edge like them
+  row->addWidget(note);
+  m_left->addLayout(row);
 }
 
 QString KaHomeTitleBlock::crsText(const QString& authId) {
@@ -96,7 +100,9 @@ QString KaHomeTitleBlock::crsText(const QString& authId) {
 
 void KaHomeTitleBlock::setSurvey(const RecentSurveys::Item& item, const SurveyFacts::Facts& facts, bool unsaved) {
   m_name->setText(item.name);
-  m_state->setText(unsaved ? QStringLiteral("● 저장 안 됨") : QStringLiteral("저장됨"));
+  // 「● 저장 안 됨」: the attention clay dot (as 연결 상태's 「● 설정 필요」), the words in ink.
+  m_state->setText(unsaved ? QStringLiteral("<span style=\"color:#D97757\">●</span>&nbsp;저장 안 됨") : QStringLiteral("저장됨"));
+  m_state->setAccessibleName(unsaved ? QStringLiteral("저장 안 됨") : QStringLiteral("저장됨"));
   m_state->setProperty("kaTone", unsaved ? QStringLiteral("needsYou") : QString());
   m_folder->setText(KaHomeText::folder(item.path));
   m_folder->setToolTip(item.path);
