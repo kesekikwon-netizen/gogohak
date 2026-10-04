@@ -118,6 +118,7 @@ KaMapScaleBar::KaMapScaleBar(QgsMapCanvas* canvas, QWidget* host)
     connect(m_canvas, &QgsMapCanvas::scaleChanged, this, &KaMapScaleBar::refresh);
     connect(m_canvas, &QgsMapCanvas::extentsChanged, this, &KaMapScaleBar::refresh);
     connect(m_canvas, &QgsMapCanvas::destinationCrsChanged, this, &KaMapScaleBar::refresh);
+    connect(m_canvas, &QgsMapCanvas::rotationChanged, this, &KaMapScaleBar::refresh);
   }
   if (m_host) m_host->installEventFilter(this);
   refresh();
@@ -146,8 +147,11 @@ void KaMapScaleBar::refresh() {
     if (step * decade <= wanted) round = step * decade;
   m_metres = round;
   m_pixels = round / perPixel;
-  setAccessibleDescription(QStringLiteral("막대 길이 %1").arg(lengthText(m_metres)));
-  setFixedWidth(int(std::ceil(m_pixels)) + 56);
+  // 「조용한 도판」: a 도북 arrow (grid north, turned with the map) ends the bar.
+  m_north = KaTheme::displayOptions().paperLook;
+  setAccessibleDescription(QStringLiteral("막대 길이 %1").arg(lengthText(m_metres)) +
+                           (m_north ? QStringLiteral(" · 도북 화살표") : QString()));
+  setFixedWidth(int(std::ceil(m_pixels)) + 56 + (m_north ? kNorthWidth : 0));
   reposition();
   show();
   update();
@@ -182,6 +186,22 @@ void KaMapScaleBar::paintEvent(QPaintEvent*) {
   p.drawText(QPointF(bar.left() - 2, bar.bottom() + 14), QStringLiteral("0"));
   const QString end = lengthText(m_metres);
   p.drawText(QPointF(bar.right() - 4, bar.bottom() + 14), end);
+  if (!m_north) return;
+  // 12 x 20 ink arrow, left half filled, with 「도북」 under it in the muted ink.
+  p.save();
+  p.translate(width() - kNorthWidth / 2.0 - 6, 12);
+  p.rotate(m_canvas ? m_canvas->rotation() : 0.0);
+  p.setPen(QPen(tokens.ink, 1));
+  p.setBrush(tokens.ink);
+  p.drawPolygon(QPolygonF({QPointF(0, -10), QPointF(-6, 10), QPointF(0, 6)}));
+  p.setBrush(Qt::white);
+  p.drawPolygon(QPolygonF({QPointF(0, -10), QPointF(6, 10), QPointF(0, 6)}));
+  p.restore();
+  font.setPixelSize(10);
+  p.setFont(font);
+  p.setPen(tokens.inkMuted);
+  p.drawText(QRectF(width() - kNorthWidth - 6, 23, kNorthWidth, 11), Qt::AlignHCenter | Qt::AlignVCenter,
+             QStringLiteral("도북"));
 }
 
 KaMapCornerBar::KaMapCornerBar(QWidget* host) : QFrame(host), m_host(host) {

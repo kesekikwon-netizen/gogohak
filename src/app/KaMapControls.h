@@ -47,6 +47,8 @@ private:
   QWidget* m_host = nullptr;
   double m_metres = 0.0;
   double m_pixels = 0.0;
+  bool m_north = false;  // 새 모양: the 도북 arrow after the bar
+  static constexpr int kNorthWidth = 30;
 };
 
 // A small bar floating in the bottom-right corner of the map, for map-wide
