@@ -25,7 +25,7 @@
 478 src/app/MainWindowContextMenus.cpp
 1510 src/app/MainWindowEditing.cpp
 552 src/app/MainWindowExport.cpp
-501 src/app/MainWindowOffline.cpp
+502 src/app/MainWindowOffline.cpp
 696 src/app/MainWindowOverlay.cpp
 961 src/app/MainWindowRibbon.cpp
 1819 src/app/MainWindowSession.cpp

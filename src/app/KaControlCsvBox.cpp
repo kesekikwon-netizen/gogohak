@@ -21,7 +21,8 @@ void dress(QMessageBox& box, bool swapSuggested, int count, const QString& summa
   if (!reason.isEmpty()) lines.prepend(reason);
   box.setProperty("kaPlate", true);  // serif heading, 12 px sentences (QSS)
   box.setIcon(QMessageBox::NoIcon);
-  box.setText(swapSuggested ? finding : QStringLiteral("기준점 %1개를 가져옵니다.").arg(count));
+  // 「읽었습니다」, not 「가져옵니다」: rows already in the survey are skipped when it is imported.
+  box.setText(swapSuggested ? finding : QStringLiteral("기준점 %1개를 읽었습니다.").arg(count));
   box.setInformativeText(lines.join(QLatin1Char(0x0A)));
 }
 

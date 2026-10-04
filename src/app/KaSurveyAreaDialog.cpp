@@ -11,6 +11,7 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QPushButton>
+#include <QStyle>
 #include <QVBoxLayout>
 #include <cmath>
 #include <qgsproviderregistry.h>
@@ -155,11 +156,13 @@ void KaSurveyAreaDialog::setupUi() {
   m_widthSpin->setMinimumWidth(96);  // 「1.5 mm」 whole, with the app's spin padding
   connect(m_widthSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, [this](double) {
     for (auto* b : m_widthPresetButtons) b->setChecked(false);
+    markWidthEdges();
   });
   if (m_paper) {
     m_widthSpin->setFixedWidth(96);
     form->addRow(QStringLiteral("선 굵기"), widthRow);
     form->addRow(QStringLiteral("직접"), m_widthSpin);
+    markWidthEdges();
     for (int row = 0; row < form->rowCount(); ++row)  // the board's 96 px words
       if (QLayoutItem* item = form->itemAt(row, QFormLayout::LabelRole))
         if (auto* label = qobject_cast<QLabel*>(item->widget())) {
@@ -223,6 +226,19 @@ void KaSurveyAreaDialog::selectPresetWidth(double width) {
   m_widthSpin->blockSignals(false);
   for (auto* b : m_widthPresetButtons) b->setChecked(false);
   if (auto* senderBtn = qobject_cast<QPushButton*>(sender())) senderBtn->setChecked(true);
+  markWidthEdges();
+}
+
+void KaSurveyAreaDialog::markWidthEdges() {
+  if (!m_paper) return;
+  for (int i = 0; i < m_widthPresetButtons.size(); ++i) {
+    QPushButton* button = m_widthPresetButtons.at(i);
+    const bool after = i > 0 && m_widthPresetButtons.at(i - 1)->isChecked();
+    if (button->property("kaAfterChecked").toBool() == after) continue;
+    button->setProperty("kaAfterChecked", after);  // its left edge gives way to the chosen one's ink edge (QSS)
+    button->style()->unpolish(button);
+    button->style()->polish(button);
+  }
 }
 
 QString KaSurveyAreaDialog::layerName() const {

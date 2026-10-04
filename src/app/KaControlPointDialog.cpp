@@ -112,6 +112,8 @@ KaControlPointDialog::KaControlPointDialog(const QString& axisHint, const QStrin
   form->addRow(m_swap);
   form->addRow(QStringLiteral("Z (표고 m, 선택)"), m_z);
   for (QLineEdit* figure : {m_x, m_y, m_z}) figure->setFixedWidth(176);
+  setTabOrder(m_y, m_swap);  // the check stands between Y and Z here
+  setTabOrder(m_swap, m_z);
   KaFormPlate::dress(this, form);  // 96 px words, 12 px between rows, the 440 width
   form->setContentsMargins(0, 0, 0, 0);
   layout()->setContentsMargins(24, 24, 24, 16);

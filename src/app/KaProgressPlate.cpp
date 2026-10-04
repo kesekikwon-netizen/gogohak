@@ -2,6 +2,7 @@
 
 #include <QAbstractButton>
 #include <QApplication>
+#include <QLabel>
 #include <QProgressBar>
 #include <QProgressDialog>
 #include <QPushButton>
@@ -18,6 +19,7 @@ void dress(QProgressDialog* dialog) {
   dialog->setProperty("kaPlate", true);  // the 4 px bar and the muted line (QSS)
   dialog->setMinimumWidth(440);
   if (auto* bar = dialog->findChild<QProgressBar*>()) bar->setTextVisible(false);
+  if (auto* text = dialog->findChild<QLabel*>()) text->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
   if (auto* cancel = dialog->findChild<QPushButton*>()) cancel->setAutoDefault(false);  // a plain 「취소」
 }
 
@@ -27,7 +29,8 @@ QString label(const QString& text, const QString& paperNote) {
   const QString step = lines.takeFirst();
   if (!paperNote.isEmpty()) lines << paperNote;
   if (lines.isEmpty()) return step;
-  return step.toHtmlEscaped() + QStringLiteral("<br><span style=\"color:#5E5D59; font-size:12px\">") +
+  const QString muted = QApplication::palette().color(QPalette::PlaceholderText).name();  // KaTheme: inkMuted
+  return step.toHtmlEscaped() + QStringLiteral("<br><span style=\"color:%1; font-size:12px\">").arg(muted) +
          lines.join(QLatin1Char(' ')).toHtmlEscaped() + QStringLiteral("</span>");
 }
 

@@ -344,6 +344,7 @@ void MainWindow::showReferenceStatus() {
 #if KA_HGIS_HAS_QGIS
   // Read-only; reopening the command refreshes the same table instead of stacking windows.
   auto* dialog = findChild<KaReferenceStatusDialog*>(QStringLiteral("referenceStatusDialog"));
+  if (dialog && dialog->property("kaPlate").toBool() != qApp->property("kaPaperLook").toBool()) delete std::exchange(dialog, nullptr);
   if (!dialog) {
     dialog = new KaReferenceStatusDialog(QgsProject::instance(), this);
     dialog->setAttribute(Qt::WA_DeleteOnClose);

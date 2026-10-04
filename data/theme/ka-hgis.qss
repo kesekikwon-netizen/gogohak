@@ -1487,6 +1487,7 @@ QPushButton#surveyAreaWidth[kaJoin="first"] { border-top-right-radius: 0; border
 QPushButton#surveyAreaWidth[kaJoin="middle"] { border-radius: 0; border-right: none; }
 QPushButton#surveyAreaWidth[kaJoin="last"] { border-top-left-radius: 0; border-bottom-left-radius: 0; }
 QPushButton#surveyAreaWidth:checked { border-right: 1px solid @tabMark@; }
+QPushButton#surveyAreaWidth[kaAfterChecked="true"] { border-left: none; }
 /* A plain form window in the board's frame (KaFormPlate, 2차 보드 판 5 「VWorld 지적도 계정」): words and notes 12 px muted. */
 QDialog[kaPlate="true"] QLabel[kaFormWord="true"], QDialog[kaPlate="true"] QLabel[kaFormNote="true"] { font-size: 12px; color: @inkMuted@; }
 /* GPS 기준점 (2차 보드 판 5): the axis note 12 px muted, 「위치」「측량 기준」「수신」 section words and the small captions

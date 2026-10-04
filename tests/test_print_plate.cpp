@@ -190,6 +190,8 @@ private slots:
                                                 QStringLiteral("파일만 만듭니다. 지도에는 올리지 않습니다."));
     QVERIFY2(text.startsWith(QStringLiteral("제출 꾸러미: 조사도면.pdf<br>")), qPrintable(text));
     QVERIFY(text.contains(QStringLiteral("파일만 만듭니다. 지도에는 올리지 않습니다.</span>")));
+    QVERIFY2(text.contains(QApplication::palette().color(QPalette::PlaceholderText).name()), qPrintable(text));
+    QVERIFY(dialog.findChild<QLabel*>()->alignment() & Qt::AlignLeft);
     QVERIFY(KaProgressPlate::label(QStringLiteral("PDF를 그리는 중…") + QLatin1Char(0x0A) + QStringLiteral("취소하면 …"))
                 .contains(QStringLiteral("<br><span")));
     qApp->setProperty("kaPaperLook", QVariant());

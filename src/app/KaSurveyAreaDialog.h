@@ -34,6 +34,7 @@ private:
   void setupUi();
   void selectColorIndex(int index);
   void selectPresetWidth(double width);
+  void markWidthEdges();  // 새 모양: the joined width buttons keep one ink edge round the chosen one
 
   QLineEdit* m_nameEdit{nullptr};
   QList<QPushButton*> m_colorButtons;

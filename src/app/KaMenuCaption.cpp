@@ -24,9 +24,17 @@ QAction* insert(QMenu* menu, const QString& text, QAction* before) {
 
 void follow(QMenu* menu) {
   const bool paper = qApp && qApp->property("kaPaperLook").toBool();
-  for (QAction* action : menu->actions()) {
-    if (action->property(kCaption).toBool()) action->setVisible(paper);
-    else if (!action->isSeparator()) action->setIconVisibleInMenu(!paper);
+  const QList<QAction*> actions = menu->actions();
+  for (int i = 0; i < actions.size(); ++i) {
+    QAction* action = actions.at(i);
+    if (action->property(kCaption).toBool()) {
+      action->setVisible(paper);
+    } else if (action->isSeparator()) {  // in 새 모양 the caption marks the group, so its hairline gives way
+      if (i + 1 < actions.size() && actions.at(i + 1)->property(kCaption).toBool()) action->setVisible(!paper);
+    } else {
+      action->setIconVisibleInMenu(!paper);
+      if (QMenu* submenu = action->menu()) follow(submenu);  // 「웹 자료」 too
+    }
   }
 }
 

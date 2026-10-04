@@ -44,6 +44,14 @@ private slots:
     for (int i = 1; i < widths.size(); ++i)  // joined: each starts where the one before ends
       QVERIFY2(qAbs(widths.at(i)->x() - (widths.at(i - 1)->x() + widths.at(i - 1)->width())) <= 1,
                qPrintable(QString::number(widths.at(i)->x())));
+    const auto after = [&widths] {
+      QList<bool> marks;
+      for (QPushButton* w : widths) marks << w->property("kaAfterChecked").toBool();
+      return marks;
+    };
+    QCOMPARE(after(), (QList<bool>{false, false, true, false}));  // 기본 1.5 (the second) is chosen
+    widths.at(3)->click();
+    QCOMPARE(after(), (QList<bool>{false, false, false, false}));
     auto* own = dialog.findChild<QDoubleSpinBox*>();
     QVERIFY(own->y() > widths.first()->y() + widths.first()->height() / 2);  // 「직접」 on its own row
     const QString out = qEnvironmentVariable("KA_HGIS_QA_OUTPUT_DIR");  // a picture for a look, as in the stock test

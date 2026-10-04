@@ -3,6 +3,7 @@
 #include <QtTest>
 
 #include <QApplication>
+#include <QCheckBox>
 #include <QDialog>
 #include <QFormLayout>
 #include <QDir>
@@ -150,6 +151,10 @@ class TestWindowPlate : public QObject {
     dot.fill(Qt::black);
     QAction* first = menu.addAction(QIcon(dot), QStringLiteral("벡터·도면 불러오기"));
     QAction* caption = KaMenuCaption::insert(&menu, QStringLiteral("불러오기·배경"), first);
+    QAction* rule = menu.addSeparator();
+    QAction* files = menu.addAction(QStringLiteral("파일함 보이기/숨기기"));
+    KaMenuCaption::insert(&menu, QStringLiteral("화면"), files);
+    QAction* web = menu.addMenu(QStringLiteral("웹 자료"))->addAction(QIcon(dot), QStringLiteral("농진청 토양도"));
     QCOMPARE(menu.actions().first(), caption);
     auto* word = qobject_cast<QLabel*>(static_cast<QWidgetAction*>(caption)->defaultWidget());
     QVERIFY(word);
@@ -157,9 +162,11 @@ class TestWindowPlate : public QObject {
     paper(true);
     KaMenuCaption::follow(&menu);
     QVERIFY(caption->isVisible() && !first->isIconVisibleInMenu());
+    QVERIFY(!rule->isVisible() && !web->isIconVisibleInMenu());  // the caption marks the group; submenus too
     paper(false);
     KaMenuCaption::follow(&menu);
     QVERIFY(!caption->isVisible() && first->isIconVisibleInMenu());
+    QVERIFY(rule->isVisible() && web->isIconVisibleInMenu());
     QMenu grouped;  // install(): the captions go in hidden in stock and come back when the menu opens in 새 모양
     QAction* view = grouped.addAction(QStringLiteral("지도 넓게 보기"));
     KaMenuCaption::install(&grouped, {{QStringLiteral("화면"), view}});
@@ -212,6 +219,8 @@ class TestWindowPlate : public QObject {
     QCOMPARE(sections, (QStringList{QStringLiteral("위치"), QStringLiteral("측량 기준"), QStringLiteral("수신")}));
     const auto box = [&dialog](const char* name) { return dialog.findChild<QLineEdit*>(QString::fromLatin1(name)); };
     QCOMPARE(box("controlPointX")->width(), 176);
+    auto* swap = dialog.findChild<QCheckBox*>();
+    QVERIFY(box("controlPointY")->nextInFocusChain() == swap && swap->nextInFocusChain() == box("controlPointZ"));
     for (const char* name : {"controlPointEllipsoid", "controlPointProjection", "controlPointOrigin"})
       QCOMPARE(box(name)->y(), box("controlPointDatum")->y());  // side by side
     QCOMPARE(box("controlPointFix")->y(), box("controlPointAccuracy")->y());
@@ -247,7 +256,7 @@ class TestWindowPlate : public QObject {
     QVERIFY(box.property("kaPlate").toBool());
     QMessageBox calm;
     KaControlCsvBox::dress(calm, false, 4, QStringLiteral("UTF-8 · 4점"));
-    QCOMPARE(calm.text(), QStringLiteral("기준점 4개를 가져옵니다."));
+    QCOMPARE(calm.text(), QStringLiteral("기준점 4개를 읽었습니다."));  // read, not promised: repeats are skipped
     paper(false);
     QMessageBox stock;
     KaControlCsvBox::dress(stock, true, 4, summary);
