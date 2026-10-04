@@ -4,6 +4,7 @@
 #include "KaWindowSize.h"
 
 #include <QApplication>
+#include <QComboBox>
 #include <QDialog>
 #include <QDialogButtonBox>
 #include <QEvent>
@@ -13,12 +14,16 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QPushButton>
+#include <QScreen>
+#include <QScrollArea>
 #include <QVBoxLayout>
 
+#include <algorithm>
 #include <iterator>
 
 namespace {
 const char* const kSections[] = {"식별", "층위", "표고", "조사", "사진 · 비고"};
+constexpr std::size_t kElevationSection = 2;
 constexpr int kHalfBox = 244 - 96;  // the board's 244 px half cell less its 96 px word
 
 struct Place {
@@ -30,7 +35,7 @@ struct Place {
 const Place kPlaces[] = {{"kind", 0, false},      {"period", 0, false},    {"feature_no", 0, false},
                          {"survey_name", 0, false}, {"site_name", 0, false}, {"layer_no", 1, false},
                          {"relation", 1, true},   {"top_el", 2, false},    {"bottom_el", 2, false},
-                         {"depth_m", 2, false},   {"status", 3, false},    {"surv_date", 3, false},
+                         {"depth_m", 2, false},   {"z", 2, false},         {"status", 3, false},    {"surv_date", 3, false},
                          {"surveyor", 3, false},  {"photo", 4, true},      {"note", 4, true}};
 
 struct Entry {
@@ -54,12 +59,21 @@ QHBoxLayout* sectionHead(QWidget* parent, const QString& word) {
   return head;
 }
 
-// A 96 px word and its box.
+// A 96 px word and its box. A longer word (a field of the survey's own file) is shortened, whole on hover.
 QHBoxLayout* cell(const Entry& entry) {
   auto* line = new QHBoxLayout;
   line->setSpacing(0);
   entry.word->setFixedWidth(96);
   entry.word->setProperty("kaFormWord", true);
+  entry.word->ensurePolished();  // the sheet's 12 px before measuring
+  const QString full = entry.word->text();
+  const QString shown = entry.word->fontMetrics().elidedText(full, Qt::ElideRight, 96);
+  if (shown != full) {
+    entry.word->setText(shown);
+    entry.word->setToolTip(full);
+  }
+  if (auto* combo = qobject_cast<QComboBox*>(entry.box))  // the half box cuts the example; it stays on hover
+    if (combo->lineEdit() && combo->toolTip().isEmpty()) combo->setToolTip(combo->lineEdit()->placeholderText());
   const bool lines = entry.box->inherits("QPlainTextEdit");  // 비고: the word stays at the first line
   if (lines) entry.word->setContentsMargins(0, 6, 0, 0);
   line->addWidget(entry.word, 0, lines ? Qt::AlignTop : Qt::Alignment());
@@ -195,27 +209,57 @@ void arrange(QDialog* dialog, QFormLayout* form) {
   dialog->setProperty("kaPlate", true);
   dialog->setFixedWidth(KaWindowSize::width(KaWindowSize::Medium, 420));
   auto* root = new QVBoxLayout(dialog);
-  root->setContentsMargins(24, 24, 24, 16);
+  root->setContentsMargins(24, 24, 8, 16);  // the right 16 of the sheet leaves room for its scroll bar
   root->setSpacing(0);
+  auto* sheet = new QWidget;
+  sheet->setObjectName(QStringLiteral("recordSheet"));
+  auto* body = new QVBoxLayout(sheet);
+  body->setContentsMargins(0, 0, 16, 0);
+  body->setSpacing(0);
   if (tip) {
     tip->setProperty("kaFormNote", true);
-    root->addWidget(tip);
+    body->addWidget(tip);
   }
+  QWidget* previous = nullptr;  // Tab walks the boxes as they stand on screen
   for (std::size_t at = 0; at < std::size(kSections); ++at) {
     if (sections[at].isEmpty()) continue;
-    root->addSpacing(16);
-    root->addLayout(sectionHead(dialog, QString::fromUtf8(kSections[at])));
-    root->addSpacing(8);
+    body->addSpacing(16);
+    body->addLayout(sectionHead(dialog, QString::fromUtf8(kSections[at])));
+    body->addSpacing(8);
     auto* rows = new QVBoxLayout;
     rows->setSpacing(12);
-    if (at == 2) addElevations(dialog, rows, sections[at]);
+    if (at == kElevationSection) addElevations(dialog, rows, sections[at]);
     else addRows(rows, sections[at]);
-    root->addLayout(rows);
+    body->addLayout(rows);
+    for (const Entry& entry : sections[at]) {
+      if (previous) QWidget::setTabOrder(previous, entry.box);
+      previous = entry.box;
+    }
   }
+  // The sections scroll when the screen is short, so 저장 · 취소 never fall below its edge.
+  auto* scroll = new QScrollArea(dialog);
+  scroll->setObjectName(QStringLiteral("recordScroll"));
+  scroll->setFrameShape(QFrame::NoFrame);
+  scroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+  scroll->setWidgetResizable(true);
+  scroll->setWidget(sheet);
+  scroll->viewport()->setAutoFillBackground(false);
+  const QScreen* screen = dialog->screen();
+  const int room = (screen ? screen->availableGeometry().height() : 768) - 180;  // title, margins, buttons
+  scroll->setMinimumHeight(std::min(sheet->sizeHint().height(), std::max(200, room)));
+  root->addWidget(scroll, 1);
   if (buttons) {
-    if (QPushButton* cancel = buttons->button(QDialogButtonBox::Cancel)) cancel->setText(QStringLiteral("취소"));
+    QPushButton* save = buttons->button(QDialogButtonBox::Save);
+    QPushButton* cancel = buttons->button(QDialogButtonBox::Cancel);
+    if (cancel) cancel->setText(QStringLiteral("취소"));
     root->addSpacing(24);
     root->addWidget(buttons);
+    buttons->setContentsMargins(0, 0, 16, 0);
+    for (QPushButton* button : {save, cancel})
+      if (button && previous) {
+        QWidget::setTabOrder(previous, button);
+        previous = button;
+      }
   }
 }
 

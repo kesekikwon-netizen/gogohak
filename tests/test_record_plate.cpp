@@ -12,6 +12,8 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QPushButton>
+#include <QScreen>
+#include <QScrollArea>
 
 #include <memory>
 
@@ -33,7 +35,7 @@ struct Field {
 };
 
 // The window as MainWindow::editFeatureAttributes builds it for a 유구 면 (SurveySchema feature_poly order).
-std::unique_ptr<QDialog> recordWindow(QFormLayout** formOut = nullptr) {
+std::unique_ptr<QDialog> recordWindow(QFormLayout** formOut = nullptr, bool elevations = true) {
   auto dlg = std::make_unique<QDialog>();
   auto* form = new QFormLayout(dlg.get());
   auto* tip = new QLabel(QStringLiteral("그린 도형의 속성입니다. 종류·시대 등을 입력한 뒤 저장하세요."), dlg.get());
@@ -47,6 +49,7 @@ std::unique_ptr<QDialog> recordWindow(QFormLayout** formOut = nullptr) {
                           {"photo", "사진", "전경.jpg"},       {"surveyor", "조사자", "권영인"},
                           {"surv_date", "조사일", "2026-10-03"}, {"section_id", "단면번호", ""}};
   for (const Field& field : fields) {
+    if (!elevations && QByteArray(field.name).endsWith("_el")) continue;  // a 유구 선 has no 표고
     auto* edit = new QLineEdit(QString::fromUtf8(field.value), dlg.get());
     edit->setObjectName(QStringLiteral("edit_") + QLatin1String(field.name));
     edit->setProperty("kaRecordField", QLatin1String(field.name));
@@ -162,6 +165,59 @@ private slots:
     for (int x = 0; x < image.width(); ++x)
       if (image.pixelColor(x, 58).lightness() < 100) ++ink;  // the pit floor line
     QVERIFY2(ink >= 60, qPrintable(QString::number(ink)));
+  }
+
+  // Tab walks the boxes as they now stand on screen, then 저장 and 취소.
+  void tabFollowsTheScreenOrder() {
+    paper(true);
+    QFormLayout* form = nullptr;
+    auto dlg = recordWindow(&form);
+    KaRecordPlate::arrange(dlg.get(), form);
+    QStringList walked;
+    QWidget* at = edit(dlg.get(), "kind");
+    for (int step = 0; step < 200 && walked.size() < 16; ++step, at = at->nextInFocusChain()) {
+      if (at->objectName().startsWith(QStringLiteral("edit_"))) walked << at->objectName().mid(5);
+      if (auto* button = qobject_cast<QPushButton*>(at)) walked << button->text();
+      if (walked.size() > 1 && walked.first() == walked.last()) break;
+    }
+    QCOMPARE(walked.mid(0, 16),
+             QStringList({"kind", "period", "feature_no", "section_id", "layer_no", "relation", "top_el", "bottom_el",
+                          "depth_m", "status", "surv_date", "surveyor", "photo", "note", "저장", "취소"}));
+  }
+
+  // On a short screen the sections scroll and 저장 · 취소 stay in the window.
+  void saveStaysOnAShortScreen() {
+    paper(true);
+    QFormLayout* form = nullptr;
+    auto dlg = recordWindow(&form);
+    KaRecordPlate::arrange(dlg.get(), form);
+    dlg->show();
+    QVERIFY(QTest::qWaitForWindowExposed(dlg.get()));
+    QVERIFY(dlg->findChild<QScrollArea*>());
+    QVERIFY2(dlg->height() <= dlg->screen()->availableGeometry().height(), qPrintable(QString::number(dlg->height())));
+    auto* buttons = dlg->findChild<QDialogButtonBox*>();
+    QVERIFY(buttons->mapTo(dlg.get(), QPoint(0, buttons->height())).y() <= dlg->height());
+  }
+
+  // A long word from the survey's own file is shortened with the whole of it on hover; 표고 Z joins 표고.
+  void longWordsAndPointHeights() {
+    paper(true);
+    QFormLayout* form = nullptr;
+    auto dlg = recordWindow(&form, false);
+    auto* z = new QLineEdit(QStringLiteral("12.5"), dlg.get());
+    z->setObjectName(QStringLiteral("edit_z"));
+    z->setProperty("kaRecordField", QStringLiteral("z"));
+    form->insertRow(1, QStringLiteral("excavation_record_date"), z);
+    KaRecordPlate::arrange(dlg.get(), form);
+    QVERIFY(!dlg->findChild<KaElevationFigure*>());  // no 상면 · 바닥: no picture
+    QCOMPARE(sectionWords(dlg.get()).value(2), QStringLiteral("표고"));
+    QVERIFY(z->findChild<QLabel*>(QStringLiteral("recordUnit")));
+    dlg->show();
+    QVERIFY(QTest::qWaitForWindowExposed(dlg.get()));
+    QVERIFY(z->mapTo(dlg.get(), QPoint()).y() > edit(dlg.get(), "relation")->mapTo(dlg.get(), QPoint()).y());
+    for (QLabel* label : dlg->findChildren<QLabel*>())
+      if (label->toolTip() == QStringLiteral("excavation_record_date"))
+        QVERIFY(label->text() != label->toolTip());  // shortened to its 96 px
   }
 
   void stockKeepsTheFormAsItWas() {

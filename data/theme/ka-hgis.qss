@@ -1508,6 +1508,7 @@ QFrame#controlPointRule { background: @border@; border: none; }
 QLabel#recordSection, QLabel#recordUnit { font-size: 11px; color: @inkMuted@; background: transparent; }
 QLabel#recordUnit { font-size: 12px; }
 QFrame#recordRule { background: @border@; border: none; }
+QScrollArea#recordScroll, QWidget#recordSheet { background: transparent; border: none; }
 QDialog[kaPlate="true"] QLineEdit[kaRecordMetres="true"] { font-family: @monoFont@; }
 /* 주변유적 받을 시·군 선택 (2차 보드 판 5): 96 px words, the recent-data time, the nearby hint and the pledge 12 px muted,
    the nearby section word 11 px muted over a hairline, no frame round the nearby 시·군. */
