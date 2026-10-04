@@ -3,6 +3,8 @@
 #include <QtTest>
 
 #include <QApplication>
+#include <QDialog>
+#include <QFormLayout>
 #include <QDir>
 #include <QLabel>
 #include <QLineEdit>
@@ -15,6 +17,7 @@
 
 #include "app/KaApiKeyDialog.h"
 #include "app/KaClosePrompt.h"
+#include "app/KaFormPlate.h"
 #include "app/KaMenuCaption.h"
 #include "app/KaTheme.h"
 #include "app/KaUserError.h"
@@ -161,6 +164,33 @@ class TestWindowPlate : public QObject {
     paper(true);
     emit grouped.aboutToShow();
     QVERIFY(grouped.actions().first()->isVisible());
+  }
+
+  // VWorld 지적도 계정 (보드 판 5, 440): a plain form window gets the board's frame — 96 px words, the note under the
+  // boxes as a muted sentence, 24 px margins; stock is left as it is.
+  void accountFormGetsTheBoardFrameInPaper() {
+    const auto build = [](QDialog& dialog) {
+      auto* form = new QFormLayout(&dialog);
+      form->addRow(QStringLiteral("아이디"), new QLineEdit(&dialog));
+      form->addRow(QStringLiteral("비밀번호"), new QLineEdit(&dialog));
+      form->addRow(new QLabel(QStringLiteral("이 PC의 개인 설정에 저장하여 다음 다운로드에 사용합니다."), &dialog));
+      return form;
+    };
+    paper(true);
+    QDialog dialog;
+    QFormLayout* form = build(dialog);
+    KaFormPlate::dress(&dialog, form);
+    QCOMPARE(dialog.minimumWidth(), 440);
+    auto* word = qobject_cast<QLabel*>(form->itemAt(0, QFormLayout::LabelRole)->widget());
+    QVERIFY(word && word->minimumWidth() == 96 && word->property("kaFormWord").toBool());
+    auto* note = qobject_cast<QLabel*>(form->itemAt(2, QFormLayout::SpanningRole)->widget());
+    QVERIFY(note && note->property("kaFormNote").toBool() && note->wordWrap());
+    paper(false);
+    QDialog stock;
+    QFormLayout* plain = build(stock);
+    KaFormPlate::dress(&stock, plain);
+    QCOMPARE(stock.minimumWidth(), 0);
+    QVERIFY(!qobject_cast<QLabel*>(plain->itemAt(0, QFormLayout::LabelRole)->widget())->property("kaFormWord").isValid());
   }
 
   // 「광령리1을」 · 「테스트를」 · 「광령리2를」: the object particle follows how the name ends.

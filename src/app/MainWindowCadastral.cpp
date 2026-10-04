@@ -1,4 +1,5 @@
 #include "MainWindow.h"
+#include "KaFormPlate.h"
 #include "KaDownloadUi.h"
 #include "KaReferenceDownloadJob.h"
 #include "KaUserError.h"
@@ -40,6 +41,7 @@ bool MainWindow::configureCadastralAccount() {
   form->addRow(new QLabel(QStringLiteral("이 PC의 개인 설정에 저장하여 다음 다운로드에 사용합니다."), &dialog));
   auto* buttons = new QDialogButtonBox(QDialogButtonBox::Save | QDialogButtonBox::Cancel, &dialog);
   form->addRow(buttons);
+  KaFormPlate::dress(&dialog, form);  // 새 모양: the board's 440 frame (2차 보드 판 5)
   connect(buttons, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
   connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
   if (dialog.exec() != QDialog::Accepted) return false;
