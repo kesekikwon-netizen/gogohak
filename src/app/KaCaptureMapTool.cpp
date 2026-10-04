@@ -2,6 +2,7 @@
 #include "core/KaLogExcept.h"
 #include "KaCaptureMapTool.h"
 #include "KaEditTolerance.h"
+#include "KaSketchMeasure.h"
 #include "core/EditGeometryRepair.h"
 #include <qgsmapcanvas.h>
 #include <qgsvectorlayer.h>
@@ -81,6 +82,7 @@ void KaCaptureMapTool::announceSketch() {
 }
 
 void KaCaptureMapTool::destroyRubber() {
+  emit measureChanged(QString());
   if (!m_rubber) return;
   m_rubber->reset(Qgis::GeometryType::Line);
   delete m_rubber;
@@ -196,6 +198,10 @@ void KaCaptureMapTool::rebuildRubber(const QgsPointXY* cursorOrNull) {
     m_rubber->addPoint(*cursorOrNull, true);
   else if (!m_points.isEmpty())
     m_rubber->addPoint(m_points.last(), true);
+  QVector<QgsPointXY> measured = m_points;
+  if (cursorOrNull) measured.append(*cursorOrNull);
+  const bool metres = !c->mapSettings().destinationCrs().isGeographic();
+  emit measureChanged(m_mode != Mode::Point && metres ? KaSketchMeasure::text(measured, m_mode == Mode::Polygon) : QString());
 }
 
 void KaCaptureMapTool::activate() {

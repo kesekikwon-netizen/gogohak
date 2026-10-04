@@ -1324,7 +1324,8 @@ QLabel#surveyBadge { margin: 0; }
 QWidget#drawGuideBand { background: transparent; }
 QFrame#drawGuidePill { background: @surface@; border: 1px solid @border@; border-radius: 8px; }
 QLabel#drawGuideGlyph { background: transparent; }
-QLabel#drawGuideTitle { font-size: 13px; font-weight: 700; color: @accentDeep@; padding: 0 2px; background: transparent; }
+QLabel#drawGuideTitle { font-size: 13px; font-weight: 700; color: @tabInk@; padding: 0 2px; background: transparent; }
+QLabel#drawGuideMeasure { font-family: @monoFont@; font-size: 12px; color: @ink@; padding: 0 6px 0 4px; background: transparent; }
 QLabel#drawGuideHint { font-size: 12px; color: @inkMuted@; padding-right: 4px; background: transparent; }
 QWidget#drawGuideBand QToolButton { border: 1px solid @border@; border-radius: 18px; background: @surface@; padding: 0; }
 QWidget#drawGuideBand QToolButton:enabled:hover { background: @hover@; border-color: @borderStrong@; }

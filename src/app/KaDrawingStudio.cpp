@@ -2394,10 +2394,7 @@ void KaDrawingStudio::applyLegendSettings() {
   const bool created = !legend;
   if (!legend) {
     // 사용자가 지운 범례는 글자 설정을 만졌다고 되살아나면 안 된다.
-    if (m_legendRemoved) {
-      syncSheetTiles();
-      return;
-    }
+    if (m_legendRemoved) return;  // deleteSelectedItems already synced the 범례 tile
     legend = new QgsLayoutItemLegend(ly);
     legend->setId(QString::fromUtf8(kIdLegend));
     legend->setFrameEnabled(true);

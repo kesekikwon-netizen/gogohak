@@ -59,6 +59,8 @@ signals:
   void sketchCanceled();
   // The number of sketch points changed (0 after finishing, canceling or leaving).
   void sketchChanged(int pointCount);
+  // 「변 4.20 m · 면적 32.9 ㎡」 for the guide band (KaSketchMeasure); empty when nothing is drawn.
+  void measureChanged(const QString& text);
 
 private:
   void finish();

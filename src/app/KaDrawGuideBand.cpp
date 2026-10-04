@@ -44,6 +44,11 @@ KaDrawGuideBand::KaDrawGuideBand(QWidget* host) : QWidget(host), m_host(host) {
   pillRow->addWidget(m_glyph);
   pillRow->addWidget(m_title);
   pillRow->addWidget(m_hint);
+  m_measure = new QLabel(m_pill);
+  m_measure->setObjectName(QStringLiteral("drawGuideMeasure"));
+  m_measure->setTextFormat(Qt::PlainText);
+  m_measure->hide();
+  pillRow->addWidget(m_measure);
   row->addWidget(m_pill);
 
   m_undo = makeRoundButton(QStringLiteral("drawGuideUndo"), QStringLiteral("undo"), QStringLiteral("되돌리기 (Ctrl+Z)"));
@@ -89,6 +94,12 @@ void KaDrawGuideBand::bindAction(QToolButton* button, QAction* action, const QSt
   QObject::connect(action, &QAction::changed, button, keepGlyph);
 }
 
+void KaDrawGuideBand::setMeasure(const QString& text) {
+  m_measure->setText(text);
+  m_measure->setVisible(!text.isEmpty() && KaTheme::displayOptions().paperLook);
+  relayout();
+}
+
 void KaDrawGuideBand::setActions(QAction* undo, QAction* redo) {
   bindAction(m_undo, undo, QStringLiteral("undo"));
   bindAction(m_redo, redo, QStringLiteral("redo"));
@@ -104,7 +115,7 @@ void KaDrawGuideBand::setTool(const QString& iconId, const QString& title, const
   m_hint->setVisible(!m_hintText.isEmpty());
   QPixmap glyph;
   if (has && !m_iconId.isEmpty() && KaIcons::hasIcon(m_iconId))
-    glyph = KaIcons::glyphPixmap(m_iconId, KaTheme::tokens().accentDeep, kGlyphPx, devicePixelRatioF());
+    glyph = KaIcons::glyphPixmap(m_iconId, KaTheme::tokens().tabInk, kGlyphPx, devicePixelRatioF());
   m_glyph->setPixmap(glyph);
   m_glyph->setVisible(!glyph.isNull());
   m_pill->setVisible(has);

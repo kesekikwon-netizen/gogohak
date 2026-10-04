@@ -2,6 +2,7 @@
 #include "KaAttributeMapTool.h"
 #include "KaCaptureMapTool.h"
 #include "KaCrashGuard.h"
+#include "KaDrawGuideBand.h"
 #include "KaDrawingStudio.h"
 #include "KaEditErrors.h"
 #include "KaFeatureCard.h"
@@ -990,6 +991,8 @@ void MainWindow::beginEdit(QgsVectorLayer* layer) {
       connect(m_captureTool, &KaCaptureMapTool::sketchCanceled, this, [this]() {
         statusBar()->showMessage(QStringLiteral("그리던 도형을 지웠습니다."), 4000);
       });
+      if (m_drawGuide)
+        connect(m_captureTool, &KaCaptureMapTool::measureChanged, m_drawGuide, &KaDrawGuideBand::setMeasure);
       connect(m_captureTool, &KaCaptureMapTool::sketchChanged, this, [this](int) {
         updateToolChip();  // also enables 완료·되돌리기·취소 while points exist
         updateUndoRedoActions();

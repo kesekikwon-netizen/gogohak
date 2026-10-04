@@ -458,6 +458,7 @@ add_executable(ka-hgis
   src/app/KaSubmitFlow.cpp
   src/app/KaIcons.cpp
   src/app/KaCaptureMapTool.cpp
+  src/app/KaSketchMeasure.cpp
   src/app/KaAttributeMapTool.cpp
   src/app/KaDrawingStudio.cpp
   src/app/KaDrawingStudioSheets.cpp
@@ -537,6 +538,7 @@ add_executable(ka-hgis
   src/app/KaUserError.h
   src/app/KaIcons.h
   src/app/KaCaptureMapTool.h
+  src/app/KaSketchMeasure.h
   src/app/KaAttributeMapTool.h
   src/app/KaDrawingStudio.h
   src/app/KaDrawingTools.h
@@ -685,7 +687,7 @@ if(KA_HGIS_BUILD_TESTS)
   ka_add_qtest(checklist_engine ka_hgis_tests)
 
   add_executable(ka_workflow_tests tests/test_workflow.cpp
-    src/app/KaCaptureMapTool.cpp src/app/KaCaptureMapTool.h
+    src/app/KaCaptureMapTool.cpp src/app/KaCaptureMapTool.h src/app/KaSketchMeasure.cpp src/app/KaSketchMeasure.h
     src/app/KaCrashGuard.cpp src/app/KaCrashGuard.h)
   target_link_libraries(ka_workflow_tests PRIVATE ${KA_TEST_LIBS})
   target_include_directories(ka_workflow_tests PRIVATE ${KA_INCLUDES})
@@ -699,7 +701,7 @@ if(KA_HGIS_BUILD_TESTS)
   set_tests_properties(workflow_engine PROPERTIES TIMEOUT 900)
 
   add_executable(ka_editing_tools_tests tests/test_editing_tools.cpp
-    src/app/KaCaptureMapTool.cpp src/app/KaCaptureMapTool.h
+    src/app/KaCaptureMapTool.cpp src/app/KaCaptureMapTool.h src/app/KaSketchMeasure.cpp src/app/KaSketchMeasure.h
     src/app/KaFeatureSelectTool.cpp src/app/KaFeatureSelectPick.cpp src/app/KaFeatureSelectTool.h
     src/app/KaVertexEditTool.cpp src/app/KaVertexEditTool.h
     src/app/KaAttributeMapTool.cpp src/app/KaAttributeMapTool.h
@@ -713,7 +715,7 @@ if(KA_HGIS_BUILD_TESTS)
 
   # 도형선택 cases that used to pick nothing (unsaved shape, lifted layer, inner piece) and key A.
   add_executable(ka_inner_piece_tests tests/test_inner_piece.cpp
-    src/app/KaCaptureMapTool.cpp src/app/KaCaptureMapTool.h
+    src/app/KaCaptureMapTool.cpp src/app/KaCaptureMapTool.h src/app/KaSketchMeasure.cpp src/app/KaSketchMeasure.h
     src/app/KaFeatureSelectTool.cpp src/app/KaFeatureSelectPick.cpp src/app/KaFeatureSelectTool.h
     src/app/KaVertexEditTool.cpp src/app/KaVertexEditTool.h
     src/app/KaAttributeMapTool.cpp src/app/KaAttributeMapTool.h
@@ -1863,6 +1865,13 @@ if(KA_HGIS_BUILD_TESTS)
   target_include_directories(ka_plate_sheet_tests PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_BINARY_DIR}/generated)
   ka_add_qtest(plate_sheet ka_plate_sheet_tests)
   set_tests_properties(plate_sheet PROPERTIES TIMEOUT 90)
+  add_executable(ka_sketch_measure_tests tests/test_sketch_measure.cpp src/app/KaSketchMeasure.cpp src/app/KaSketchMeasure.h
+    src/app/KaDrawGuideBand.cpp src/app/KaDrawGuideBand.h ${_ka_p1_font_sources} src/app/KaIcons.cpp src/app/KaTheme.cpp
+    src/app/KaThemeSheet.cpp src/app/KaThemeStyle.cpp)
+  set_target_properties(ka_sketch_measure_tests PROPERTIES WIN32_EXECUTABLE FALSE)
+  target_link_libraries(ka_sketch_measure_tests PRIVATE ka_core Qt6::Test Qt6::Widgets Qt6::Svg)
+  target_include_directories(ka_sketch_measure_tests PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_BINARY_DIR}/generated)
+  ka_add_qtest(sketch_measure ka_sketch_measure_tests)
 endif()
 
 # ---- [P2 icons] outline glyph set: travels with KaIcons.cpp wherever that file is compiled ----

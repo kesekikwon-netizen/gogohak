@@ -33,6 +33,8 @@ class KaDrawGuideBand : public QWidget {
   void setActions(QAction* undo, QAction* redo);
   // iconId: KaIcons id (empty or unknown: no glyph). Empty title folds the pill.
   void setTool(const QString& iconId, const QString& title, const QString& hint);
+  // 「조용한 도판」: 「변 4.20 m · 면적 32.9 ㎡」 in mono after the hint while drawing (새 모양 only).
+  void setMeasure(const QString& text);
   bool hasTool() const { return !m_titleText.isEmpty(); }
   QString iconId() const { return m_iconId; }
   QString title() const { return m_titleText; }
@@ -64,6 +66,7 @@ class KaDrawGuideBand : public QWidget {
   QLabel* m_glyph = nullptr;
   QLabel* m_title = nullptr;
   QLabel* m_hint = nullptr;
+  QLabel* m_measure = nullptr;
   QToolButton* m_undo = nullptr;
   QToolButton* m_redo = nullptr;
   QString m_iconId;
