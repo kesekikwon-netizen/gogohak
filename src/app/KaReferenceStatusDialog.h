@@ -20,4 +20,5 @@ private:
   QPointer<QgsProject> m_project;
   QTreeWidget* m_table = nullptr;
   QLabel* m_summary = nullptr;
+  bool m_paper = false;  // 새 모양 when the window was built (2차 보드 판 5 table)
 };

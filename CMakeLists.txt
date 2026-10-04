@@ -1633,6 +1633,16 @@ if(KA_HGIS_BUILD_TESTS)
   target_compile_definitions(ka_reference_status_tests PRIVATE ${KA_TEST_DEFS})
   set_target_properties(ka_reference_status_tests PROPERTIES WIN32_EXECUTABLE FALSE)
   ka_add_qtest(reference_status ka_reference_status_tests)
+  # 새 모양 자료 준비 상태 (2차 보드 판 5); tests/test_reference_status.cpp is near 300 lines.
+  add_executable(ka_reference_status_plate_tests tests/test_reference_status_plate.cpp
+    src/app/KaReferenceStatusDialog.cpp src/app/KaReferenceStatusDialog.h)
+  target_link_libraries(ka_reference_status_plate_tests PRIVATE ${KA_TEST_LIBS})
+  target_include_directories(ka_reference_status_plate_tests PRIVATE ${KA_INCLUDES})
+  target_link_directories(ka_reference_status_plate_tests PRIVATE ${KA_LIBDIRS})
+  target_compile_definitions(ka_reference_status_plate_tests PRIVATE ${KA_TEST_DEFS})
+  set_target_properties(ka_reference_status_plate_tests PROPERTIES WIN32_EXECUTABLE FALSE)
+  ka_add_qtest(reference_status_plate ka_reference_status_plate_tests)
+  set_tests_properties(reference_status_plate PROPERTIES ENVIRONMENT "GDAL_DATA=${OSGEO4W_ROOT}/apps/gdal-dev/share/gdal;PATH=${_ka_path_esc};QGIS_PREFIX_PATH=${QGIS_PREFIX_PATH};QT_QPA_PLATFORM=offscreen" TIMEOUT 60)
 
   add_executable(ka_cadastral_tests tests/test_cadastral.cpp)
   target_link_libraries(ka_cadastral_tests PRIVATE ka_core Qt6::Test Qt6::Network)

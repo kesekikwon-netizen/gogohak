@@ -1468,3 +1468,11 @@ QPushButton#gridOriginCentre[kaPlate="true"], QPushButton#gridOriginZero[kaPlate
 /* 이름·번호 (2차 보드 판 5): the two plain lines, the 96 px words and 「다음 번호를 미리 넣었습니다」, 12 px muted. */
 QDialog#kaFeatureForm[kaPlate="true"] QLabel#kaFeatureFormTip, QDialog#kaFeatureForm[kaPlate="true"] QLabel[kaFormWord="true"],
 QLabel#kaFeatureFormNumberFilled { font-size: 12px; color: @inkMuted@; }
+/* 자료 준비 상태 (2차 보드 판 5): the counts as the 28 px serif Title, the note 12 px muted, a table ruled in ink above
+   and below with a hairline under its 11 px head, 32 px rows and a hairline over the buttons. */
+QDialog#referenceStatusDialog[kaPlate="true"] QLabel#referenceStatusSummary { font-family: @titleFont@; font-weight: @titleWeight@; font-size: 28px; color: @ink@; }
+QDialog#referenceStatusDialog[kaPlate="true"] QLabel#referenceStatusHint { font-size: 12px; color: @inkMuted@; }
+QDialog#referenceStatusDialog[kaPlate="true"] QTreeWidget#referenceStatusTable { border: none; border-top: 1px solid @ink@; border-bottom: 1px solid @ink@; background: transparent; font-size: 12px; }
+QDialog#referenceStatusDialog[kaPlate="true"] QTreeWidget#referenceStatusTable::item { height: 32px; border: none; }
+QDialog#referenceStatusDialog[kaPlate="true"] QTreeWidget#referenceStatusTable QHeaderView::section { background: transparent; border: none; border-bottom: 1px solid @border@; font-size: 11px; color: @inkMuted@; min-height: 28px; padding: 0 4px; }
+QFrame#referenceStatusFoot { border: none; border-top: 1px solid @border@; }
