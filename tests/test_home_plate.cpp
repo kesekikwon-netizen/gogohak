@@ -14,6 +14,7 @@
 
 #include <qgsapplication.h>
 
+#include "app/KaChip.h"
 #include "app/KaHomeRecentCard.h"
 #include "app/KaStartPage.h"
 #include "app/KaTheme.h"
@@ -129,6 +130,37 @@ private slots:
     QCOMPARE(table->item(0, 4)->text(), QStringLiteral("오류 1 · 주의 3"));
     QCOMPARE(table->item(0, 0)->data(KaHomeRecentCard::kThumbRole).toString(), QStringLiteral("none"));
     QVERIFY(page.findChild<QLabel*>(QStringLiteral("startRecentNote")));
+  }
+
+  // 작업 순서: a finished step is an ink ring with a check (no green disc), the steps are joined by a line,
+  // and the last check reads 「오류 1 · 주의 3」.
+  void stepsAreInkRingsJoinedByALine() {
+    const QString path = touch(m_dir.filePath(QStringLiteral("e/광령리1.gpkg")));
+    {
+      QSettings st = RecentSurveys::userSettings();
+      RecentSurveys::remember(st, path, QStringLiteral("광령리1"));
+      SurveyFacts::rememberCounts(st, path, 1, 6, QStringLiteral("EPSG:5186"));
+      SurveyFacts::rememberCheck(st, path, 1, 3);
+    }
+    KaStartPage page;
+    page.reload();
+    auto* done = page.findChild<QLabel*>(QStringLiteral("startStepDone"));
+    QVERIFY(done);
+    const QImage badge = done->pixmap().toImage();
+    int green = 0, ink = 0;
+    for (int y = 0; y < badge.height(); ++y)
+      for (int x = 0; x < badge.width(); ++x) {
+        const QColor c = badge.pixelColor(x, y);
+        if (c.alpha() < 200) continue;
+        if (c.green() > c.red() + 30) ++green;
+        if (c.lightness() < 60) ++ink;
+      }
+    QCOMPARE(green, 0);
+    QVERIFY2(ink > 10, qPrintable(QString::number(ink)));
+    QCOMPARE(page.findChildren<QFrame*>(QStringLiteral("startStepLine")).size(), 2);
+    auto* warnings = page.findChild<KaChip*>(QStringLiteral("startSubmitWarnings"));
+    QVERIFY(warnings);
+    QCOMPARE(warnings->text(), QStringLiteral("주의 3"));
   }
 
   void heroDrawsNoBand() {

@@ -22,7 +22,8 @@ QLabel* label(const QString& text, const char* name, QWidget* parent) {
 }
 
 // The step badge: done = ok disc with a white check, next = accent disc with the number,
-// todo = borderStrong ring with the number in muted ink.
+// todo = borderStrong ring with the number in muted ink. 새 모양 (2차 보드): done = an ink ring with an ink
+// check, next = a clay dot, todo = the ring with its number.
 QPixmap badgePixmap(int number, bool done, bool isNext, const QFont& font, qreal dpr) {
   const auto& t = KaTheme::tokens();
   QPixmap pm(QSize(kBadgePx, kBadgePx) * dpr);
@@ -31,6 +32,21 @@ QPixmap badgePixmap(int number, bool done, bool isNext, const QFont& font, qreal
   QPainter p(&pm);
   p.setRenderHint(QPainter::Antialiasing, true);
   const QRectF disc(1.0, 1.0, kBadgePx - 2.0, kBadgePx - 2.0);
+  if (KaTheme::displayOptions().paperLook && done) {
+    p.setPen(QPen(t.ink, 1.2));
+    p.setBrush(t.surface);
+    p.drawEllipse(disc);
+    p.setPen(QPen(t.ink, 1.6, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+    const QPointF c = disc.center();
+    p.drawPolyline(QPolygonF{c + QPointF(-4.5, 0.5), c + QPointF(-1.2, 3.8), c + QPointF(5.0, -3.5)});
+    return pm;
+  }
+  if (KaTheme::displayOptions().paperLook && isNext) {
+    p.setPen(Qt::NoPen);
+    p.setBrush(QColor(0xD9, 0x77, 0x57));  // the board's clay dot, 8 px
+    p.drawEllipse(disc.center(), 4.0, 4.0);
+    return pm;
+  }
   if (done) {
     p.setPen(Qt::NoPen);
     p.setBrush(t.ok);
@@ -86,7 +102,18 @@ KaHomeGuideCard::KaHomeGuideCard(QWidget* parent) : QFrame(parent) {
     row->setSpacing(12);
     m_steps[i].badge = label(QString(), "startStepTodo", this);
     m_steps[i].badge->setFixedSize(kBadgePx, kBadgePx);
-    row->addWidget(m_steps[i].badge, 0, Qt::AlignTop);
+    if (KaTheme::displayOptions().paperLook && i < 2) {  // 2차 보드: a line joins the step marks
+      auto* marks = new QVBoxLayout;
+      marks->setSpacing(2);
+      marks->addWidget(m_steps[i].badge, 0, Qt::AlignHCenter);
+      auto* line = new QFrame(this);
+      line->setObjectName(QStringLiteral("startStepLine"));
+      line->setFixedWidth(1);
+      marks->addWidget(line, 1, Qt::AlignHCenter);
+      row->addLayout(marks);
+    } else {
+      row->addWidget(m_steps[i].badge, 0, Qt::AlignTop);
+    }
     auto* text = new QVBoxLayout;
     text->setSpacing(4);
     auto* titleRow = new QHBoxLayout;
@@ -149,7 +176,8 @@ void KaHomeGuideCard::setFacts(const QString& targetName, const SurveyFacts::Fac
   if (!checked) return;
   m_errors->setText(QStringLiteral("오류 %1").arg(qMax(0, facts.errors)));
   m_errors->setTone(facts.errors > 0 ? KaChip::Tone::Danger : KaChip::Tone::Ok);
-  m_warnings->setText(QStringLiteral("경고 %1").arg(qMax(0, facts.warnings)));
+  m_warnings->setText((KaTheme::displayOptions().paperLook ? QStringLiteral("주의 %1") : QStringLiteral("경고 %1"))
+                          .arg(qMax(0, facts.warnings)));
   m_warnings->setTone(facts.warnings > 0 ? KaChip::Tone::Warn : KaChip::Tone::Ok);
 }
 

@@ -1373,3 +1373,4 @@ QLabel#startCellCheck[kaTone="block"] { color: @danger@; }
 QPushButton#startNewBtn[kaQuiet="true"] { background: transparent; color: @ink@; border: 1px solid @borderStrong@; font-weight: 400; }
 QPushButton#startNewBtn[kaQuiet="true"]:enabled:hover { background: @hover@; border-color: @borderStrong@; }
 QLabel#startRecentNote { color: @inkMuted@; font-size: 12px; }
+QFrame#startStepLine { background: @borderStrong@; border: none; }
