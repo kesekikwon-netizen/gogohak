@@ -28,6 +28,9 @@
 #include <gdal_priv.h>
 #include <ogr_spatialref.h>
 #include <qgsapplication.h>
+#include <qgscoordinatereferencesystem.h>
+#include <qgsrectangle.h>
+#include <QPainter>
 #include <qgsmapcanvas.h>
 #include <qgsproject.h>
 #include <qgsrasterlayer.h>
@@ -68,6 +71,7 @@ private slots:
   void magnetIsOnUntilTheUserTurnsItOff();
   void demDialogOffersTheViewFit();
   void gridOriginButtonMovesTheGrid();
+  void gridEdgeBandIsOpaqueInPaper();
 };
 
 void TestSurveyPointDialogs::contourDialogShowsDiagnosticsAndHandsOverPoints() {
@@ -271,6 +275,26 @@ void TestSurveyPointDialogs::gridOriginButtonMovesTheGrid() {
   QVERIFY2(std::abs(snapped.x() - 1.3) < 1e-9 && std::abs(snapped.y() - 0.7) < 1e-9,
            qPrintable(QStringLiteral("%1 %2").arg(snapped.x()).arg(snapped.y())));
   QVERIFY(button.toolTip().contains(QStringLiteral("0.300")));
+}
+
+// 「조용한 도판」 도곽 band: with 좌표격자 on, an opaque band runs along the top and left map edges, so the
+// coordinate numbers sit on paper instead of the picture; stock keeps them on the map.
+void TestSurveyPointDialogs::gridEdgeBandIsOpaqueInPaper() {
+  QgsMapCanvas canvas;
+  canvas.setDestinationCrs(QgsCoordinateReferenceSystem(QStringLiteral("EPSG:5187")));
+  canvas.resize(600, 400);
+  canvas.setExtent(QgsRectangle(200000, 450000, 200120, 450080));
+  auto* grid = new KaCanvasGridOverlay(&canvas);
+  KaCanvasGridOverlay::Config config = grid->config();
+  config.enabled = true;
+  grid->setConfig(config);
+  canvas.show();
+  const auto corner = [&] { return canvas.grab().toImage().pixelColor(1, 1); };
+  QVERIFY(corner() != QColor(0xF5, 0xF4, 0xED));
+  KaTheme::DisplayOptions paper; paper.paperLook = true; KaTheme::setDisplayOptions(nullptr, paper);
+  const QColor inPaper = corner();
+  KaTheme::setDisplayOptions(nullptr, KaTheme::DisplayOptions());
+  QCOMPARE(inPaper, QColor(0xF5, 0xF4, 0xED));
 }
 
 int main(int argc, char** argv) {

@@ -92,3 +92,4 @@
 922 tests/test_topographic_import.cpp
 756 tests/test_topographic_scope.cpp
 8464 tests/test_workflow.cpp
+321 tests/test_survey_point_dialogs.cpp

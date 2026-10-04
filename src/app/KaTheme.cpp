@@ -264,7 +264,7 @@ void apply(QApplication* app) {
 
 void setDisplayOptions(QApplication* app, const DisplayOptions& options) {
   activeOptions() = options;
-  activeTokens() = tokensFor(options);
+  activeTokens() = tokensFor(options); if (auto* core = QCoreApplication::instance()) core->setProperty("kaPaperLook", options.paperLook);
   if (!app)
     return;
   QFont ui = app->font();
