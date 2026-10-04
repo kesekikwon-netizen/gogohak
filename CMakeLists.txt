@@ -1025,6 +1025,19 @@ if(KA_HGIS_BUILD_TESTS)
   endif()
   ka_add_qtest(survey_point_dialogs ka_survey_point_dialog_tests)
   set_tests_properties(survey_point_dialogs PROPERTIES TIMEOUT 90)
+  # 새 모양 조사구역 그리기 설정 (2차 보드 판 5); tests/test_survey_point_dialogs.cpp is at its line limit.
+  add_executable(ka_survey_area_plate_tests tests/test_survey_area_plate.cpp
+    src/app/KaSurveyAreaDialog.cpp src/app/KaSurveyAreaDialog.h
+    src/app/KaTheme.cpp src/app/KaThemeSheet.cpp src/app/KaThemeStyle.cpp)
+  target_link_libraries(ka_survey_area_plate_tests PRIVATE ka_core Qt6::Test)
+  target_include_directories(ka_survey_area_plate_tests PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_BINARY_DIR}/generated)
+  set_target_properties(ka_survey_area_plate_tests PROPERTIES WIN32_EXECUTABLE FALSE)
+  if (MSVC)
+    target_compile_options(ka_survey_area_plate_tests PRIVATE /utf-8)
+  endif()
+  ka_add_qtest(survey_area_plate ka_survey_area_plate_tests)
+  set_tests_properties(survey_area_plate PROPERTIES ENVIRONMENT
+    "GDAL_DATA=${OSGEO4W_ROOT}/apps/gdal-dev/share/gdal;PATH=${_ka_path_esc};QGIS_PREFIX_PATH=${QGIS_PREFIX_PATH};QT_QPA_PLATFORM=offscreen" TIMEOUT 90)
 
   add_executable(ka_section_layout_tests tests/test_section_layout.cpp)
   target_link_libraries(ka_section_layout_tests PRIVATE ${KA_TEST_LIBS})

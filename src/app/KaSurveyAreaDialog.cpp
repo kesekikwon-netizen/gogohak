@@ -6,7 +6,9 @@
 #include <QDoubleSpinBox>
 #include <QFileInfo>
 #include <QFormLayout>
+#include <QGridLayout>
 #include <QHBoxLayout>
+#include <QLabel>
 #include <QLineEdit>
 #include <QPushButton>
 #include <QVBoxLayout>
@@ -67,39 +69,77 @@ KaSurveyAreaDialog::KaSurveyAreaDialog(QWidget* parent) : QDialog(parent) {
 }
 
 void KaSurveyAreaDialog::setupUi() {
+  // 새 모양 (2차 보드 판 5, 440): plain swatches in two rows with the chosen one ringed and named under its word,
+  // the widths joined in one row and 「직접」 mm below; stock keeps its one row of named swatches.
+  m_paper = KaTheme::displayOptions().paperLook;
+  setObjectName(QStringLiteral("surveyAreaDialog"));
+  setProperty("kaPlate", m_paper);
+  if (m_paper) setMinimumWidth(440);
   auto* mainLayout = new QVBoxLayout(this);
-  mainLayout->setSpacing(12);
-  mainLayout->setContentsMargins(16, 16, 16, 16);
+  mainLayout->setSpacing(m_paper ? 24 : 12);
+  mainLayout->setContentsMargins(m_paper ? 24 : 16, m_paper ? 24 : 16, m_paper ? 24 : 16, 16);
   auto* form = new QFormLayout();
-  form->setHorizontalSpacing(10);
-  form->setVerticalSpacing(10);
+  form->setHorizontalSpacing(m_paper ? 0 : 10);
+  form->setVerticalSpacing(m_paper ? 12 : 10);
 
   m_nameEdit = new QLineEdit(QStringLiteral("조사구역"), this);
   form->addRow(QStringLiteral("이름"), m_nameEdit);
 
   auto* colorRow = new QHBoxLayout();
   colorRow->setSpacing(4);
+  auto* colorGrid = new QGridLayout();  // 새 모양: four a row; the 4 px ring room on each side makes the 8 px gap
+  colorGrid->setSpacing(0);
   for (int i = 0; i < m_paletteColors.size(); ++i) {
-    auto* btn = new QPushButton(m_colorNames[i], this);
+    auto* btn = new QPushButton(m_paper ? QString() : m_colorNames[i], this);
     btn->setObjectName(QStringLiteral("surveyAreaColor"));
     btn->setAutoDefault(false);  // Enter and the main-button paint stay with 「그리기 시작」
-    btn->setFixedSize(52, 28);
+    btn->setFixedSize(m_paper ? QSize(52, 32) : QSize(52, 28));
     btn->setCursor(Qt::PointingHandCursor);
+    btn->setAccessibleName(m_colorNames[i]);
+    if (m_paper) btn->setToolTip(m_colorNames[i]);
     connect(btn, &QPushButton::clicked, this, [this, i]() { selectColorIndex(i); });
     m_colorButtons.append(btn);
-    colorRow->addWidget(btn);
+    if (m_paper) colorGrid->addWidget(btn, i / 4, i % 4);
+    else colorRow->addWidget(btn);
   }
-  form->addRow(QStringLiteral("외곽선 색"), colorRow);
+  if (m_paper) {
+    colorGrid->setColumnStretch(4, 1);
+    auto* word = new QWidget(this);  // 「외곽선 색」 with the chosen colour's name under it
+    auto* words = new QVBoxLayout(word);
+    words->setContentsMargins(0, 4, 0, 0);
+    words->setSpacing(14);
+    auto* caption = new QLabel(QStringLiteral("외곽선 색"), word);
+    caption->setProperty("kaFormWord", true);
+    m_colorName = new QLabel(word);
+    m_colorName->setObjectName(QStringLiteral("surveyAreaColorName"));
+    words->addWidget(caption);
+    words->addWidget(m_colorName);
+    words->addStretch(1);
+    word->setFixedWidth(96);
+    form->addRow(word, colorGrid);
+    delete colorRow;
+  } else {
+    delete colorGrid;
+    form->addRow(QStringLiteral("외곽선 색"), colorRow);
+  }
 
   auto* widthRow = new QHBoxLayout();
   widthRow->setSpacing(4);
   const QList<QPair<QString, double>> presets = {{QStringLiteral("보통 1.0"), 1.0}, {QStringLiteral("기본 1.5"), 1.5},
                                                  {QStringLiteral("굵게 2.0"), 2.0}, {QStringLiteral("강조 3.0"), 3.0}};
+  if (m_paper) widthRow->setSpacing(0);  // joined like the board's group
   for (const auto& p : presets) {
     auto* btn = new QPushButton(p.first, this);
-    btn->setFixedHeight(28);
+    btn->setFixedHeight(m_paper ? 32 : 28);
     btn->setAutoDefault(false);
-    btn->setStyleSheet(QStringLiteral("QPushButton { min-height: 0px; padding: 2px 8px; }"));
+    if (m_paper) {  // the QSS joins them: square inner edges, round outer ends
+      btn->setObjectName(QStringLiteral("surveyAreaWidth"));
+      btn->setProperty("kaJoin", m_widthPresetButtons.isEmpty()            ? QStringLiteral("first")
+                                 : p.second == presets.last().second ? QStringLiteral("last")
+                                                                     : QStringLiteral("middle"));
+    } else {
+      btn->setStyleSheet(QStringLiteral("QPushButton { min-height: 0px; padding: 2px 8px; }"));
+    }
     btn->setCheckable(true);
     btn->setChecked(p.second == 1.5);
     connect(btn, &QPushButton::clicked, this, [this, w = p.second]() { selectPresetWidth(w); });
@@ -116,9 +156,21 @@ void KaSurveyAreaDialog::setupUi() {
   connect(m_widthSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, [this](double) {
     for (auto* b : m_widthPresetButtons) b->setChecked(false);
   });
-  widthRow->addWidget(m_widthSpin);
-  widthRow->addStretch();
-  form->addRow(QStringLiteral("선 굵기"), widthRow);
+  if (m_paper) {
+    m_widthSpin->setFixedWidth(96);
+    form->addRow(QStringLiteral("선 굵기"), widthRow);
+    form->addRow(QStringLiteral("직접"), m_widthSpin);
+    for (int row = 0; row < form->rowCount(); ++row)  // the board's 96 px words
+      if (QLayoutItem* item = form->itemAt(row, QFormLayout::LabelRole))
+        if (auto* label = qobject_cast<QLabel*>(item->widget())) {
+          label->setFixedWidth(96);
+          label->setProperty("kaFormWord", true);
+        }
+  } else {
+    widthRow->addWidget(m_widthSpin);
+    widthRow->addStretch();
+    form->addRow(QStringLiteral("선 굵기"), widthRow);
+  }
   mainLayout->addLayout(form);
 
   auto* btnLayout = new QHBoxLayout();
@@ -143,6 +195,15 @@ void KaSurveyAreaDialog::selectColorIndex(int index) {
   m_strokeColor = m_paletteColors[index];
   m_fillColor = QColor(m_strokeColor.red(), m_strokeColor.green(), m_strokeColor.blue(), 50);
   const KaTheme::Tokens& theme = KaTheme::tokens();
+  if (m_paper) {  // plain swatches; the chosen one ringed in ink with a paper gap (the 2 px padding)
+    for (int i = 0; i < m_colorButtons.size(); ++i)
+      m_colorButtons[i]->setStyleSheet(
+          QStringLiteral("QPushButton { background-color: %1; background-clip: content; border: 2px solid %2; "
+                         "border-radius: 4px; padding: 2px; min-height: 24px; max-height: 24px; }")
+              .arg(m_paletteColors[i].name(), i == index ? theme.ink.name() : QStringLiteral("transparent")));
+    m_colorName->setText(m_colorNames[index]);
+    return;
+  }
   for (int i = 0; i < m_colorButtons.size(); ++i) {
     const QColor& fill = m_paletteColors[i];
     const bool selected = i == index;

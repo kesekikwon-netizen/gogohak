@@ -1478,3 +1478,12 @@ QDialog#referenceStatusDialog[kaPlate="true"] QTreeWidget#referenceStatusTable Q
 QFrame#referenceStatusFoot { border: none; border-top: 1px solid @border@; }
 /* 더보기 group captions (2차 보드 판 5), shown only in 새 모양: 11 px muted rows 24 px high. */
 QLabel#kaMenuCaption { font-size: 11px; color: @inkMuted@; background: transparent; padding: 0 12px; min-height: 24px; }
+/* 조사구역 그리기 설정 (2차 보드 판 5): 96 px words 12 px muted, the chosen colour's name in ink, the four widths
+   joined (square inner edges; the chosen one keeps its whole ink outline). */
+QDialog#surveyAreaDialog[kaPlate="true"] QLabel[kaFormWord="true"] { font-size: 12px; color: @inkMuted@; }
+QLabel#surveyAreaColorName { font-size: 12px; font-weight: 400; color: @ink@; }
+QPushButton#surveyAreaWidth { min-height: 30px; padding: 0 8px; }
+QPushButton#surveyAreaWidth[kaJoin="first"] { border-top-right-radius: 0; border-bottom-right-radius: 0; border-right: none; }
+QPushButton#surveyAreaWidth[kaJoin="middle"] { border-radius: 0; border-right: none; }
+QPushButton#surveyAreaWidth[kaJoin="last"] { border-top-left-radius: 0; border-bottom-left-radius: 0; }
+QPushButton#surveyAreaWidth:checked { border-right: 1px solid @tabMark@; }

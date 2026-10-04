@@ -6,6 +6,7 @@
 #include <QList>
 
 class QDoubleSpinBox;
+class QLabel;
 class QLineEdit;
 class QPushButton;
 class QgsMapLayer;
@@ -42,5 +43,7 @@ private:
   QColor m_fillColor;
 
   QDoubleSpinBox* m_widthSpin{nullptr};
+  bool m_paper{false};           // 새 모양 when the window was built (2차 보드 판 5)
+  QLabel* m_colorName{nullptr};  // 새 모양: the chosen colour's name under 「외곽선 색」
   QList<QPushButton*> m_widthPresetButtons;
 };
