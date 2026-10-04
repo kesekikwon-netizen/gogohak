@@ -1,4 +1,5 @@
 #include "KaFeatureFormDialog.h"
+#include "KaWindowSize.h"
 #include "core/FeatureNumbering.h"
 #include "core/FeaturePresets.h"
 #include "core/FeatureRecord.h"
@@ -61,7 +62,7 @@ KaFeatureFormDialog::KaFeatureFormDialog(QgsVectorLayer* layer, QWidget* parent,
     : QDialog(parent), m_layer(layer), m_featureId(featureId) {
   setObjectName(QStringLiteral("kaFeatureForm"));
   setWindowTitle(QStringLiteral("이름·번호"));
-  setMinimumWidth(380);
+  setMinimumWidth(KaWindowSize::width(KaWindowSize::Small, 380));
   auto* form = new QFormLayout(this);
   auto* tip = new QLabel(
       QStringLiteral("선택입니다. 취소해도 그린 도형은 그대로 남습니다."), this);

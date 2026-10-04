@@ -1,4 +1,5 @@
 #include "KaNewSurveyDialog.h"
+#include "KaWindowSize.h"
 
 #include "KaTheme.h"
 
@@ -43,7 +44,7 @@ KaNewSurveyDialog::KaNewSurveyDialog(const QString& currentWorkCrs, double mapLo
                                      QWidget* parent)
     : QDialog(parent), m_suggested(suggestedWorkCrs(mapLongitude)), m_longitude(mapLongitude) {
   setWindowTitle(QStringLiteral("새 조사"));
-  setMinimumWidth(460);
+  setMinimumWidth(KaWindowSize::width(KaWindowSize::Medium, 460));
   auto* form = new QFormLayout(this);
   form->setSpacing(12);
   form->setContentsMargins(20, 20, 20, 16);

@@ -4,6 +4,7 @@
 #include <QApplication>
 #include <QRegularExpression>
 #include "app/KaTheme.h"
+#include "app/KaWindowSize.h"
 
 namespace {
 
@@ -96,6 +97,17 @@ private slots:
     QCOMPARE(captured(chosen), ink);
     QCOMPARE(captured(edge), ink);
     QCOMPARE(captured(focus), ink);
+  }
+
+  // 창 너비: 새 모양 windows come in three widths (S 440 · M 560 · L 860); stock keeps each window's own width.
+  void windowWidthsAreTheThreeSizesInPaper() {
+    QCOMPARE(KaWindowSize::width(KaWindowSize::Medium, 460), 460);
+    KaTheme::DisplayOptions paper;
+    paper.paperLook = true;
+    KaTheme::setDisplayOptions(qApp, paper);
+    QCOMPARE(KaWindowSize::width(KaWindowSize::Small, 380), 440);
+    QCOMPARE(KaWindowSize::width(KaWindowSize::Medium, 460), 560);
+    QCOMPARE(KaWindowSize::width(KaWindowSize::Large, 820), 860);
   }
 
   void paperTableHasInkRulesAndOatRow() {

@@ -558,6 +558,7 @@ add_executable(ka-hgis
   src/app/KaHomeStatus.h
   src/app/KaHomeText.h
   src/app/KaNewSurveyDialog.h
+  src/app/KaWindowSize.h
   src/app/KaRecoverySnapshots.h
   src/app/KaAppBar.h
   src/app/KaMapControls.h

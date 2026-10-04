@@ -1,4 +1,5 @@
 #include "KaDemClassDialog.h"
+#include "KaWindowSize.h"
 #include "core/DemPresentation.h"
 #include "core/LayerOps.h"
 #include <QCheckBox>
@@ -19,7 +20,7 @@ KaDemClassDialog::KaDemClassDialog(QgsRasterLayer* layer, QWidget* parent, QgsMa
     : QDialog(parent), m_layer(layer), m_canvas(canvas) {
   setWindowTitle(QStringLiteral("DEM 표현"));
   setModal(false);
-  setMinimumWidth(380);
+  setMinimumWidth(KaWindowSize::width(KaWindowSize::Small, 380));
   auto* form = new QFormLayout(this);
   auto* hint = new QLabel(QStringLiteral("표고에 따라 색이 부드럽게 이어집니다. 유적처럼 높이차가 작은 곳은 "
                                          "「현재 화면에 색 맞추기」로 화면 안의 높이만으로 색을 나누세요."), this);

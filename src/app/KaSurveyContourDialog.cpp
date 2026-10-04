@@ -1,4 +1,5 @@
 #include "KaSurveyContourDialog.h"
+#include "KaWindowSize.h"
 
 #include "core/SurveyContourMath.h"
 #include "core/SurveyPointArrange.h"
@@ -22,7 +23,7 @@
 KaSurveyContourDialog::KaSurveyContourDialog(const QString& crsAuthId, QWidget* parent)
     : QDialog(parent), m_crsAuthId(crsAuthId.isEmpty() ? QStringLiteral("EPSG:5186") : crsAuthId) {
   setWindowTitle(QStringLiteral("측량 등고선"));
-  setMinimumWidth(460);
+  setMinimumWidth(KaWindowSize::width(KaWindowSize::Medium, 460));
   auto* form = new QFormLayout(this);
   auto* fileRow = new QHBoxLayout();
   m_file = new QLabel(QStringLiteral("파일을 고르세요"), this);
