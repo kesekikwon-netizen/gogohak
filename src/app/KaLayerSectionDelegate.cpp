@@ -16,6 +16,7 @@
 
 namespace {
 constexpr int kTextLeft = 6;
+constexpr int kPencilRoom = 18;  // QGIS paints the editing pencil at the end of the layer column
 }  // namespace
 
 KaLayerSectionDelegate::KaLayerSectionDelegate(QAbstractItemDelegate* inner, QgsLayerTreeView* view)
@@ -96,7 +97,9 @@ void KaLayerSectionDelegate::paint(QPainter* painter, const QStyleOptionViewItem
   paintPlateCheck(painter, moved, index);
   const QVariant count = index.column() == 0 ? index.data(kCountRole) : QVariant();
   if (!count.isValid()) return;
-  // The count sits 6 px after the name in 10 px mono, muted ink; it never runs past the column.
+  // The count is a right-aligned column in 10 px mono, muted ink, 18 px left at the end for QGIS's editing
+  // pencil (2차 보드 판 1). A name that would reach it pushes it back to 6 px after the name; it never runs
+  // past the column.
   QStyleOptionViewItem item(moved);
   initStyleOption(&item, index);
   const QStyle* style = item.widget ? item.widget->style() : QApplication::style();
@@ -107,7 +110,8 @@ void KaLayerSectionDelegate::paint(QPainter* painter, const QStyleOptionViewItem
   mono.setPixelSize(10);
   const QString digits = QString::number(count.toLongLong());
   const int width = QFontMetrics(mono).horizontalAdvance(digits);
-  const int x = qMin(text.left() + margin + QFontMetrics(item.font).horizontalAdvance(item.text) + 6, text.right() - width);
+  const int afterName = text.left() + margin + QFontMetrics(item.font).horizontalAdvance(item.text) + 6;
+  const int x = qMin(qMax(afterName, text.right() - kPencilRoom - width), text.right() - width);
   painter->save();
   painter->setFont(mono);
   painter->setPen(option.palette.color(QPalette::PlaceholderText));

@@ -1384,3 +1384,22 @@ QFrame#startRecentCard, QFrame#startGuideCard, QFrame#startGuideCard2, QFrame#st
   background: @cardFace@; border: 1px solid @cardEdge@; border-radius: @mapRadius@px; }
 QFrame#startConnectionCard { border-top: 1px solid @border@; }
 QLabel#startHeroName { font-size: @heroNameSize@px; }
+/* 레이어 머리 (2차 보드 판 1): 「파일함」「전체 끄기」 are words in 새 모양 (kaPlate); the open 파일함 is oat with a
+   warm grey edge. The focus ring of the panel buttons still shows. */
+QFrame#layersCard QToolButton[kaPlate="true"] {
+  background: transparent; border: 1px solid transparent; border-radius: 8px; padding: 0 8px; min-height: 22px;
+  color: @ink@; font-size: 12px; }
+QFrame#layersCard QToolButton[kaPlate="true"]:checked { background: @sheetOnFace@; border-color: @sheetOnEdge@; color: @sheetOnInk@; }
+QFrame#layersCard QToolButton[kaPlate="true"]:enabled:hover { background: @hover@; border: 1px solid transparent; }
+QFrame#layersCard QToolButton[kaPlate="true"]:enabled:checked:hover { background: @sheetOnFace@; border: 1px solid @sheetOnEdge@; }
+QFrame#layersCard QToolButton[kaPlate="true"]:enabled:pressed { background: @pressed@; border: 1px solid transparent; }
+QFrame#layersCard QToolButton[kaPlate="true"]:disabled { background: transparent; border-color: transparent; color: @inkDisabled@; }
+/* 배경 지도 (2차 보드 판 1): no box in 새 모양 — a hairline above, a small muted caption with a rule, three plain
+   13 px buttons 4 px apart; the chosen one is oat with a warm grey edge. */
+QFrame#basemapQuickCard[kaPlate="true"] { background: transparent; border: none; border-top: 1px solid @border@; border-radius: 0; }
+QLabel#basemapQuickTitle[kaPlate="true"] { font-size: 11px; font-weight: 400; color: @inkMuted@; }
+QFrame#basemapQuickRule { background: @border@; border: none; }
+QFrame#basemapQuickCard[kaPlate="true"] QToolButton { min-width: 0; min-height: 30px; padding: 0 6px; border: 1px solid @borderStrong@;
+  border-radius: 8px; background: @surface@; color: @ink@; font-size: 13px; }
+QFrame#basemapQuickCard[kaPlate="true"] QToolButton:checked { background: @sheetOnFace@; color: @sheetOnInk@; border-color: @sheetOnEdge@; }
+QFrame#basemapQuickCard[kaPlate="true"] QToolButton:enabled:focus { border-color: @focusRing@; }

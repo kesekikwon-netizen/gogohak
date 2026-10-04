@@ -109,6 +109,32 @@ private slots:
     QCOMPARE(shown, QStringLiteral("유구 (면)"));  // the count is painted apart, in mono
     QCOMPARE(count.toLongLong(), 2LL);
   }
+  // 도형 개수 칸 (2차 보드 판 1): the count is a right-aligned column at the end of the layer column, room left for
+  // QGIS's editing pencil; it does not follow the name.
+  void featureCountIsARightColumnInPaper() {
+    QgsProject project;
+    auto* layer = add(project, project.layerTreeRoot()->addGroup(QStringLiteral("조사 데이터")), QStringLiteral("유구 (면)"));
+    LayerOps::markSurveyLayer(layer, QStringLiteral("feature_poly"));
+    QgsFeature f(layer->fields()); f.setGeometry(QgsGeometry::fromWkt(QStringLiteral("Polygon((0 0,1 0,1 1,0 0))")));
+    QgsFeatureList two; two << f << f; layer->dataProvider()->addFeatures(two);
+    KaTheme::DisplayOptions paper; paper.paperLook = true; KaTheme::setDisplayOptions(qApp, paper);
+    KaLayerInformationModel model(&project, false);
+    QgsLayerTreeView view; view.setModel(&model); KaLayerInformationModel::configureView(&view);
+    view.expandAll(); view.resize(340, 200); view.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&view));
+    view.header()->resizeSection(0, 240);
+    const QModelIndexList found = view.model()->match(view.model()->index(0, 0), Qt::DisplayRole, QStringLiteral("유구 (면)"), 1, Qt::MatchRecursive);
+    QCOMPARE(found.size(), 1);
+    const QRect rowRect = view.visualRect(found.first());
+    const QImage image = view.viewport()->grab().toImage();
+    KaTheme::setDisplayOptions(qApp, KaTheme::DisplayOptions());
+    const int right = view.columnViewportPosition(0) + view.columnWidth(0);
+    int digits = 0;  // muted figure pixels in the last 40 px of the column, before the pencil's 18 px
+    for (int y = rowRect.top(); y <= rowRect.bottom(); ++y)
+      for (int x = right - 40; x < right - 18; ++x)
+        if (image.pixelColor(x * image.devicePixelRatio(), y * image.devicePixelRatio()).lightness() < 170) ++digits;
+    QVERIFY2(digits > 4, qPrintable(QString::number(digits)));
+  }
   // 유구 표지: in 새 모양 a survey layer's patch is a 20 × 14 square-cornered swatch of its own map symbol in a
   // 1 px ink frame, and the list makes room for it; stock keeps QGIS's square symbol icon.
   void surveyLayerPatchIsAFramedSwatchInPaper() {

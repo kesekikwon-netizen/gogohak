@@ -152,14 +152,23 @@ void KaMapScaleBar::refresh() {
     if (step * decade <= wanted) round = step * decade;
   m_metres = round;
   m_pixels = round / perPixel;
-  // 「조용한 도판」: a 도북 arrow (grid north, turned with the map) ends the bar.
+  // 「조용한 도판」: a 도북 arrow (grid north, turned with the map) comes before the bar.
   m_north = KaTheme::displayOptions().paperLook;
   setAccessibleDescription(QStringLiteral("막대 길이 %1").arg(lengthText(m_metres)) +
                            (m_north ? QStringLiteral(" · 도북 화살표") : QString()));
-  setFixedWidth(int(std::ceil(m_pixels)) + 56 + (m_north ? kNorthWidth : 0));
+  setFixedWidth(int(std::ceil(m_pixels)) + (m_north ? kPlateBarLeft + 30 : 56));
   reposition();
   show();
   update();
+}
+
+QStringList KaMapScaleBar::ticks(double metres) {
+  const double end = metres >= 1000.0 ? metres / 1000.0 : metres;
+  return {QStringLiteral("0"), QString::number(end / 2.0, 'g', 3), QString::number(end, 'g', 3)};
+}
+
+QString KaMapScaleBar::unit(double metres) {
+  return metres >= 1000.0 ? QStringLiteral("km") : QStringLiteral("m");
 }
 
 void KaMapScaleBar::reposition() {
@@ -172,6 +181,10 @@ void KaMapScaleBar::paintEvent(QPaintEvent*) {
   if (m_pixels <= 0.0) return;
   QPainter p(this);
   p.setRenderHint(QPainter::Antialiasing);
+  if (m_north) {
+    paintPlate(p);
+    return;
+  }
   const auto& tokens = KaTheme::tokens();
   p.setPen(Qt::NoPen);
   p.setBrush(QColor(255, 255, 255, 225));
@@ -191,22 +204,57 @@ void KaMapScaleBar::paintEvent(QPaintEvent*) {
   p.drawText(QPointF(bar.left() - 2, bar.bottom() + 14), QStringLiteral("0"));
   const QString end = lengthText(m_metres);
   p.drawText(QPointF(bar.right() - 4, bar.bottom() + 14), end);
-  if (!m_north) return;
-  // 12 x 20 ink arrow, left half filled, with 「도북」 under it in the muted ink.
+}
+
+// 「조용한 도판」 (2차 보드 판 1): no box. 「▲ 도북」 first (a 12 x 20 arrow, left half ink, turned with the map),
+// then the bar with 0 · middle · end over it in 11 px mono and the unit after the end. Every mark has a 3 px
+// white halo so it reads on any map.
+void KaMapScaleBar::paintPlate(QPainter& p) const {
+  const auto& tokens = KaTheme::tokens();
+  const qreal h = height();
+  const QPen halo(Qt::white, 3, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin);
+  const QPolygonF arrow({QPointF(0, -9.5), QPointF(5.5, 9.5), QPointF(0, 5.5), QPointF(-5.5, 9.5)});
   p.save();
-  p.translate(width() - kNorthWidth / 2.0 - 6, 12);
+  p.translate(6.5, h - 11.5);
   p.rotate(m_canvas ? m_canvas->rotation() : 0.0);
-  p.setPen(QPen(tokens.ink, 1));
-  p.setBrush(tokens.ink);
-  p.drawPolygon(QPolygonF({QPointF(0, -10), QPointF(-6, 10), QPointF(0, 6)}));
+  p.setPen(halo);
   p.setBrush(Qt::white);
-  p.drawPolygon(QPolygonF({QPointF(0, -10), QPointF(6, 10), QPointF(0, 6)}));
+  p.drawPolygon(arrow);
+  p.setPen(Qt::NoPen);
+  p.setBrush(tokens.ink);
+  p.drawPolygon(QPolygonF({QPointF(0, -9.5), QPointF(-5.5, 9.5), QPointF(0, 5.5)}));
+  p.setPen(QPen(tokens.ink, 1));
+  p.setBrush(Qt::NoBrush);
+  p.drawPolygon(arrow);
   p.restore();
-  font.setPixelSize(10);
-  p.setFont(font);
-  p.setPen(tokens.inkMuted);
-  p.drawText(QRectF(width() - kNorthWidth - 6, 23, kNorthWidth, 11), Qt::AlignHCenter | Qt::AlignVCenter,
-             QStringLiteral("도북"));
+  const auto haloText = [&p, &halo](const QPointF& at, const QString& text, const QColor& ink, const QFont& font) {
+    QPainterPath path;
+    path.addText(at, font, text);
+    p.strokePath(path, halo);
+    p.fillPath(path, ink);
+  };
+  QFont font = p.font();
+  font.setPixelSize(11);
+  haloText(QPointF(19, h - 2.5), QStringLiteral("도북"), tokens.ink, font);
+  const QRectF bar(kPlateBarLeft + 0.5, h - 8.5, m_pixels, 6);
+  p.setPen(halo);
+  p.setBrush(Qt::white);
+  p.drawRect(bar);
+  // Two dark and two light quarters, as on a printed survey scale.
+  for (int i = 0; i < 4; i += 2)
+    p.fillRect(QRectF(bar.left() + bar.width() * i / 4.0, bar.top(), bar.width() / 4.0, bar.height()), tokens.ink);
+  p.setPen(QPen(tokens.ink, 1));
+  p.setBrush(Qt::NoBrush);
+  p.drawRect(bar);
+  QFont mono(QStringLiteral("Consolas"));
+  mono.setStyleHint(QFont::Monospace);
+  mono.setPixelSize(11);
+  const QFontMetricsF fm(mono);
+  const QStringList figures = ticks(m_metres);
+  for (int i = 0; i < figures.size(); ++i)
+    haloText(QPointF(bar.left() + bar.width() * i / 2.0 - fm.horizontalAdvance(figures.at(i)) / 2.0, bar.top() - 4.5),
+             figures.at(i), tokens.ink, mono);
+  haloText(QPointF(bar.right() + 10, bar.top() - 4.5), unit(m_metres), tokens.inkMuted, mono);
 }
 
 KaMapCornerBar::KaMapCornerBar(QWidget* host) : QFrame(host), m_host(host) {

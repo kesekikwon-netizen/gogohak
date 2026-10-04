@@ -36,7 +36,13 @@ KaAppBar::KaAppBar(QWidget* parent) : QWidget(parent) {
 
   m_search = new QLineEdit(this);
   m_search->setObjectName(QStringLiteral("appBarSearch"));
-  m_search->setPlaceholderText(QStringLiteral("도로명·지번 (예: 하회종가길 40)  Ctrl+F"));
+  if (KaTheme::displayOptions().paperLook) {
+    // 새 모양 (2차 보드 판 1): the short words in the field; the example and the shortcut in the tip.
+    m_search->setPlaceholderText(QStringLiteral("주소·지번 찾기"));
+    m_search->setToolTip(QStringLiteral("도로명·지번으로 찾습니다 (예: 하회종가길 40) · Ctrl+F"));
+  } else {
+    m_search->setPlaceholderText(QStringLiteral("도로명·지번 (예: 하회종가길 40)  Ctrl+F"));
+  }
   m_search->addAction(KaIcons::icon(QStringLiteral("search"), KaTheme::tokens().inkMuted), QLineEdit::LeadingPosition);
   m_search->setClearButtonEnabled(true);
   // The placeholder vanishes once typing starts; the name stays for screen readers.

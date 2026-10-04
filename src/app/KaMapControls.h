@@ -2,6 +2,8 @@
 
 #include <QFrame>
 #include <QPointer>
+
+class QPainter;
 #include <functional>
 
 class QgsMapCanvas;
@@ -34,6 +36,9 @@ class KaMapScaleBar final : public QWidget {
 public:
   KaMapScaleBar(QgsMapCanvas* canvas, QWidget* host);
   double lengthMetres() const { return m_metres; }
+  // 새 모양 figures over the bar: 0, the middle and the end ("0", "10", "20"); unit() goes after the end.
+  static QStringList ticks(double metres);
+  static QString unit(double metres);
 
 protected:
   void paintEvent(QPaintEvent* event) override;
@@ -43,13 +48,14 @@ protected:
 private:
   void refresh();
   void reposition();
+  void paintPlate(QPainter& p) const;
 
   QPointer<QgsMapCanvas> m_canvas;
   QWidget* m_host = nullptr;
   double m_metres = 0.0;
   double m_pixels = 0.0;
-  bool m_north = false;  // 새 모양: the 도북 arrow after the bar
-  static constexpr int kNorthWidth = 30;
+  bool m_north = false;  // 새 모양: no box, the 도북 arrow before the bar
+  static constexpr int kPlateBarLeft = 57;  // arrow 12 + 6 + 「도북」 24 + 14 (2차 보드 판 1)
 };
 
 // A small bar floating in the bottom-right corner of the map, for map-wide

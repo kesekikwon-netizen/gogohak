@@ -2074,6 +2074,21 @@ if(KA_HGIS_BUILD_TESTS)
   target_include_directories(ka_shell_chrome_tests PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_BINARY_DIR}/generated)
   ka_add_qtest(shell_widgets ka_shell_chrome_tests)
   set_tests_properties(shell_widgets PROPERTIES ENVIRONMENT "PATH=${_ka_path_esc};QT_QPA_PLATFORM=offscreen" TIMEOUT 90)
+  # 「조용한 도판」 map screen (board 1): survey mark, work CRS, address search, scale bar, basemap buttons.
+  add_executable(ka_map_plate_tests tests/test_map_plate.cpp
+    src/app/KaStatusBar.cpp src/app/KaStatusBar.h
+    src/app/KaAppBar.cpp src/app/KaAppBar.h
+    src/app/KaMapControls.cpp src/app/KaMapControls.h
+    src/app/KaBasemapQuickCard.cpp src/app/KaBasemapQuickCard.h
+    ${_ka_p5_app_sources} ${_ka_p1_chip_sources} ${_ka_p5_theme_sources})
+  set_target_properties(ka_map_plate_tests PROPERTIES WIN32_EXECUTABLE FALSE)
+  target_link_libraries(ka_map_plate_tests PRIVATE ${KA_TEST_LIBS})
+  target_include_directories(ka_map_plate_tests PRIVATE ${KA_INCLUDES} ${CMAKE_SOURCE_DIR}/src ${CMAKE_BINARY_DIR}/generated)
+  target_link_directories(ka_map_plate_tests PRIVATE ${KA_LIBDIRS})
+  target_compile_definitions(ka_map_plate_tests PRIVATE ${KA_TEST_DEFS})
+  ka_add_qtest(map_plate ka_map_plate_tests)
+  set_tests_properties(map_plate PROPERTIES ENVIRONMENT
+    "GDAL_DATA=${OSGEO4W_ROOT}/apps/gdal-dev/share/gdal;PATH=${_ka_path_esc};QGIS_PREFIX_PATH=${QGIS_PREFIX_PATH};QT_QPA_PLATFORM=offscreen" TIMEOUT 90)
   # Three-pane splitter, F10 fold and the rail inset (tests/test_shell.cpp is at its 300-line limit).
   add_executable(ka_shell_focus_tests tests/test_shell_focus.cpp
     src/app/KaShellFocus.cpp src/app/KaShellFocus.h

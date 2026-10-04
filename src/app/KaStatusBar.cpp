@@ -1,6 +1,7 @@
 #include "app/KaStatusBar.h"
 
 #include "app/KaChip.h"
+#include "app/KaTheme.h"
 
 #include <QComboBox>
 #include <QFrame>
@@ -24,6 +25,13 @@ QString shortCrs(const QString& authId) {
   if (s.startsWith(QLatin1String("EPSG:"), Qt::CaseInsensitive))
     s = s.mid(5);
   return s;
+}
+
+// 새 모양 (2차 보드 판 1): the work CRS names its origin, 「5186 · 중부원점」.
+QString originName(const QString& authId) {
+  if (authId.endsWith(QLatin1String("5186"))) return QStringLiteral("중부원점");
+  if (authId.endsWith(QLatin1String("5187"))) return QStringLiteral("동부원점");
+  return QString();
 }
 
 }  // namespace
@@ -173,7 +181,10 @@ void KaStatusBar::setUploadCrs(const QString& authId) {
 void KaStatusBar::refreshCrsText() {
   const QString work = shortCrs(m_workCrs);
   const QString upload = shortCrs(m_uploadCrs);
-  m_crsButton->setText(QStringLiteral("작업 %1").arg(work));
+  const QString origin = originName(m_workCrs);
+  m_crsButton->setText(KaTheme::displayOptions().paperLook && !origin.isEmpty()
+                           ? QStringLiteral("작업 %1 · %2 ▾").arg(work, origin)
+                           : QStringLiteral("작업 %1").arg(work));
   m_crsButton->setToolTip(
       QStringLiteral("지금 그리는 좌표계는 %1입니다. 눌러서 바꿀 수 있습니다.").arg(m_workCrs));
   m_uploadChip->setText(QStringLiteral("→ 제출 %1").arg(upload));
