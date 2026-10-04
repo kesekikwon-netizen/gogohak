@@ -11,7 +11,7 @@
 1538 src/app/KaHeritageBrowser.cpp
 1120 src/app/KaIcons.cpp
 504 src/app/KaMeasureMapTool.cpp
-810 src/app/KaPrintDialog.cpp
+668 src/app/KaPrintDialog.cpp
 1110 src/app/KaSectionDrawingStudio.cpp
 636 src/app/KaTerrain3dLayoutStudio.cpp
 546 src/app/KaTerrain3dStudio.cpp

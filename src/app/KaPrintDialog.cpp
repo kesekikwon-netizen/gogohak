@@ -1,4 +1,5 @@
 #include "KaPrintDialog.h"
+#include "KaTilePreview.h"
 #include "KaWindowSize.h"
 
 #include <QApplication>
@@ -11,10 +12,8 @@
 #include <QFormLayout>
 #include <QHBoxLayout>
 #include <QLabel>
-#include <QLineF>
 #include <QLocale>
 #include <QMessageBox>
-#include <QMouseEvent>
 #include <QPageLayout>
 #include <QPainter>
 #include <QPdfDocument>
@@ -31,7 +30,6 @@
 
 #include <algorithm>
 #include <cmath>
-#include <functional>
 
 namespace {
 constexpr double kDefaultMarginMm = 5.0;  // 프린터를 모를 때의 가장자리
@@ -65,155 +63,13 @@ QString sizeText(const QSizeF& mm) {
   if (!iso.isEmpty()) return iso;
   return QStringLiteral("%1×%2 cm").arg(decimal(mm.width() / 10.0), decimal(mm.height() / 10.0));
 }
-
-QSizeF portraitMm(const QPageSize& size) {
-  const QSizeF s = size.size(QPageSize::Millimeter);
-  return s.width() <= s.height() ? s : s.transposed();
-}
 }  // namespace
 
-// 나눈 칸을 그리고, 누르면 그 장을 이번 인쇄에서 빼거나 다시 넣는 미리보기.
-class KaTilePreview : public QWidget {
-public:
-  explicit KaTilePreview(QWidget* parent) : QWidget(parent) {
-    setObjectName(QStringLiteral("printPreview"));
-    setMinimumSize(360, 300);
-    setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
-  }
-
-  std::function<void(int)> onToggle;
-
-  void setContent(const QImage& thumb, const TilePlan& plan, const QSet<int>& skipped, bool tiled,
-                  const QSizeF& drawingMm, const QPageSize& sheet, const TileFit& fit) {
-    m_thumb = thumb;
-    m_plan = plan;
-    m_skipped = skipped;
-    m_tiled = tiled && plan.ok;
-    m_drawingMm = drawingMm;
-    m_sheet = sheet;
-    m_fit = fit;
-    setCursor(m_tiled && plan.sheets.size() > 1 ? Qt::PointingHandCursor : Qt::ArrowCursor);
-    update();
-  }
-
-  // 좌표에 있는 장. 겹침 칸에서는 가운데가 더 가까운 장을 고른다.
-  int sheetAt(const QPointF& pos) const {
-    if (!m_tiled) return -1;
-    double k = 1.0;
-    QPointF origin;
-    layoutTiles(&k, &origin);
-    int best = -1;
-    double bestDistance = 1e18;
-    for (int i = 0; i < m_plan.sheets.size(); ++i) {
-      const QRectF r = mapped(m_plan.sheets.at(i).areaMm, k, origin);
-      if (!r.contains(pos)) continue;
-      const double distance = QLineF(r.center(), pos).length();
-      if (distance < bestDistance) {
-        bestDistance = distance;
-        best = i;
-      }
-    }
-    return best;
-  }
-
-protected:
-  void paintEvent(QPaintEvent*) override {
-    QPainter p(this);
-    p.setRenderHint(QPainter::Antialiasing);
-    p.setRenderHint(QPainter::SmoothPixmapTransform);
-    p.fillRect(rect(), QColor(244, 244, 245));
-    if (m_thumb.isNull() || m_drawingMm.isEmpty()) {
-      p.drawText(rect(), Qt::AlignCenter, QStringLiteral("미리보기를 만들지 못했습니다."));
-      return;
-    }
-    if (m_tiled) paintTiles(p);
-    else paintSheet(p);
-  }
-
-  void mousePressEvent(QMouseEvent* event) override {
-    if (!m_tiled || m_plan.sheets.size() < 2 || event->button() != Qt::LeftButton) return;
-    const int index = sheetAt(event->position());
-    if (index >= 0 && onToggle) onToggle(index);
-  }
-
-private:
-  QRectF box() const { return QRectF(rect()).adjusted(10, 10, -10, -10); }
-
-  void layoutTiles(double* k, QPointF* origin) const {
-    QRectF extent(QPointF(0, 0), m_plan.outputMm);
-    for (const TileSheet& tile : m_plan.sheets) extent = extent.united(tile.areaMm);
-    const QRectF b = box();
-    *k = std::min(b.width() / extent.width(), b.height() / extent.height());
-    *origin = QPointF(b.center().x() - (extent.x() + extent.width() / 2.0) * *k,
-                      b.center().y() - (extent.y() + extent.height() / 2.0) * *k);
-  }
-
-  static QRectF mapped(const QRectF& mm, double k, const QPointF& origin) {
-    return QRectF(origin.x() + mm.x() * k, origin.y() + mm.y() * k, mm.width() * k, mm.height() * k);
-  }
-
-  void paintTiles(QPainter& p) const {
-    double k = 1.0;
-    QPointF origin;
-    layoutTiles(&k, &origin);
-    const QRectF drawing = mapped(QRectF(QPointF(0, 0), m_plan.outputMm), k, origin);
-    p.fillRect(drawing, Qt::white);
-    p.drawImage(drawing, m_thumb);
-    QFont font = p.font();
-    font.setBold(true);
-    font.setPixelSize(13);
-    p.setFont(font);
-    for (int i = 0; i < m_plan.sheets.size(); ++i) {
-      const QRectF r = mapped(m_plan.sheets.at(i).areaMm, k, origin);
-      const bool skipped = m_skipped.contains(i);
-      if (skipped) {
-        p.setPen(Qt::NoPen);
-        p.setBrush(QColor(110, 110, 110, 150));
-        p.drawRect(r);
-      }
-      p.setPen(QPen(skipped ? QColor(110, 110, 110) : QColor(37, 99, 235), 1.5));
-      p.setBrush(skipped ? QBrush(Qt::NoBrush) : QBrush(QColor(37, 99, 235, 14)));
-      p.drawRect(r);
-      const QString label = skipped ? QStringLiteral("%1 뺌").arg(i + 1) : QString::number(i + 1);
-      const QSizeF size = QFontMetricsF(font).size(Qt::TextSingleLine, label) + QSizeF(10, 4);
-      const QRectF chip(r.center().x() - size.width() / 2.0, r.center().y() - size.height() / 2.0,
-                        size.width(), size.height());
-      p.setPen(Qt::NoPen);
-      p.setBrush(QColor(255, 255, 255, 225));
-      p.drawRoundedRect(chip, 4, 4);
-      p.setPen(skipped ? QColor(90, 90, 90) : QColor(30, 64, 175));
-      p.drawText(chip, Qt::AlignCenter, label);
-    }
-  }
-
-  void paintSheet(QPainter& p) const {
-    QSizeF paper = portraitMm(m_sheet);
-    if (m_fit.landscape) paper.transpose();
-    const QRectF b = box();
-    const double k = std::min(b.width() / paper.width(), b.height() / paper.height());
-    const QRectF page(b.center().x() - paper.width() * k / 2.0, b.center().y() - paper.height() * k / 2.0,
-                      paper.width() * k, paper.height() * k);
-    p.fillRect(page, Qt::white);
-    p.setPen(QPen(QColor(120, 120, 120), 1));
-    p.drawRect(page);
-    const QSizeF drawn = m_drawingMm * m_fit.ratio * k;
-    p.drawImage(QRectF(page.center().x() - drawn.width() / 2.0, page.center().y() - drawn.height() / 2.0,
-                       drawn.width(), drawn.height()),
-                m_thumb);
-  }
-
-  QImage m_thumb;
-  TilePlan m_plan;
-  QSet<int> m_skipped;
-  bool m_tiled = false;
-  QSizeF m_drawingMm;
-  QPageSize m_sheet;
-  TileFit m_fit;
-};
-
 KaPrintDialog::KaPrintDialog(const QString& pdfPath, const QString& title, double drawingScale, QWidget* parent)
-    : QDialog(parent), m_pdfPath(pdfPath), m_title(title), m_drawingScale(drawingScale > 0.0 ? drawingScale : 0.0) {
+    : QDialog(parent), m_pdfPath(pdfPath), m_title(title), m_drawingScale(drawingScale > 0.0 ? drawingScale : 0.0),
+      m_plate(qApp && qApp->property("kaPaperLook").toBool()) {
   setObjectName(QStringLiteral("printDialog"));
+  setProperty("kaPlate", m_plate);
   setWindowTitle(QStringLiteral("도면 인쇄"));
   QString readError;
   m_drawingMm = TilePrint::pdfPageSizeMm(pdfPath, &readError);
@@ -356,6 +212,7 @@ KaPrintDialog::KaPrintDialog(const QString& pdfPath, const QString& title, doubl
   buttons->addWidget(m_print);
   buttons->addWidget(close);
   root->addLayout(buttons);
+  if (m_plate) arrangePlate(root, pickRow, paperRow);
 
   buildOutputs();
   loadSettings();
@@ -599,6 +456,7 @@ void KaPrintDialog::rebuild() {
       ? printTip
       : printTip + QStringLiteral(" 속성 창에서 「인쇄」를 누르면 바로 찍히고, 「취소」를 누르면 찍지 않습니다."));
   m_savePdf->setEnabled(tiled && canDraw);
+  refreshPlate();
 }
 
 QString KaPrintDialog::summary() const {

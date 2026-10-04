@@ -12,9 +12,11 @@ class QCheckBox;
 class QComboBox;
 class QDoubleSpinBox;
 class QFormLayout;
+class QHBoxLayout;
 class QLabel;
 class QPushButton;
 class QRadioButton;
+class QVBoxLayout;
 class KaTilePreview;
 
 // 도면 인쇄 창. 용지 한 장에 찍거나, 큰 도면을 작은 용지 여러 장으로 나눠 찍는다.
@@ -74,6 +76,11 @@ private:
   QMarginsF marginsFor(const QPageSize& sheet) const;
   double outputFactor() const;
   QString paperScaleText() const;
+  // 「조용한 도판」 (KaPrintDialogPlate.cpp, 2차 보드 판 5): the settings over a dotted ledger on the left, the preview
+  // under its heading on the right, 「A4 | A3」 as joined words; refreshPlate follows every rebuild.
+  void arrangePlate(QVBoxLayout* root, QHBoxLayout* pickRow, QHBoxLayout* paperRow);
+  QWidget* buildLedger();
+  void refreshPlate();
 
   QString m_pdfPath;
   QString m_title;
@@ -110,4 +117,14 @@ private:
   QPushButton* m_pickAll = nullptr;
   QPushButton* m_print = nullptr;
   QPushButton* m_savePdf = nullptr;
+  bool m_plate = false;  // 새 모양 when the window was built
+  QLabel* m_previewHead = nullptr;
+  QLabel* m_skipNote = nullptr;
+  QLabel* m_ledgerSheet = nullptr;
+  QWidget* m_ledgerGridRow = nullptr;
+  QLabel* m_ledgerGrid = nullptr;
+  QLabel* m_ledgerSizeWord = nullptr;
+  QLabel* m_ledgerSize = nullptr;
+  QWidget* m_ledgerScaleRow = nullptr;
+  QLabel* m_ledgerScale = nullptr;
 };

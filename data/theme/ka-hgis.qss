@@ -1443,3 +1443,14 @@ QPushButton#newSurveyCrs5186[kaPlate="true"], QPushButton#newSurveyCrs5187[kaPla
 QLabel#newSurveyCrsRecommend { font-size: 12px; color: @accentDeep@; background: transparent; }
 QDialog[kaPlate="true"] QLabel#newSurveyCrsSuggestion { font-size: 12px; color: @ink@; }
 QDialog[kaPlate="true"] QLabel#newSurveyCrsHint, QDialog[kaPlate="true"] QLabel#newSurveyTip { font-size: 12px; color: @inkMuted@; }
+/* 도면 인쇄 (2차 보드 판 5): 12 px muted words, the dotted ledger between an ink rule and a hairline, the preview
+   heading and hint at 11 px, 「A4 | A3」 joined, the small 24 px words 「프린터 속성…」 「모두 다시 넣기」. */
+QDialog#printDialog[kaPlate="true"] QLabel[kaFormWord="true"] { font-size: 12px; color: @inkMuted@; }
+QFrame#printLedger { border: none; border-top: 1px solid @ink@; border-bottom: 1px solid @border@; }
+QFrame#printLedgerLeader { border: none; border-bottom: 1px dotted @borderStrong@; }
+QFrame#printLedger QLabel { font-size: 12px; color: @ink@; }
+QLabel#printPreviewHead, QLabel#printPickHint { font-size: 11px; color: @inkMuted@; }
+QLabel#printSkipNote { font-size: 12px; color: @ink@; }
+QPushButton#printProperties[kaPlate="true"], QPushButton#printPickAll[kaPlate="true"] { min-height: 22px; padding: 0 8px; font-size: 12px; }
+QPushButton#printSheetA4 { min-height: 30px; padding: 0 12px; border-top-right-radius: 0; border-bottom-right-radius: 0; }
+QPushButton#printSheetA3 { min-height: 30px; padding: 0 12px; border-top-left-radius: 0; border-bottom-left-radius: 0; border-left: none; }
