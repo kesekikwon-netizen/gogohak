@@ -1161,7 +1161,8 @@ QFrame#filesCard QToolButton#btnBrowseUp:disabled {
 /* ---- Download windows (수치지형·주변유적·지적도): KaDownloadUi sets the
    kaDownloadWindow property and these object names. Flat header in the
    startup-notice blue; the compact size and 상세 보기 fold are set in C++. ---- */
-QDialog[kaDownloadWindow="true"] { background: @desk@; }
+QDialog { background: @dialogGround@; }
+QDialog[kaDownloadWindow="true"] { background: @dialogGround@; }
 QDialog[kaDownloadWindow="true"] QFrame#downloadHeader {
   background: @band@;
   border: none;

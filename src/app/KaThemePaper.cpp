@@ -41,6 +41,7 @@ void applyPaperLook(Tokens& t, bool highContrast) {
   t.chosenFill = QColor(0xE3, 0xDA, 0xCC);  // the chosen segment: oat with an ink edge
   t.plateRule = t.ink;                      // a table's top and bottom rules
   t.selectedBar = t.selected;               // a chosen row has no accent bar
+  t.dialogGround = QColor(0xFA, 0xF9, 0xF5);                // a window's body is the one ivory sheet
   t.ribbonLabelInk = t.ink;
   t.ribbonActiveInk = t.ink;                 // the chosen label and text links read in ink
   t.ribbonGroupInk = t.inkMuted;

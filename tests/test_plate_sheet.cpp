@@ -56,6 +56,16 @@ private slots:
     QCOMPARE(captured(radius), QStringLiteral("0"));
   }
 
+  // 창 바탕: a window's body is the one ivory sheet in 새 모양 (inputs stay white); stock keeps the desk colour.
+  void dialogBodyIsIvoryInPaper() {
+    const QString ground = QStringLiteral("(?m)^QDialog \\{ background: (#[0-9a-fA-F]{6}); \\}");
+    QCOMPARE(captured(ground), KaTheme::tokens().desk.name());
+    KaTheme::DisplayOptions paper;
+    paper.paperLook = true;
+    KaTheme::setDisplayOptions(qApp, paper);
+    QCOMPARE(captured(ground), KaTheme::tokens().chrome.name());
+  }
+
   void paperTableHasInkRulesAndOatRow() {
     KaTheme::DisplayOptions paper;
     paper.paperLook = true;
