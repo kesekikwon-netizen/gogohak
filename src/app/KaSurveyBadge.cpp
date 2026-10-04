@@ -1,6 +1,7 @@
 #include "app/KaSurveyBadge.h"
 #include "app/KaTheme.h"
 
+#include <QEvent>
 #include <QFontMetrics>
 #include <QKeyEvent>
 #include <QMouseEvent>
@@ -9,12 +10,12 @@
 namespace {
 constexpr int kRightGap = 8;    // breathing room before the tab bar's right edge
 constexpr int kMaxNamePx = 200;  // long survey names are elided in the middle
-constexpr int kStateGap = 12;    // 새 모양: the name, then the state
+constexpr int kStateGap = 8;     // 새 모양: the name, then the state
 constexpr int kDot = 6;          // 새 모양: the clay dot before 「저장 안 됨」 and its gap
 
-// 새 모양 (2차 보드 판 1): the plain words of the mark, 12 px regular like the board.
+// 새 모양 (2차 보드 판 1): the plain words of the mark, 13 px regular like the board.
 QFont plateFont(QFont base) {
-  base.setPixelSize(12);
+  base.setPixelSize(13);
   base.setWeight(QFont::Normal);
   return base;
 }
@@ -55,8 +56,15 @@ void KaSurveyBadge::setSurvey(const QString& name, bool unsaved) {
   setTone(unsaved ? Tone::Warn : Tone::Ok);
   setGlyph(unsaved ? QStringLiteral("warn") : QStringLiteral("check"));
   setText(textFor(shown, unsaved));
+  setAccessibleName(QString(text()).remove(QStringLiteral("● ")));  // readers hear the words, not the dot
   updateGeometry();
   show();
+}
+
+void KaSurveyBadge::changeEvent(QEvent* event) {
+  KaChip::changeEvent(event);
+  // 「새 모양」 switched while the app runs (화면 보기): the words follow the look.
+  if (event->type() == QEvent::StyleChange && !m_name.isEmpty()) setSurvey(m_name, m_unsaved);
 }
 
 QSize KaSurveyBadge::sizeHint() const {

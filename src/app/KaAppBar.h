@@ -24,7 +24,12 @@ public:
 signals:
   void searchRequested(const QString& query, bool lot);
 
+protected:
+  void changeEvent(QEvent* event) override;
+
 private:
+  void showSearchWords();
+
   QToolButton* m_region = nullptr;
   QLineEdit* m_search = nullptr;
 };

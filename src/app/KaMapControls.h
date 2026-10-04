@@ -2,10 +2,9 @@
 
 #include <QFrame>
 #include <QPointer>
-
-class QPainter;
 #include <functional>
 
+class QPainter;
 class QgsMapCanvas;
 
 // Zoom buttons floating in the top-right corner of the map. 「맞춤」 runs a
@@ -55,7 +54,9 @@ private:
   double m_metres = 0.0;
   double m_pixels = 0.0;
   bool m_north = false;  // 새 모양: no box, the 도북 arrow before the bar
-  static constexpr int kPlateBarLeft = 57;  // arrow 12 + 6 + 「도북」 24 + 14 (2차 보드 판 1)
+  // 2차 보드 판 1: arrow 12 + 6 + 「도북」 24 + 14, plus 6 so a turned arrow (11 px out from its middle) stays whole.
+  static constexpr int kPlateBarLeft = 62;
+  static constexpr qreal kArrowMiddle = 14.0;
 };
 
 // A small bar floating in the bottom-right corner of the map, for map-wide

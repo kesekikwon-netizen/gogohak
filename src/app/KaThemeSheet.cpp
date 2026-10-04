@@ -105,6 +105,9 @@ QHash<QString, QString> replacementTable() {
   values.insert(QStringLiteral("panelRadius"), paper ? QStringLiteral("0") : QStringLiteral("8"));
   values.insert(QStringLiteral("innerFace"), paper ? clear : c.altRow.name());
   values.insert(QStringLiteral("innerRadius"), paper ? QStringLiteral("0") : QStringLiteral("6"));
+  // The layer list's head is one line under the words in 새 모양 (stock: a box per cell).
+  values.insert(QStringLiteral("layerHeadEdge"), paper ? QStringLiteral("none") : QStringLiteral("1px solid ") + c.border.name());
+  values.insert(QStringLiteral("layerHeadFace"), paper ? clear : c.surface.name());
   values.insert(QStringLiteral("figureSize"), paper ? QStringLiteral("16") : QStringLiteral("13"));  // 수치 대장 (spec 20: 16 keeps 12,000,000.00 m² inside the 272 px panel)
   values.insert(QStringLiteral("subCheckedFace"), paper ? c.selected.name() : none);
   values.insert(QStringLiteral("subCheckedEdge"), paper ? c.accent.name() : none);

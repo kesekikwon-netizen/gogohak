@@ -4,6 +4,7 @@
 #include "core/AddressQuery.h"
 
 #include <QAction>
+#include <QEvent>
 #include <QHBoxLayout>
 #include <QLineEdit>
 #include <QMenu>
@@ -36,13 +37,7 @@ KaAppBar::KaAppBar(QWidget* parent) : QWidget(parent) {
 
   m_search = new QLineEdit(this);
   m_search->setObjectName(QStringLiteral("appBarSearch"));
-  if (KaTheme::displayOptions().paperLook) {
-    // 새 모양 (2차 보드 판 1): the short words in the field; the example and the shortcut in the tip.
-    m_search->setPlaceholderText(QStringLiteral("주소·지번 찾기"));
-    m_search->setToolTip(QStringLiteral("도로명·지번으로 찾습니다 (예: 하회종가길 40) · Ctrl+F"));
-  } else {
-    m_search->setPlaceholderText(QStringLiteral("도로명·지번 (예: 하회종가길 40)  Ctrl+F"));
-  }
+  showSearchWords();
   m_search->addAction(KaIcons::icon(QStringLiteral("search"), KaTheme::tokens().inkMuted), QLineEdit::LeadingPosition);
   m_search->setClearButtonEnabled(true);
   // The placeholder vanishes once typing starts; the name stays for screen readers.
@@ -72,6 +67,18 @@ void KaAppBar::setRegionWidget(QWidget* widget) {
   menu->addAction(host);
   m_region->setMenu(menu);
   m_region->show();
+}
+
+void KaAppBar::showSearchWords() {
+  const bool plate = KaTheme::displayOptions().paperLook;
+  // 새 모양 (2차 보드 판 1): the short words in the field; the example and the shortcut in the tip.
+  m_search->setPlaceholderText(plate ? QStringLiteral("주소·지번 찾기") : QStringLiteral("도로명·지번 (예: 하회종가길 40)  Ctrl+F"));
+  m_search->setToolTip(plate ? QStringLiteral("도로명·지번으로 찾습니다 (예: 하회종가길 40) · Ctrl+F") : QString());
+}
+
+void KaAppBar::changeEvent(QEvent* event) {
+  QWidget::changeEvent(event);
+  if (event->type() == QEvent::StyleChange) showSearchWords();  // 「새 모양」 switched while the app runs
 }
 
 void KaAppBar::focusSearch() {

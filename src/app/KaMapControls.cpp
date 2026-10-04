@@ -215,7 +215,7 @@ void KaMapScaleBar::paintPlate(QPainter& p) const {
   const QPen halo(Qt::white, 3, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin);
   const QPolygonF arrow({QPointF(0, -9.5), QPointF(5.5, 9.5), QPointF(0, 5.5), QPointF(-5.5, 9.5)});
   p.save();
-  p.translate(6.5, h - 11.5);
+  p.translate(kArrowMiddle, h - 11.5);
   p.rotate(m_canvas ? m_canvas->rotation() : 0.0);
   p.setPen(halo);
   p.setBrush(Qt::white);
@@ -235,7 +235,7 @@ void KaMapScaleBar::paintPlate(QPainter& p) const {
   };
   QFont font = p.font();
   font.setPixelSize(11);
-  haloText(QPointF(19, h - 2.5), QStringLiteral("도북"), tokens.ink, font);
+  haloText(QPointF(kArrowMiddle + 12, h - 2.5), QStringLiteral("도북"), tokens.ink, font);
   const QRectF bar(kPlateBarLeft + 0.5, h - 8.5, m_pixels, 6);
   p.setPen(halo);
   p.setBrush(Qt::white);
@@ -254,7 +254,9 @@ void KaMapScaleBar::paintPlate(QPainter& p) const {
   for (int i = 0; i < figures.size(); ++i)
     haloText(QPointF(bar.left() + bar.width() * i / 2.0 - fm.horizontalAdvance(figures.at(i)) / 2.0, bar.top() - 4.5),
              figures.at(i), tokens.ink, mono);
-  haloText(QPointF(bar.right() + 10, bar.top() - 4.5), unit(m_metres), tokens.inkMuted, mono);
+  // The unit a space after the end figure, however many digits it has.
+  haloText(QPointF(bar.right() + fm.horizontalAdvance(figures.last()) / 2.0 + 4, bar.top() - 4.5), unit(m_metres),
+           tokens.inkMuted, mono);
 }
 
 KaMapCornerBar::KaMapCornerBar(QWidget* host) : QFrame(host), m_host(host) {

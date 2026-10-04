@@ -131,7 +131,6 @@ void KaLayerInformationModel::configureView(QgsLayerTreeView* view) {
   view->setMinimumHeight(view->header()->sizeHint().height() + 4 * 22 + 4);
   view->setIndentation(12);
   if (KaTheme::displayOptions().paperLook) view->setIconSize(QSize(20, 14));  // 유구 표지 20 × 14
-  view->setProperty("kaPlate", KaTheme::displayOptions().paperLook);  // ink check squares (KaLayerSectionDelegate)
   view->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
   // Section bands make the first row of each section 16 px taller than the rest.
   view->setUniformRowHeights(false);

@@ -4,6 +4,7 @@
 #include "app/KaTheme.h"
 
 #include <QComboBox>
+#include <QEvent>
 #include <QFrame>
 #include <QLabel>
 #include <QLineEdit>
@@ -182,15 +183,20 @@ void KaStatusBar::refreshCrsText() {
   const QString work = shortCrs(m_workCrs);
   const QString upload = shortCrs(m_uploadCrs);
   const QString origin = originName(m_workCrs);
-  m_crsButton->setText(KaTheme::displayOptions().paperLook && !origin.isEmpty()
-                           ? QStringLiteral("작업 %1 · %2 ▾").arg(work, origin)
-                           : QStringLiteral("작업 %1").arg(work));
+  const bool named = KaTheme::displayOptions().paperLook && !origin.isEmpty();
+  m_crsButton->setText(named ? QStringLiteral("작업 %1 · %2 ▾").arg(work, origin) : QStringLiteral("작업 %1").arg(work));
+  m_crsButton->setAccessibleName(named ? QStringLiteral("작업 %1 · %2").arg(work, origin) : QString());
   m_crsButton->setToolTip(
       QStringLiteral("지금 그리는 좌표계는 %1입니다. 눌러서 바꿀 수 있습니다.").arg(m_workCrs));
   m_uploadChip->setText(QStringLiteral("→ 제출 %1").arg(upload));
   m_uploadChip->setToolTip(
       QStringLiteral("제출용 파일은 작업 좌표계와 상관없이 항상 %1로 변환되어 나갑니다.")
           .arg(m_uploadCrs));
+}
+
+void KaStatusBar::changeEvent(QEvent* event) {
+  QStatusBar::changeEvent(event);
+  if (event->type() == QEvent::StyleChange) refreshCrsText();  // 「새 모양」 switched while the app runs
 }
 
 void KaStatusBar::setRenderingEnabled(bool on) {

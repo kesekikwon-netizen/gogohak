@@ -554,6 +554,9 @@ QTreeView[kaLayerInformation="true"]::item {
 QTreeView[kaLayerInformation="true"] QHeaderView::section {
   font-size: 10px;
   padding: 4px 6px;
+  border: @layerHeadEdge@;
+  border-bottom: 1px solid @border@;
+  background: @layerHeadFace@;
 }
 QTreeView::item:selected, QgsLayerTreeView::item:selected, QListWidget::item:selected,
 QTableWidget::item:selected, QTableView::item:selected {
@@ -875,9 +878,9 @@ QFrame#layersCard QToolButton {
 QFrame#filesCard QToolButton,
 QFrame#studioFilesPanel QToolButton {
   padding: 4px 6px;
-  border: 1px solid @panelEdge@;
-  border-bottom: 2px solid @panelEdgeStrong@;
-  background: @panelFace@;
+  border: 1px solid @border@;
+  border-bottom: 2px solid @borderStrong@;
+  background: @surface@;
   border-radius: 6px;
   color: @inkMuted@;
 }
@@ -1392,6 +1395,7 @@ QFrame#layersCard QToolButton[kaPlate="true"] {
 QFrame#layersCard QToolButton[kaPlate="true"]:checked { background: @sheetOnFace@; border-color: @sheetOnEdge@; color: @sheetOnInk@; }
 QFrame#layersCard QToolButton[kaPlate="true"]:enabled:hover { background: @hover@; border: 1px solid transparent; }
 QFrame#layersCard QToolButton[kaPlate="true"]:enabled:checked:hover { background: @sheetOnFace@; border: 1px solid @sheetOnEdge@; }
+QFrame#layersCard QToolButton[kaPlate="true"]:enabled:focus { border-color: @focusRing@; }
 QFrame#layersCard QToolButton[kaPlate="true"]:enabled:pressed { background: @pressed@; border: 1px solid transparent; }
 QFrame#layersCard QToolButton[kaPlate="true"]:disabled { background: transparent; border-color: transparent; color: @inkDisabled@; }
 /* 배경 지도 (2차 보드 판 1): no box in 새 모양 — a hairline above, a small muted caption with a rule, three plain

@@ -3,6 +3,7 @@
 #include <QtTest>
 
 #include <QApplication>
+#include <QFontMetrics>
 #include <QStandardPaths>
 #include <QImage>
 #include <QLabel>
@@ -159,6 +160,101 @@ class TestMapPlate : public QObject {
     };
     QCOMPARE(face(QStringLiteral("terrain")), KaTheme::tokens().tileShown.name());
     QCOMPARE(face(QStringLiteral("satellite")), KaTheme::tokens().surface.name());
+  }
+
+  // The board's mark is 13 px with 8 px between the name and the state; readers hear it without the dot.
+  void surveyMarkIsBoardSizedAndReadable() {
+    paper(true);
+    KaSurveyBadge badge;
+    badge.setSurvey(QStringLiteral("광령리1"), true);
+    QFont font = badge.font();
+    font.setPixelSize(13);
+    font.setWeight(QFont::Normal);
+    const QFontMetrics fm(font);
+    QCOMPARE(badge.sizeHint().width(),
+             fm.horizontalAdvance(QStringLiteral("광령리1")) + 8 + 12 + fm.horizontalAdvance(QStringLiteral("저장 안 됨")) + 8);
+    QCOMPARE(badge.accessibleName(), QStringLiteral("광령리1 저장 안 됨"));
+  }
+
+  // 「새 모양」 switched while the app runs (화면 보기): the words follow without a restart.
+  void wordsFollowALiveSwitch() {
+    paper(true);
+    KaStatusBar bar;
+    bar.setWorkCrs(QStringLiteral("EPSG:5186"));
+    KaAppBar app;
+    KaSurveyBadge badge;
+    badge.setSurvey(QStringLiteral("광령리1"), true);
+    for (QWidget* w : std::initializer_list<QWidget*>{&bar, &app, &badge}) w->show();
+    auto* crs = bar.findChild<QToolButton*>(QStringLiteral("crsButton"));
+    auto* search = app.findChild<QLineEdit*>(QStringLiteral("appBarSearch"));
+    QCOMPARE(crs->accessibleName(), QStringLiteral("작업 5186 · 중부원점"));
+    paper(false);
+    QCoreApplication::processEvents();
+    QCOMPARE(crs->text(), QStringLiteral("작업 5186"));
+    QCOMPARE(search->placeholderText(), QStringLiteral("도로명·지번 (예: 하회종가길 40)  Ctrl+F"));
+    QCOMPARE(badge.text(), QStringLiteral("광령리1 · 저장 안 됨"));
+    paper(true);
+    QCoreApplication::processEvents();
+    QCOMPARE(crs->text(), QStringLiteral("작업 5186 · 중부원점 ▾"));
+    QCOMPARE(search->placeholderText(), QStringLiteral("주소·지번 찾기"));
+    QCOMPARE(badge.text(), QStringLiteral("광령리1 ● 저장 안 됨"));
+  }
+
+  void basemapSectionFollowsALiveSwitch() {
+    paper(true);
+    KaBasemapQuickCard card;
+    card.show();
+    auto* note = card.findChild<QLabel*>(QStringLiteral("basemapQuickNote"));
+    QToolButton* old = card.button(QStringLiteral("old_map"));
+    paper(false);
+    QCoreApplication::processEvents();
+    QVERIFY(!note->isHidden());
+    QVERIFY(!card.button(QStringLiteral("satellite"))->icon().isNull());
+    QCOMPARE(old->text(), QStringLiteral("옛 지도"));
+    QVERIFY(!card.property("kaPlate").toBool());
+    paper(true);
+    QCoreApplication::processEvents();
+    QVERIFY(note->isHidden());
+    QVERIFY(card.button(QStringLiteral("satellite"))->icon().isNull());
+    QCOMPARE(old->text(), QStringLiteral("옛 지도 ▾"));
+    QVERIFY(card.property("kaPlate").toBool());
+  }
+
+  // 축척 막대: a three-figure end (100) keeps a space before its unit; a turned map keeps the whole arrow.
+  void scaleUnitClearsTheEndFigureAndArrowFitsTurned() {
+    QWidget host;
+    host.resize(800, 600);
+    QgsMapCanvas canvas(&host);
+    canvas.resize(800, 600);
+    canvas.setDestinationCrs(QgsCoordinateReferenceSystem(QStringLiteral("EPSG:5186")));
+    host.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&host));
+    canvas.setExtent(QgsRectangle(200000, 400000, 200800, 400600));  // 1 m a pixel: a 100 m bar
+    paper(true);
+    KaMapScaleBar bar(&canvas, &host);
+    QTRY_COMPARE(bar.lengthMetres(), 100.0);
+    QImage image = alone(bar);
+    const auto ink = [&image](int x, int y) {
+      const QColor c = image.pixelColor(x, y);
+      return c.alpha() > 200 && c.lightness() < 120;
+    };
+    int barRight = 0;  // the bar's right outline on its middle row
+    for (int x = 0; x < image.width(); ++x)
+      if (ink(x, image.height() - 6)) barRight = x;
+    QList<int> columns;  // inked columns of the figures right of the bar's end
+    for (int x = barRight + 1; x < image.width(); ++x)
+      for (int y = 0; y < image.height() - 10; ++y)
+        if (ink(x, y)) {
+          columns << x;
+          break;
+        }
+    int widest = 0;
+    for (int i = 1; i < columns.size(); ++i) widest = qMax(widest, columns.at(i) - columns.at(i - 1) - 1);
+    QVERIFY2(widest >= 5, qPrintable(QString::number(widest)));  // a space's width, not a squeeze
+    canvas.setRotation(90.0);
+    QTRY_VERIFY(!alone(bar).isNull());
+    image = alone(bar);
+    for (int y = 0; y < image.height(); ++y) QVERIFY2(image.pixelColor(0, y).alpha() < 30, qPrintable(QString::number(y)));
   }
 };
 

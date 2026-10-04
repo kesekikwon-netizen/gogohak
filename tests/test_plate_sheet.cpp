@@ -2,10 +2,7 @@
 // the head) and a chosen row is oat with no accent bar. The stock look keeps its accent bar and no rules.
 #include <QtTest>
 #include <QApplication>
-#include <QFrame>
-#include <QHBoxLayout>
 #include <QRegularExpression>
-#include <QToolButton>
 #include "app/KaTheme.h"
 #include "app/KaWindowSize.h"
 
@@ -140,61 +137,6 @@ private slots:
     KaTheme::setDisplayOptions(qApp, paper);
     QCOMPARE(captured(face), QStringLiteral("transparent"));
     QCOMPARE(captured(name), QStringLiteral("34"));
-  }
-
-  // 지도 화면 판 (2차 보드 판 1): the layer and record panels sit on the page — no box, square corners;
-  // stock keeps the white 8 px panels.
-  void sidePanelsHaveNoBoxInPaper() {
-    const QString panel = QStringLiteral("(?m)^QFrame#inspectorPanel \\{ background: ([^;]+); border: 1px solid [^;]+; border-radius: (\\d+)px;");
-    const auto both = [&panel]() {
-      const auto m = QRegularExpression(panel).match(qApp->styleSheet());
-      return QStringList{m.captured(1).toLower(), m.captured(2)};
-    };
-    QCOMPARE(both(), (QStringList{KaTheme::tokens().surface.name(), QStringLiteral("8")}));
-    KaTheme::DisplayOptions paper;
-    paper.paperLook = true;
-    KaTheme::setDisplayOptions(qApp, paper);
-    QCOMPARE(both(), (QStringList{QStringLiteral("transparent"), QStringLiteral("0")}));
-  }
-
-  // 레이어 머리 (2차 보드 판 1): 「파일함」 and 「전체 끄기」 are words, not boxed buttons; the open 파일함 is oat
-  // with a warm grey edge.
-  void layerHeadButtonsAreWordsInPaper() {
-    KaTheme::DisplayOptions paper;
-    paper.paperLook = true;
-    KaTheme::setDisplayOptions(qApp, paper);
-    QWidget host;  // the side panel's ground under the see-through card
-    host.setAutoFillBackground(true);
-    auto* hostRow = new QHBoxLayout(&host);
-    auto* card = new QFrame(&host);
-    hostRow->addWidget(card);
-    card->setObjectName(QStringLiteral("layersCard"));
-    auto* row = new QHBoxLayout(card);
-    auto* files = new QToolButton(card);
-    files->setObjectName(QStringLiteral("sidebarFilesToggle"));
-    files->setText(QStringLiteral("파일함"));
-    files->setCheckable(true);
-    files->setChecked(true);
-    auto* all = new QToolButton(card);
-    all->setObjectName(QStringLiteral("layerCheckAllBtn"));
-    all->setText(QStringLiteral("전체 끄기"));
-    for (QToolButton* button : {files, all}) {
-      button->setProperty("kaPlate", true);
-      row->addWidget(button);
-    }
-    host.show();
-    QVERIFY(QTest::qWaitForWindowExposed(&host));
-    const QImage image = host.grab().toImage();
-    const auto at = [&](QWidget* w, const QPoint& p) {
-      return image.pixelColor(w->mapTo(&host, p) * image.devicePixelRatio()).name();
-    };
-    const KaTheme::Tokens t = KaTheme::tokens();
-    QCOMPARE(at(files, QPoint(4, files->height() / 2)), t.tileShown.name());
-    QCOMPARE(at(files, QPoint(files->width() / 2, 0)), t.tileShownBorder.name());
-    const QString ground = at(all, QPoint(all->width() / 2, -2));
-    QCOMPARE(at(all, QPoint(all->width() / 2, 0)), ground);                  // no edge
-    QCOMPARE(at(all, QPoint(all->width() / 2, all->height() - 1)), ground);  // no bottom ledge
-    QCOMPARE(at(all, QPoint(4, all->height() / 2)), ground);                 // no face
   }
 
   // 창 너비: 새 모양 windows come in three widths (S 440 · M 560 · L 860); stock keeps each window's own width.

@@ -16,7 +16,7 @@
 
 namespace {
 constexpr int kTextLeft = 6;
-constexpr int kPencilRoom = 18;  // QGIS paints the editing pencil at the end of the layer column
+constexpr int kCountRight = 4;  // the count column's gap before the 글자 column
 }  // namespace
 
 KaLayerSectionDelegate::KaLayerSectionDelegate(QAbstractItemDelegate* inner, QgsLayerTreeView* view)
@@ -68,7 +68,7 @@ QStyleOptionViewItem KaLayerSectionDelegate::below(const QStyleOptionViewItem& o
 // The band keeps the row's own background (alternate colours stay); it adds a 1 px
 // top line and the section title, 10 px bold in the muted ink, 6 px from the left.
 // Colours come from the view palette KaTheme::palette() fills (Mid = border,
-// PlaceholderText = inkMuted), so the ka_layer_* test targets need no theme sources.
+// PlaceholderText = inkMuted).
 void KaLayerSectionDelegate::paintBand(QPainter* painter, const QStyleOptionViewItem& option,
                                        const QModelIndex& index) const {
   if (index.column() != 0) return;
@@ -97,9 +97,9 @@ void KaLayerSectionDelegate::paint(QPainter* painter, const QStyleOptionViewItem
   paintPlateCheck(painter, moved, index);
   const QVariant count = index.column() == 0 ? index.data(kCountRole) : QVariant();
   if (!count.isValid()) return;
-  // The count is a right-aligned column in 10 px mono, muted ink, 18 px left at the end for QGIS's editing
-  // pencil (2차 보드 판 1). A name that would reach it pushes it back to 6 px after the name; it never runs
-  // past the column.
+  // The count is a right-aligned column at the end of the layer column in 10 px mono, muted ink (2차 보드 판 1;
+  // QGIS draws the editing pencil at the list's right edge). A name that would reach it pushes it back to 6 px
+  // after the name; it never runs past the column.
   QStyleOptionViewItem item(moved);
   initStyleOption(&item, index);
   const QStyle* style = item.widget ? item.widget->style() : QApplication::style();
@@ -111,7 +111,7 @@ void KaLayerSectionDelegate::paint(QPainter* painter, const QStyleOptionViewItem
   const QString digits = QString::number(count.toLongLong());
   const int width = QFontMetrics(mono).horizontalAdvance(digits);
   const int afterName = text.left() + margin + QFontMetrics(item.font).horizontalAdvance(item.text) + 6;
-  const int x = qMin(qMax(afterName, text.right() - kPencilRoom - width), text.right() - width);
+  const int x = qMin(qMax(afterName, text.right() - kCountRight - width), text.right() - width);
   painter->save();
   painter->setFont(mono);
   painter->setPen(option.palette.color(QPalette::PlaceholderText));
@@ -120,19 +120,20 @@ void KaLayerSectionDelegate::paint(QPainter* painter, const QStyleOptionViewItem
 }
 
 // 「조용한 도판」 (2차 보드 판 1): QGIS's layer tree style draws a bare tick; in 새 모양 the check is the app's
-// own square (ink with an ivory tick, an empty grey-edged square), drawn over it at the same place.
+// own square (ink with an ivory tick, an empty grey-edged square), drawn over it at the same place. It reads the
+// look as it paints, so switching 「새 모양」 while the app runs needs nothing else.
 void KaLayerSectionDelegate::paintPlateCheck(QPainter* painter, const QStyleOptionViewItem& option,
                                              const QModelIndex& index) const {
-  const QVariant check = index.data(Qt::CheckStateRole);
-  if (!check.isValid() || !m_view || !m_view->property("kaPlate").toBool()) return;
+  if (!index.data(Qt::CheckStateRole).isValid() || !KaTheme::displayOptions().paperLook) return;
   QStyleOptionViewItem item(option);
   initStyleOption(&item, index);
   const QStyle* style = item.widget ? item.widget->style() : QApplication::style();
   QStyleOptionViewItem box(item);
   box.rect = style->subElementRect(QStyle::SE_ItemViewItemCheckIndicator, &item, item.widget);
   box.state &= ~(QStyle::State_On | QStyle::State_Off | QStyle::State_NoChange);
-  const auto state = check.value<Qt::CheckState>();
-  box.state |= state == Qt::Checked ? QStyle::State_On : state == Qt::PartiallyChecked ? QStyle::State_NoChange : QStyle::State_Off;
+  box.state |= item.checkState == Qt::Checked            ? QStyle::State_On
+               : item.checkState == Qt::PartiallyChecked ? QStyle::State_NoChange
+                                                         : QStyle::State_Off;
   KaTheme::paintCheckIndicator(&box, painter);
 }
 

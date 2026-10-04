@@ -833,7 +833,7 @@ void MainWindow::buildUi() {
       "레이어 체크를 한 번에 모두 끄거나 켭니다. 하나라도 켜져 있으면 전부 끕니다."));
   connect(m_layerCheckAllBtn, &QToolButton::clicked, this, &MainWindow::toggleAllLayersChecked);
   capRow->addWidget(m_layerCheckAllBtn);
-  for (QToolButton* word : {filesToggle, m_layerCheckAllBtn}) word->setProperty("kaPlate", KaTheme::displayOptions().paperLook);  // 새 모양: 글자 단추
+  for (QToolButton* word : {filesToggle, m_layerCheckAllBtn}) KaTheme::followPaperLook(word);  // 새 모양: 글자 단추
   layersLay->addLayout(capRow);
 #if KA_HGIS_HAS_QGIS
   // 체크를 하나씩 손으로 바꿔도 단추 글씨가 따라가야 한다.

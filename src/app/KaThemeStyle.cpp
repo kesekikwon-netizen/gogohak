@@ -3,6 +3,7 @@
 #include "KaTheme.h"
 
 #include <QAbstractSpinBox>
+#include <QEvent>
 #include <QPainter>
 #include <QPainterPath>
 #include <QProxyStyle>
@@ -239,5 +240,30 @@ public:
 QStyle* createChromeStyle() { return new ChromeStyle; }
 
 void paintCheckIndicator(const QStyleOption* option, QPainter* painter) { drawCheckIndicator(option, painter); }
+
+namespace {
+// Puts a widget's kaPlate back on the look after the application sheet changes: QApplication::setStyleSheet
+// sends every polished widget StyleChange once it has re-polished it.
+class PlateFollower final : public QObject {
+public:
+  using QObject::QObject;
+  bool eventFilter(QObject* watched, QEvent* event) override {
+    auto* widget = qobject_cast<QWidget*>(watched);
+    if (widget && event->type() == QEvent::StyleChange && widget->property("kaPlate").toBool() != displayOptions().paperLook) {
+      widget->setProperty("kaPlate", displayOptions().paperLook);
+      widget->style()->unpolish(widget);
+      widget->style()->polish(widget);
+      widget->update();
+    }
+    return false;
+  }
+};
+}  // namespace
+
+void followPaperLook(QWidget* widget) {
+  if (!widget) return;
+  widget->setProperty("kaPlate", displayOptions().paperLook);
+  widget->installEventFilter(new PlateFollower(widget));
+}
 
 }  // namespace KaTheme

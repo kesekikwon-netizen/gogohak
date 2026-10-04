@@ -54,6 +54,9 @@ signals:
   void crsClicked();
   void renderingToggled(bool on);
 
+protected:
+  void changeEvent(QEvent* event) override;
+
 private:
   void refreshCrsText();
   void syncChipVisibility();

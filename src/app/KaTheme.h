@@ -152,5 +152,8 @@ QString colorSwatchStyle(const QColor& fill);
 QStyle* createChromeStyle();
 // The chrome style's check box (option->state On/Off/NoChange), for views drawn by another style (QGIS layer tree).
 void paintCheckIndicator(const QStyleOption* option, QPainter* painter);
+// 새 모양 words and plates (QSS [kaPlate="true"]): sets the widget's kaPlate to the current look and keeps it
+// there when 「새 모양」 is switched while the app runs (화면 보기).
+void followPaperLook(QWidget* widget);
 
 }  // namespace KaTheme

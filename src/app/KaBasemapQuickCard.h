@@ -2,11 +2,14 @@
 
 #include <QFrame>
 #include <QHash>
+#include <QSizePolicy>
 #include <QString>
 #include <QStringList>
 
+class QHBoxLayout;
 class QLabel;
 class QToolButton;
+class QVBoxLayout;
 
 // 「배경 지도」 card at the bottom of the inspector column: one sentence that says what
 // really happens (opening a survey brings up satellite and cadastral) and three buttons
@@ -31,7 +34,20 @@ class KaBasemapQuickCard : public QFrame {
  signals:
   void basemapRequested(const QString& id);
 
+ protected:
+  void changeEvent(QEvent* event) override;
+
  private:
+  void applyLook();
+
   QHash<QString, QToolButton*> m_buttons;
   QLabel* m_note = nullptr;
+  QLabel* m_glyph = nullptr;
+  QLabel* m_title = nullptr;
+  QFrame* m_rule = nullptr;
+  QVBoxLayout* m_column = nullptr;
+  QHBoxLayout* m_head = nullptr;
+  QHBoxLayout* m_row = nullptr;
+  QSizePolicy m_stockPolicy;
+  bool m_plate = false;
 };

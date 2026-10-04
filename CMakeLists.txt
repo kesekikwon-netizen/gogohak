@@ -1873,6 +1873,14 @@ if(KA_HGIS_BUILD_TESTS)
   target_include_directories(ka_plate_sheet_tests PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_BINARY_DIR}/generated)
   ka_add_qtest(plate_sheet ka_plate_sheet_tests)
   set_tests_properties(plate_sheet PROPERTIES TIMEOUT 90)
+  # 「조용한 도판」 map screen panels (board 1) as the sheet draws them; split from plate_sheet at its 300-line limit.
+  add_executable(ka_panel_sheet_tests tests/test_panel_sheet.cpp
+    ${_ka_p1_font_sources} src/app/KaIcons.cpp src/app/KaTheme.cpp src/app/KaThemeSheet.cpp src/app/KaThemeStyle.cpp)
+  set_target_properties(ka_panel_sheet_tests PROPERTIES WIN32_EXECUTABLE FALSE)
+  target_link_libraries(ka_panel_sheet_tests PRIVATE Qt6::Test Qt6::Core Qt6::Gui Qt6::Widgets)
+  target_include_directories(ka_panel_sheet_tests PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_BINARY_DIR}/generated)
+  ka_add_qtest(panel_sheet ka_panel_sheet_tests)
+  set_tests_properties(panel_sheet PROPERTIES TIMEOUT 90)
   add_executable(ka_sketch_measure_tests tests/test_sketch_measure.cpp src/app/KaSketchMeasure.cpp src/app/KaSketchMeasure.h
     src/app/KaDrawGuideBand.cpp src/app/KaDrawGuideBand.h ${_ka_p1_font_sources} src/app/KaIcons.cpp src/app/KaTheme.cpp
     src/app/KaThemeSheet.cpp src/app/KaThemeStyle.cpp)
