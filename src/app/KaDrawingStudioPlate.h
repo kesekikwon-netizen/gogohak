@@ -9,4 +9,7 @@ namespace KaDrawingStudioPlate {
 // 「PDF 내보내기 | 인쇄」 (the btnPrimary and btnPrint buttons moved out of their card), so they never scroll away.
 // In stock the scrolling panel itself, untouched.
 QWidget* inspectorColumn(QScrollArea* scroll);
+// The bottom tool strip, returned as given. In 새 모양 one strip of joined 96 × 52 cells, a hairline between them and
+// one-line words (QSS: QWidget#layoutBottomTools[kaPlate]); in stock left as it is.
+QWidget* bottomStrip(QWidget* strip);
 }  // namespace KaDrawingStudioPlate

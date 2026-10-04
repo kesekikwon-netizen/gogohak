@@ -59,6 +59,41 @@ private slots:
     QVERIFY(pdf->x() < print->x());
   }
 
+  // 아래 도구 줄 (보드 판 4): one strip of joined 96 × 52 cells with a hairline between them and one-line words;
+  // stock keeps its spaced buttons.
+  void bottomToolsAreOneStripOfCellsInPaper() {
+    const auto strip = [] {
+      auto* tools = new QWidget;
+      tools->setObjectName(QStringLiteral("layoutBottomTools"));
+      auto* line = new QHBoxLayout(tools);
+      line->setContentsMargins(14, 6, 14, 6);
+      line->setSpacing(22);
+      for (const QString& word : {QStringLiteral("좌표점"), QStringLiteral("항목\n이동"), QStringLiteral("도면 목록")}) {
+        auto* cell = new QToolButton(tools);
+        cell->setText(word);
+        line->addWidget(cell);
+      }
+      return tools;
+    };
+    qApp->setProperty("kaPaperLook", true);
+    std::unique_ptr<QWidget> tools(strip());
+    QCOMPARE(KaDrawingStudioPlate::bottomStrip(tools.get()), tools.get());
+    QCOMPARE(tools->layout()->spacing(), 0);
+    QCOMPARE(tools->layout()->contentsMargins(), QMargins());
+    const auto cells = tools->findChildren<QToolButton*>();
+    QCOMPARE(cells.size(), 3);
+    for (QToolButton* cell : cells) {
+      QCOMPARE(cell->minimumSize(), QSize(96, 52));
+      QVERIFY2(!cell->text().contains(QLatin1Char(0x0A)), qPrintable(cell->text()));
+    }
+    QCOMPARE(cells.at(0)->property("kaCell").toString(), QStringLiteral("first"));
+    QCOMPARE(cells.at(1)->property("kaCell").toString(), QStringLiteral("rest"));
+    qApp->setProperty("kaPaperLook", QVariant());
+    std::unique_ptr<QWidget> stock(strip());
+    KaDrawingStudioPlate::bottomStrip(stock.get());
+    QCOMPARE(stock->layout()->spacing(), 22);
+  }
+
   void stockKeepsTheButtonsInTheirCard() {
     QToolButton* pdf = nullptr;
     QToolButton* print = nullptr;

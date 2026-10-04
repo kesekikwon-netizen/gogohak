@@ -1507,3 +1507,9 @@ QProgressDialog[kaPlate="true"] QProgressBar { min-height: 4px; max-height: 4px;
 QProgressDialog[kaPlate="true"] QProgressBar::chunk { background: @ink@; border-radius: 0; }
 /* 도면 (2차 보드 판 4): 「PDF 내보내기 | 인쇄」 at the foot of the right panel under a hairline. */
 QWidget#studioOutputFoot { border: none; border-top: 1px solid @border@; }
+/* 도면 아래 도구 줄 (2차 보드 판 4): one white strip, joined 96 × 52 cells with a hairline between them, 11 px words. */
+QWidget#layoutBottomTools[kaPlate="true"] { background: @surface@; border: 1px solid @borderStrong@; border-radius: 8px; }
+QWidget#layoutBottomTools[kaPlate="true"] QToolButton { border: none; border-radius: 0; background: transparent; padding: 6px 0 0 0; font-size: 11px; color: @ink@; }
+QWidget#layoutBottomTools[kaPlate="true"] QToolButton[kaCell="rest"] { border-left: 1px solid @border@; }
+QWidget#layoutBottomTools[kaPlate="true"] QToolButton:enabled:hover { background: @hover@; }
+QWidget#layoutBottomTools[kaPlate="true"] QToolButton::menu-indicator { width: 0; }

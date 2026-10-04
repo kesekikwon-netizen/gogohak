@@ -38,4 +38,21 @@ QWidget* inspectorColumn(QScrollArea* scroll) {
   return column;
 }
 
+QWidget* bottomStrip(QWidget* strip) {
+  if (!qApp || !qApp->property("kaPaperLook").toBool() || !strip->layout()) return strip;
+  strip->setProperty("kaPlate", true);
+  strip->layout()->setContentsMargins(0, 0, 0, 0);
+  strip->layout()->setSpacing(0);
+  bool first = true;
+  for (int i = 0; i < strip->layout()->count(); ++i) {
+    auto* cell = qobject_cast<QToolButton*>(strip->layout()->itemAt(i)->widget());
+    if (!cell) continue;
+    cell->setFixedSize(96, 52);
+    cell->setText(cell->text().replace(QLatin1Char(0x0A), QLatin1Char(' ')));  // one line under the icon
+    cell->setProperty("kaCell", first ? QStringLiteral("first") : QStringLiteral("rest"));  // hairline before the rest
+    first = false;
+  }
+  return strip;
+}
+
 }  // namespace KaDrawingStudioPlate

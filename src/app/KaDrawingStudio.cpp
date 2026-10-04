@@ -1316,7 +1316,7 @@ void KaDrawingStudio::buildUi() {
   updateLayerOpacityControl();
   rightLay->addWidget(desk, 1);
 
-  deskGrid->addWidget(buildBottomTools(desk), 0, 0, Qt::AlignHCenter | Qt::AlignBottom);
+  deskGrid->addWidget(KaDrawingStudioPlate::bottomStrip(buildBottomTools(desk)), 0, 0, Qt::AlignHCenter | Qt::AlignBottom);
   if (m_opacityRail)
     m_opacityRail->raise();
   side->setMinimumWidth(260);
