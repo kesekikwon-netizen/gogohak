@@ -1,6 +1,7 @@
 #include "KaCrashGuard.h"
 #include "core/KaLogExcept.h"
 #include "KaCaptureMapTool.h"
+#include "KaDrawCursor.h"
 #include "KaEditTolerance.h"
 #include "KaSketchMeasure.h"
 #include "core/EditGeometryRepair.h"
@@ -24,7 +25,7 @@
 
 KaCaptureMapTool::KaCaptureMapTool(QgsMapCanvas* canvas)
     : QgsMapTool(canvas) {
-  setCursor(Qt::CrossCursor);
+  setCursor(KaDrawCursor::cursor());
   m_dwell = new QTimer(this);
   m_dwell->setSingleShot(true);
   m_dwell->setInterval(KaEditTolerance::kEasyDrawDwellMs);
@@ -61,7 +62,7 @@ void KaCaptureMapTool::setEasyDraw(bool on) {
   m_easyDraw = on;
   if (on) {
     m_snapEnabled = true;
-    setCursor(Qt::CrossCursor);
+    setCursor(KaDrawCursor::cursor());
   } else {
     stopDwell();
   }
@@ -216,7 +217,7 @@ void KaCaptureMapTool::activate() {
     canvas()->setContextMenuPolicy(Qt::PreventContextMenu);
   }
   QgsMapTool::activate();
-  setCursor(Qt::CrossCursor);
+  setCursor(KaDrawCursor::cursor());
   announceSketch();
 }
 

@@ -4,7 +4,7 @@
 565 src/app/KaAlignMapTool.cpp
 975 src/app/KaApplication.cpp
 343 src/app/KaBeginnerRibbon.cpp
-470 src/app/KaCaptureMapTool.cpp
+471 src/app/KaCaptureMapTool.cpp
 3903 src/app/KaDrawingStudio.cpp
 499 src/app/KaFeatureSelectTool.cpp
 381 src/app/KaFileBrowserPanel.cpp
@@ -23,7 +23,7 @@
 652 src/app/MainWindow.h
 881 src/app/MainWindowAlign.cpp
 478 src/app/MainWindowContextMenus.cpp
-1541 src/app/MainWindowEditing.cpp
+1542 src/app/MainWindowEditing.cpp
 552 src/app/MainWindowExport.cpp
 501 src/app/MainWindowOffline.cpp
 696 src/app/MainWindowOverlay.cpp

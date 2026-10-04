@@ -2,6 +2,7 @@
 #include "KaAttributeMapTool.h"
 #include "KaCaptureMapTool.h"
 #include "KaCrashGuard.h"
+#include "KaDrawCursor.h"
 #include "KaDrawGuideBand.h"
 #include "KaDrawingStudio.h"
 #include "KaEditErrors.h"
@@ -1005,7 +1006,7 @@ void MainWindow::beginEdit(QgsVectorLayer* layer) {
     MeasureOps::pinPlanarEllipsoid(QgsProject::instance());
     m_canvas->setMapTool(m_captureTool);
     m_canvas->setFocus(Qt::OtherFocusReason);
-    m_canvas->setCursor(Qt::CrossCursor);
+    m_canvas->setCursor(KaDrawCursor::cursor());
     updateToolChip();
 
     // Short enough for a narrow status bar; the tool chip keeps showing the target.

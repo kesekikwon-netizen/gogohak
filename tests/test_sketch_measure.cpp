@@ -2,6 +2,7 @@
 // in mono figures after the hint. Display only; the sketch itself is never changed.
 #include <QtTest>
 #include <QLabel>
+#include "app/KaDrawCursor.h"
 #include "app/KaDrawGuideBand.h"
 #include "app/KaSketchMeasure.h"
 #include "app/KaTheme.h"
@@ -42,6 +43,16 @@ private slots:
     QVERIFY(shown);
     QCOMPARE(text, figures);
     QVERIFY(emptyHides);
+  }
+  // The drawing cursor leaves the point being placed open, so the line under it stays visible
+  // (user 2026-10-04 「+ 가 커서 선을 가린다」): a picture cursor whose hot spot is transparent.
+  void drawCursorHasAnOpenCentre() {
+    const QCursor cursor = KaDrawCursor::cursor();
+    const QImage image = cursor.pixmap().toImage();
+    QVERIFY2(!image.isNull(), "the system cross covers the point; a picture cursor with an open centre is wanted");
+    const QPoint hot = cursor.hotSpot();
+    for (const QPoint& offset : {QPoint(0, 0), QPoint(1, 0), QPoint(0, 1), QPoint(-1, 0), QPoint(0, -1)})
+      QCOMPARE(image.pixelColor(hot + offset).alpha(), 0);
   }
   void onePointSaysNothing() {
     QVERIFY(KaSketchMeasure::text({{1, 1}}, true).isEmpty());

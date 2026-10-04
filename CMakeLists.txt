@@ -540,6 +540,7 @@ add_executable(ka-hgis
   src/app/KaIcons.h
   src/app/KaCaptureMapTool.h
   src/app/KaSketchMeasure.h
+  src/app/KaDrawCursor.h
   src/app/KaAttributeMapTool.h
   src/app/KaDrawingStudio.h
   src/app/KaDrawingTools.h
