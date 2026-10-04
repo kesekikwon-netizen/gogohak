@@ -233,7 +233,7 @@ void KaFeatureCard::dropEditors() {
   m_controlMeta = m_controlXyz[0] = m_controlXyz[1] = m_controlXyz[2] = nullptr;
   m_note = nullptr;
   m_textEdits.clear();
-  m_area = m_perimeter = nullptr;
+  m_area = m_perimeter = m_lockedJibun = m_lockedJimok = nullptr;
 }
 
 void KaFeatureCard::setState(const QString& text, bool changed, bool failed) {
@@ -262,9 +262,11 @@ void KaFeatureCard::refresh() {
     showText(edit, value(field));
     if (area && header.isEmpty()) header = value(field);  // a survey area is named by its 조사명
   }
-  m_name->setText(header.isEmpty() ? QStringLiteral("이름 없음") : header);
-  showPlateHeader(f, {m_layerKind->text(), kind, value(QStringLiteral("period")),
-                      area && value(QStringLiteral("survey_name")) != header ? value(QStringLiteral("survey_name")) : QString()});
+  const QString parcel = fillLockedRows(f);  // 새 모양 지적도: named by its 지번
+  m_name->setText(!parcel.isEmpty() ? parcel : header.isEmpty() ? QStringLiteral("이름 없음") : header);
+  showPlateHeader(f, !parcel.isEmpty() ? QStringList{QStringLiteral("지적도"), QStringLiteral("참조 자료")}
+                                       : QStringList{m_layerKind->text(), kind, value(QStringLiteral("period")),
+                                                     area && value(QStringLiteral("survey_name")) != header ? value(QStringLiteral("survey_name")) : QString()});
   showText(m_number, number);
   showText(m_kind, kind);
   showText(m_period, value(QStringLiteral("period")));

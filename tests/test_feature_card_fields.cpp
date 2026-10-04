@@ -143,6 +143,35 @@ class TestFeatureCardFields : public QObject {
     QCOMPARE(boxFace, ground);   // the figure has no box of its own
   }
 
+  // 참조 자료 (2차 보드 판 3 B8): a parcel is named by its 지번, 「지적도 · 참조 자료」 under it, and 지번·지목
+  // read as locked rows (the record is never written).
+  void parcelReadsAsALockedRecordInPaper() {
+    KaTheme::DisplayOptions paper;
+    paper.paperLook = true;
+    KaTheme::setDisplayOptions(nullptr, paper);
+    QgsVectorLayer parcels(QStringLiteral("MultiPolygon?crs=EPSG:5186&field=PNU:string&field=JIBUN:string"),
+                           QStringLiteral("지적도 · 조사 주변 5km"), QStringLiteral("memory"));
+    LayerOps::markCadastralLayer(&parcels);  // as the cadastral download marks its layer
+    QgsFeature f(parcels.fields());
+    f.setAttribute(QStringLiteral("PNU"), QStringLiteral("5011025021116160001"));
+    f.setAttribute(QStringLiteral("JIBUN"), QStringLiteral("1616-1 과"));
+    f.setGeometry(QgsGeometry::fromRect(QgsRectangle(200000, 450000, 200010, 450005)));
+    parcels.dataProvider()->addFeature(f);
+    KaFeatureCard card;
+    card.setFeature(&parcels, firstId(&parcels));
+    const auto text = [&card](const char* name) {
+      auto* label = card.findChild<QLabel*>(QString::fromLatin1(name));
+      return label ? label->text() : QStringLiteral("(없음)");
+    };
+    const QString name = text("kaFeatureCardName"), sub = text("kaFeatureCardSub");
+    const QString jibun = text("kaLockedJibun"), jimok = text("kaLockedJimok");
+    KaTheme::setDisplayOptions(nullptr, KaTheme::DisplayOptions());
+    QCOMPARE(name, QStringLiteral("1616-1"));
+    QCOMPARE(sub, QStringLiteral("지적도 · 참조 자료"));
+    QCOMPARE(jibun, QStringLiteral("1616-1"));
+    QCOMPARE(jimok, QStringLiteral("과"));
+  }
+
   // 시대 띠: under 시대 the card shows the ten period cells with the recorded one marked (새 모양 only).
   void periodBandMarksTheRecordedPeriodInPaper() {
     auto layer = recordedFeature();

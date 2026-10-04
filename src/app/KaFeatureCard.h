@@ -87,6 +87,9 @@ private:
   void fillControlPoint(const QgsFeature& f);  // KaFeatureCardEditors.cpp
   void showPlateHeader(const QgsFeature& feature, QStringList record);  // KaFeatureCardPlate.cpp
   static QFrame* measureHead(QWidget* parent);  // 새 모양 「자동 계산」 over the ledger, KaFeatureCardPlate.cpp
+  void addLockedRows();  // 새 모양 지적도: 지번·지목 as locked rows, KaFeatureCardPlate.cpp
+  // Fills those rows; returns the 지번 that names the card (empty when the card has no such rows).
+  QString fillLockedRows(const QgsFeature& feature);  // KaFeatureCardPlate.cpp
   void setState(const QString& text, bool changed, bool failed = false);
 
   QPointer<QgsVectorLayer> m_layer;
@@ -118,6 +121,8 @@ private:
   // Plain text rows: a survey area's 조사명·유적명 (a separate area layer: 이름), a record's 조사 상태·조사자·조사일.
   QList<QPair<QString, QLineEdit*>> m_textEdits;
   QLabel* m_area = nullptr;
+  QLabel* m_lockedJibun = nullptr;  // 새 모양 지적도 rows
+  QLabel* m_lockedJimok = nullptr;
   QLabel* m_perimeter = nullptr;
   KaChip* m_state = nullptr;
   QPushButton* m_openForm = nullptr;

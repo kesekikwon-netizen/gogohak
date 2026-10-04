@@ -144,6 +144,7 @@ void KaFeatureCard::buildEditors() {
       m_form->addRow(gt == Qgis::GeometryType::Line ? QStringLiteral("길이") : QStringLiteral("둘레"),
                      measureField(&m_perimeter));
   };
+  if (plate && LayerOps::isCadastralLayer(m_layer) && has("JIBUN")) addLockedRows();  // 2차 보드 판 3 B8
   if (plate) addLedger();  // 2차 보드 판 3: the ledger right under the name
   m_numberField = FeatureNumbering::fieldsOf(m_layer).numberName;
   if (!m_numberField.isEmpty()) {
