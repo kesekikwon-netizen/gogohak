@@ -70,8 +70,11 @@ QHash<QString, QString> replacementTable() {
                 paper ? titleFontFamilies() : quotedFamilies({QStringLiteral("Segoe UI"), QStringLiteral("Malgun Gothic")}));
   values.insert(QStringLiteral("wordmarkWeight"), paper ? QStringLiteral("500") : QStringLiteral("600"));
   values.insert(QStringLiteral("buttonEdge"), QString::number(buttonEdgeWidth()));
-  values.insert(QStringLiteral("nameSize"), paper ? QStringLiteral("19") : QStringLiteral("15"));
-  values.insert(QStringLiteral("bigNameSize"), paper ? QStringLiteral("24") : QStringLiteral("20"));
+  values.insert(QStringLiteral("nameSize"), paper ? QStringLiteral("20") : QStringLiteral("15"));     // serif Heading
+  values.insert(QStringLiteral("bigNameSize"), paper ? QStringLiteral("28") : QStringLiteral("20"));  // serif Title
+  // Home section heads (최근 조사·작업 순서): the 15 px sans Lead in 새 모양, the title face in stock.
+  values.insert(QStringLiteral("sectionFont"), paper ? quotedFamilies(uiFontStack()) : titleFontFamilies());
+  values.insert(QStringLiteral("sectionWeight"), paper ? QStringLiteral("400") : QString::number(titleFontWeight()));
   // The drawing row's tools (QToolBar#subToolbar): buttons in 새 모양, the flat row in the stock look.
   const QString none = QStringLiteral("transparent");
   values.insert(QStringLiteral("subFace"), c.surface.name());

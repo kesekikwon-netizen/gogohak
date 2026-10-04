@@ -66,6 +66,20 @@ private slots:
     QCOMPARE(captured(ground), KaTheme::tokens().chrome.name());
   }
 
+  // Type scale: the chosen object's name is the 20 px serif Heading, the home survey name the 28 px Title,
+  // and the home section heads 「최근 조사」·「작업 순서」 are 15 px sans (not serif).
+  void namesFollowTheTypeScaleInPaper() {
+    KaTheme::DisplayOptions paper;
+    paper.paperLook = true;
+    KaTheme::setDisplayOptions(qApp, paper);
+    const auto size = [](const char* name) {
+      return captured(QStringLiteral("QLabel#%1 \\{ font-family: [^;]+; font-weight: [^;]+; font-size: (\\d+)px;").arg(QLatin1String(name)));
+    };
+    QCOMPARE(size("kaFeatureCardName"), QStringLiteral("20"));
+    QCOMPARE(size("startContinueName"), QStringLiteral("28"));
+    QVERIFY(captured(QStringLiteral("QLabel#startRecentTitle \\{ font-family: ([^;]+);")).contains(QStringLiteral("malgun gothic")));
+  }
+
   void paperTableHasInkRulesAndOatRow() {
     KaTheme::DisplayOptions paper;
     paper.paperLook = true;
