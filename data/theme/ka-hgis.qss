@@ -849,35 +849,35 @@ QFrame#mapControls QToolButton:enabled:pressed { background: @pressed@; }
 QFrame#layersCard,
 QFrame#filesCard,
 QFrame#studioFilesPanel {
-  background: @surface@;
-  border: 1px solid @border@;
-  border-bottom: 1px solid @borderStrong@;
-  border-right: 1px solid @border@;
-  border-radius: 8px;
+  background: @panelFace@;
+  border: 1px solid @panelEdge@;
+  border-bottom: 1px solid @panelEdgeStrong@;
+  border-right: 1px solid @panelEdge@;
+  border-radius: @panelRadius@px;
 }
 QFrame#layersInner,
 QFrame#filesInner {
-  background: @altRow@;
-  border: 1px solid @border@;
-  border-radius: 6px;
+  background: @innerFace@;
+  border: 1px solid @panelEdge@;
+  border-radius: @innerRadius@px;
 }
 
 /* ---- Side panel buttons (레이어·파일함) ---- */
 QFrame#layersCard QToolButton {
   font-size: 12px;
   padding: 4px 10px;
-  border: 1px solid @border@;
-  border-bottom: 2px solid @borderStrong@;
-  background: @surface@;
+  border: 1px solid @panelEdge@;
+  border-bottom: 2px solid @panelEdgeStrong@;
+  background: @panelFace@;
   border-radius: 6px;
   color: @inkMuted@;
 }
 QFrame#filesCard QToolButton,
 QFrame#studioFilesPanel QToolButton {
   padding: 4px 6px;
-  border: 1px solid @border@;
-  border-bottom: 2px solid @borderStrong@;
-  background: @surface@;
+  border: 1px solid @panelEdge@;
+  border-bottom: 2px solid @panelEdgeStrong@;
+  background: @panelFace@;
   border-radius: 6px;
   color: @inkMuted@;
 }
@@ -1293,7 +1293,7 @@ QLineEdit#layerFilterEdit { min-height: 30px; padding: 0 8px 0 4px; border: 1px 
   background: @surface@; font-size: 12px; }
 QLineEdit#layerFilterEdit:focus { border-color: @focusRing@; }
 QLabel#layerFilterEmpty { color: @inkMuted@; font-size: 12px; padding: 4px 6px; }
-QFrame#inspectorPanel { background: @surface@; border: 1px solid @border@; border-radius: 8px; }
+QFrame#inspectorPanel { background: @panelFace@; border: 1px solid @panelEdge@; border-radius: @panelRadius@px; }
 QFrame#inspectorPanel QTabBar#inspectorTabs::tab { min-width: 72px; padding: 6px 0; font-size: 12px; }
 QFrame#inspectorPanel QScrollArea#inspectorAttributeScroll, QWidget#inspectorAttributePage { background: transparent; }
 QLabel#inspectorTitle { font-size: 14px; font-weight: 700; color: @ink@; }

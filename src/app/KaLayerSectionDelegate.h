@@ -49,6 +49,7 @@ class KaLayerSectionDelegate : public QStyledItemDelegate {
  private:
   QStyleOptionViewItem below(const QStyleOptionViewItem& option, const QModelIndex& index) const;
   void paintBand(QPainter* painter, const QStyleOptionViewItem& option, const QModelIndex& index) const;
+  void paintPlateCheck(QPainter* painter, const QStyleOptionViewItem& option, const QModelIndex& index) const;
 
   QPointer<QAbstractItemDelegate> m_inner;
   QgsLayerTreeView* m_view = nullptr;

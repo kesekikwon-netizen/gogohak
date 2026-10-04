@@ -1,4 +1,5 @@
 #include "KaLayerSectionDelegate.h"
+#include "KaTheme.h"
 
 #include "core/LayerOps.h"
 #include "core/LayerRole.h"
@@ -92,6 +93,7 @@ void KaLayerSectionDelegate::paint(QPainter* painter, const QStyleOptionViewItem
   const QStyleOptionViewItem moved = below(option, index);
   if (m_inner) m_inner->paint(painter, moved, index);
   else QStyledItemDelegate::paint(painter, moved, index);
+  paintPlateCheck(painter, moved, index);
   const QVariant count = index.column() == 0 ? index.data(kCountRole) : QVariant();
   if (!count.isValid()) return;
   // The count sits 6 px after the name in 10 px mono, muted ink; it never runs past the column.
@@ -111,6 +113,23 @@ void KaLayerSectionDelegate::paint(QPainter* painter, const QStyleOptionViewItem
   painter->setPen(option.palette.color(QPalette::PlaceholderText));
   painter->drawText(QRect(x, text.top(), width + 1, text.height()), Qt::AlignLeft | Qt::AlignVCenter, digits);
   painter->restore();
+}
+
+// 「조용한 도판」 (2차 보드 판 1): QGIS's layer tree style draws a bare tick; in 새 모양 the check is the app's
+// own square (ink with an ivory tick, an empty grey-edged square), drawn over it at the same place.
+void KaLayerSectionDelegate::paintPlateCheck(QPainter* painter, const QStyleOptionViewItem& option,
+                                             const QModelIndex& index) const {
+  const QVariant check = index.data(Qt::CheckStateRole);
+  if (!check.isValid() || !m_view || !m_view->property("kaPlate").toBool()) return;
+  QStyleOptionViewItem item(option);
+  initStyleOption(&item, index);
+  const QStyle* style = item.widget ? item.widget->style() : QApplication::style();
+  QStyleOptionViewItem box(item);
+  box.rect = style->subElementRect(QStyle::SE_ItemViewItemCheckIndicator, &item, item.widget);
+  box.state &= ~(QStyle::State_On | QStyle::State_Off | QStyle::State_NoChange);
+  const auto state = check.value<Qt::CheckState>();
+  box.state |= state == Qt::Checked ? QStyle::State_On : state == Qt::PartiallyChecked ? QStyle::State_NoChange : QStyle::State_Off;
+  KaTheme::paintCheckIndicator(&box, painter);
 }
 
 QSize KaLayerSectionDelegate::sizeHint(const QStyleOptionViewItem& option, const QModelIndex& index) const {

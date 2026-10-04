@@ -139,6 +139,21 @@ private slots:
     QCOMPARE(captured(name), QStringLiteral("34"));
   }
 
+  // 지도 화면 판 (2차 보드 판 1): the layer and record panels sit on the page — no box, square corners;
+  // stock keeps the white 8 px panels.
+  void sidePanelsHaveNoBoxInPaper() {
+    const QString panel = QStringLiteral("(?m)^QFrame#inspectorPanel \\{ background: ([^;]+); border: 1px solid [^;]+; border-radius: (\\d+)px;");
+    const auto both = [&panel]() {
+      const auto m = QRegularExpression(panel).match(qApp->styleSheet());
+      return QStringList{m.captured(1).toLower(), m.captured(2)};
+    };
+    QCOMPARE(both(), (QStringList{KaTheme::tokens().surface.name(), QStringLiteral("8")}));
+    KaTheme::DisplayOptions paper;
+    paper.paperLook = true;
+    KaTheme::setDisplayOptions(qApp, paper);
+    QCOMPARE(both(), (QStringList{QStringLiteral("transparent"), QStringLiteral("0")}));
+  }
+
   // 창 너비: 새 모양 windows come in three widths (S 440 · M 560 · L 860); stock keeps each window's own width.
   void windowWidthsAreTheThreeSizesInPaper() {
     QCOMPARE(KaWindowSize::width(KaWindowSize::Medium, 460), 460);

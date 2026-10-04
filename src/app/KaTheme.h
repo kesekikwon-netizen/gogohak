@@ -4,6 +4,9 @@
 #include <QString>
 #include <QStringList>
 
+class QPainter;
+class QStyleOption;
+
 class QApplication;
 class QStyle;
 class QWidget;
@@ -147,5 +150,7 @@ QString colorSwatchStyle(const QColor& fill);
 // The Fusion-based proxy style that paints field faces, chevrons, check boxes,
 // tab close crosses and the keyboard focus ring (KaThemeStyle.cpp).
 QStyle* createChromeStyle();
+// The chrome style's check box (option->state On/Off/NoChange), for views drawn by another style (QGIS layer tree).
+void paintCheckIndicator(const QStyleOption* option, QPainter* painter);
 
 }  // namespace KaTheme

@@ -12,6 +12,7 @@
 #include <QSplitter>
 #include <QTabWidget>
 #include <QToolButton>
+#include <QStyleOptionViewItem>
 #include <QVBoxLayout>
 #include <QDir>
 #include <cmath>
@@ -120,14 +121,49 @@ private slots:
     const QIcon patch = model.data(row, Qt::DecorationRole).value<QIcon>();
     QgsLayerTreeView view; view.setModel(&model); KaLayerInformationModel::configureView(&view);
     const QSize room = view.iconSize();
+    const bool plateChecks = view.property("kaPlate").toBool();  // the ink check boxes of the board
     const QColor ink = KaTheme::tokens().ink;
     KaTheme::setDisplayOptions(nullptr, KaTheme::DisplayOptions());
     QCOMPARE(room, QSize(20, 14));
+    QVERIFY(plateChecks);
     const QImage image = patch.pixmap(QSize(20, 14)).toImage();
     QCOMPARE(image.size(), QSize(20, 14));
     QCOMPARE(image.pixelColor(0, 7).name(), ink.name());
     QCOMPARE(image.pixelColor(10, 0).name(), ink.name());
     QVERIFY2(image.pixelColor(10, 7) != ink, "the swatch shows the symbol, not a solid ink box");
+  }
+  // 레이어 체크 (2차 보드 판 1): in 새 모양 a ticked layer shows an ink square, not QGIS's bare tick.
+  void layerChecksAreInkSquaresInPaper() {
+    QgsProject project;
+    auto* layer = add(project, project.layerTreeRoot()->addGroup(QStringLiteral("조사 데이터")), QStringLiteral("유구 (면)"));
+    LayerOps::markSurveyLayer(layer, QStringLiteral("feature_poly"));
+    KaTheme::DisplayOptions paper; paper.paperLook = true; KaTheme::setDisplayOptions(qApp, paper);
+    KaLayerInformationModel model(&project, false);
+    model.setFlag(QgsLayerTreeModel::AllowNodeChangeVisibility);  // as the layer panel does
+    QgsLayerTreeView view;
+    view.setModel(&model);
+    KaLayerInformationModel::configureView(&view);
+    view.expandAll();
+    view.resize(340, 200);
+    view.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&view));
+    const QModelIndexList found = view.model()->match(view.model()->index(0, 0), Qt::DisplayRole, QStringLiteral("유구 (면)"), 1,
+                                                      Qt::MatchRecursive);  // the row as the view shows it
+    QCOMPARE(found.size(), 1);
+    const QModelIndex row = found.first();
+    QStyleOptionViewItem option;
+    option.initFrom(view.viewport());
+    option.rect = view.visualRect(row);
+    option.features = QStyleOptionViewItem::HasCheckIndicator | QStyleOptionViewItem::HasDisplay;
+    const QRect box = view.style()->subElementRect(QStyle::SE_ItemViewItemCheckIndicator, &option, &view);
+    const QImage image = view.viewport()->grab().toImage();
+    const qreal dpr = image.devicePixelRatio();
+    int dark = 0, all = 0;  // an ink square is mostly dark; QGIS's bare tick is a thin line on the row
+    for (int y = int(box.top() * dpr); y <= int(box.bottom() * dpr); ++y)
+      for (int x = int(box.left() * dpr); x <= int(box.right() * dpr); ++x, ++all)
+        if (image.pixelColor(x, y).lightness() < 90) ++dark;
+    KaTheme::setDisplayOptions(qApp, KaTheme::DisplayOptions());
+    QVERIFY2(dark * 2 > all, qPrintable(QStringLiteral("%1 of %2 dark").arg(dark).arg(all)));
   }
   void nativeModelSupportsSecondColumnWithoutBreakingTree() {
     QgsProject project;

@@ -238,4 +238,6 @@ public:
 
 QStyle* createChromeStyle() { return new ChromeStyle; }
 
+void paintCheckIndicator(const QStyleOption* option, QPainter* painter) { drawCheckIndicator(option, painter); }
+
 }  // namespace KaTheme

@@ -97,6 +97,14 @@ QHash<QString, QString> replacementTable() {
   values.insert(QStringLiteral("cardFace"), paper ? QStringLiteral("transparent") : c.surface.name());
   values.insert(QStringLiteral("cardEdge"), paper ? QStringLiteral("transparent") : c.border.name());
   values.insert(QStringLiteral("heroNameSize"), paper ? QStringLiteral("34") : QStringLiteral("40"));
+  // 지도 화면 판 (2차 보드 판 1): the layer and record panels sit on the page, no box, square corners.
+  const QString clear = QStringLiteral("transparent");
+  values.insert(QStringLiteral("panelFace"), paper ? clear : c.surface.name());
+  values.insert(QStringLiteral("panelEdge"), paper ? clear : c.border.name());
+  values.insert(QStringLiteral("panelEdgeStrong"), paper ? clear : c.borderStrong.name());
+  values.insert(QStringLiteral("panelRadius"), paper ? QStringLiteral("0") : QStringLiteral("8"));
+  values.insert(QStringLiteral("innerFace"), paper ? clear : c.altRow.name());
+  values.insert(QStringLiteral("innerRadius"), paper ? QStringLiteral("0") : QStringLiteral("6"));
   values.insert(QStringLiteral("figureSize"), paper ? QStringLiteral("16") : QStringLiteral("13"));  // 수치 대장 (spec 20: 16 keeps 12,000,000.00 m² inside the 272 px panel)
   values.insert(QStringLiteral("subCheckedFace"), paper ? c.selected.name() : none);
   values.insert(QStringLiteral("subCheckedEdge"), paper ? c.accent.name() : none);
