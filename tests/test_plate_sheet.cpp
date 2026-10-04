@@ -125,6 +125,20 @@ private slots:
     QVERIFY2(captured(family).startsWith(QStringLiteral("\"consolas\"")), qPrintable(captured(family)));
   }
 
+  // 홈 판 (2차 보드 판 2): the home cards lose their box in 새 모양 and the wordmark is 34 px; stock keeps
+  // the white rounded cards and the 40 px name.
+  void homeCardsHaveNoBoxInPaper() {
+    const QString face = QStringLiteral("(?m)^QFrame#startRecentCard, QFrame#startGuideCard, QFrame#startGuideCard2, QFrame#startConnectionCard \\{\\s*background: ([^;]+);");
+    const QString name = QStringLiteral("(?m)^QLabel#startHeroName \\{ font-size: (\\d+)px;");
+    QCOMPARE(captured(face), KaTheme::tokens().surface.name());
+    QCOMPARE(captured(name), QStringLiteral("40"));
+    KaTheme::DisplayOptions paper;
+    paper.paperLook = true;
+    KaTheme::setDisplayOptions(qApp, paper);
+    QCOMPARE(captured(face), QStringLiteral("transparent"));
+    QCOMPARE(captured(name), QStringLiteral("34"));
+  }
+
   // 창 너비: 새 모양 windows come in three widths (S 440 · M 560 · L 860); stock keeps each window's own width.
   void windowWidthsAreTheThreeSizesInPaper() {
     QCOMPARE(KaWindowSize::width(KaWindowSize::Medium, 460), 460);

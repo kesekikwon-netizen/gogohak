@@ -15,6 +15,7 @@
 #include <qgsapplication.h>
 
 #include "app/KaChip.h"
+#include "app/KaHomeConnectionCard.h"
 #include "app/KaHomeRecentCard.h"
 #include "app/KaStartPage.h"
 #include "app/KaTheme.h"
@@ -161,6 +162,30 @@ private slots:
     auto* warnings = page.findChild<KaChip*>(QStringLiteral("startSubmitWarnings"));
     QVERIFY(warnings);
     QCOMPARE(warnings->text(), QStringLiteral("주의 3"));
+  }
+
+  // 연결 상태: a plain row (no box per item), 「설정됨」 in muted words without a green dot, a missing
+  // setting as 「● 설정 필요」.
+  void connectionRowIsPlainWords() {
+    KaHomeConnectionCard card;
+    KaHomeStatus::Inputs inputs;
+    AccountStatus::Entry ready;
+    ready.source = AccountStatus::Source::VworldKey;
+    ready.ready = true;
+    AccountStatus::Entry missing;
+    missing.source = AccountStatus::Source::TopographicAccount;
+    missing.ready = false;
+    inputs.accounts = {ready, missing};
+    inputs.crsDatabase = true;
+    card.setInputs(inputs);
+    QStringList states;
+    for (QLabel* state : card.findChildren<QLabel*>(QStringLiteral("startConnState"))) states << state->text();
+    QVERIFY2(states.contains(QStringLiteral("설정됨")), qPrintable(states.join(QLatin1Char('|'))));
+    QVERIFY2(states.join(QLatin1Char('|')).contains(QStringLiteral("설정 필요")) &&
+                 states.join(QLatin1Char('|')).contains(QStringLiteral("●")),
+             qPrintable(states.join(QLatin1Char('|'))));
+    for (QFrame* row : card.findChildren<QFrame*>(QStringLiteral("startConnRow")))
+      QVERIFY(row->property("kaPlate").toBool());
   }
 
   void heroDrawsNoBand() {

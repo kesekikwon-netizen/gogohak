@@ -93,6 +93,10 @@ QHash<QString, QString> replacementTable() {
   values.insert(QStringLiteral("subGap"), paper ? QStringLiteral("1") : QStringLiteral("0"));
   values.insert(QStringLiteral("subPadSide"), paper ? QStringLiteral("6") : QStringLiteral("7"));
   values.insert(QStringLiteral("mapRadius"), paper ? QStringLiteral("0") : QStringLiteral("10"));  // 지도는 그림: square in 새 모양
+  // 홈 판 (2차 보드 판 2): no box around the home cards, a smaller wordmark.
+  values.insert(QStringLiteral("cardFace"), paper ? QStringLiteral("transparent") : c.surface.name());
+  values.insert(QStringLiteral("cardEdge"), paper ? QStringLiteral("transparent") : c.border.name());
+  values.insert(QStringLiteral("heroNameSize"), paper ? QStringLiteral("34") : QStringLiteral("40"));
   values.insert(QStringLiteral("figureSize"), paper ? QStringLiteral("16") : QStringLiteral("13"));  // 수치 대장 (spec 20: 16 keeps 12,000,000.00 m² inside the 272 px panel)
   values.insert(QStringLiteral("subCheckedFace"), paper ? c.selected.name() : none);
   values.insert(QStringLiteral("subCheckedEdge"), paper ? c.accent.name() : none);

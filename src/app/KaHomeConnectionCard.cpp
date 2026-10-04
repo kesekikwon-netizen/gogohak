@@ -122,9 +122,12 @@ void KaHomeConnectionCard::setInputs(const KaHomeStatus::Inputs& inputs) {
   clear(m_rows);
   clear(m_problems);
   const qreal dpr = devicePixelRatioF();
+  // 2차 보드 판 2: plain words in one row — no box, no green dot; a missing setting as 「● 설정 필요」.
+  const bool plate = KaTheme::displayOptions().paperLook;
   for (const AccountStatus::Entry& entry : inputs.accounts) {
     auto* row = new QFrame(this);
     row->setObjectName(QStringLiteral("startConnRow"));
+    row->setProperty("kaPlate", plate);
     row->setMinimumHeight(kRowHeight);
     auto* line = new QHBoxLayout(row);
     line->setContentsMargins(10, 4, 4, 4);
@@ -132,6 +135,7 @@ void KaHomeConnectionCard::setInputs(const KaHomeStatus::Inputs& inputs) {
     auto* dot = new QLabel(row);
     dot->setFixedSize(kDotPx, kDotPx);
     dot->setPixmap(dotPixmap(entry.ready, dpr));
+    dot->setVisible(!plate);
     line->addWidget(dot, 0, Qt::AlignVCenter);
     // The name over its state, so a 250 px cell (1366 px window) still shows both whole.
     auto* words = new QVBoxLayout;
@@ -140,7 +144,11 @@ void KaHomeConnectionCard::setInputs(const KaHomeStatus::Inputs& inputs) {
     name->setToolTip(QStringLiteral("%1 — %2 · %3").arg(displayName(entry), entry.usedFor, entry.menuPath));
     name->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Preferred);  // a narrower window clips the name, never the button
     words->addWidget(name);
-    auto* state = label(stateText(entry.ready), "startConnState", row);
+    auto* state = label(plate && !entry.ready
+                            ? QStringLiteral("<span style=\"color:#D97757\">●</span>&nbsp;%1").arg(stateText(false))
+                            : stateText(entry.ready),
+                        "startConnState", row);
+    state->setProperty("kaPlate", plate);
     state->setProperty("ready", entry.ready ? QStringLiteral("true") : QStringLiteral("false"));
     state->setProperty("kaStatusOk", entry.ready);
     state->setToolTip(entry.ready ? QString() : QStringLiteral("%1에서 넣습니다.").arg(entry.menuPath));
