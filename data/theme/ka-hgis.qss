@@ -652,7 +652,9 @@ QFrame#studioOutputBar {
 /* One output-button face for the 도면 output bar and the item inspector. */
 QFrame#studioOutputBar QToolButton,
 QFrame#itemInspector QToolButton#btnPrint,
-QFrame#itemInspector QToolButton#btnPrimary {
+QFrame#itemInspector QToolButton#btnPrimary,
+QWidget#studioOutputFoot QToolButton#btnPrint,
+QWidget#studioOutputFoot QToolButton#btnPrimary {
   min-height: 34px;
   padding: 4px 12px;
   font-size: 13px;
@@ -663,11 +665,15 @@ QFrame#itemInspector QToolButton#btnPrimary {
   border-radius: 8px;
 }
 QFrame#itemInspector QToolButton#btnPrint,
-QFrame#itemInspector QToolButton#btnPrimary { padding: 4px 10px; }
+QFrame#itemInspector QToolButton#btnPrimary,
+QWidget#studioOutputFoot QToolButton#btnPrint,
+QWidget#studioOutputFoot QToolButton#btnPrimary { padding: 4px 10px; }
 QFrame#studioOutputBar QToolButton:enabled:hover,
-QFrame#itemInspector QToolButton#btnPrint:enabled:hover { background: @hover@; }
+QFrame#itemInspector QToolButton#btnPrint:enabled:hover,
+QWidget#studioOutputFoot QToolButton#btnPrint:enabled:hover { background: @hover@; }
 QFrame#studioOutputBar QToolButton#btnPrimary,
-QFrame#itemInspector QToolButton#btnPrimary {
+QFrame#itemInspector QToolButton#btnPrimary,
+QWidget#studioOutputFoot QToolButton#btnPrimary {
   color: @primaryText@;
   background: @primary@;
   border: 1px solid @primary@;
@@ -675,9 +681,11 @@ QFrame#itemInspector QToolButton#btnPrimary {
   font-weight: 700;
 }
 QFrame#studioOutputBar QToolButton#btnPrimary:enabled:hover,
-QFrame#itemInspector QToolButton#btnPrimary:enabled:hover { background: @primaryHover@; }
+QFrame#itemInspector QToolButton#btnPrimary:enabled:hover,
+QWidget#studioOutputFoot QToolButton#btnPrimary:enabled:hover { background: @primaryHover@; }
 QFrame#studioOutputBar QToolButton#btnPrimary:enabled:pressed,
-QFrame#itemInspector QToolButton#btnPrimary:enabled:pressed { background: @primaryPressed@; }
+QFrame#itemInspector QToolButton#btnPrimary:enabled:pressed,
+QWidget#studioOutputFoot QToolButton#btnPrimary:enabled:pressed { background: @primaryPressed@; }
 QToolButton.sampleTile {
   /* Width comes from QWidget::setMinimumWidth. min-width:0 overrode it. */
   min-height: 0;
@@ -1234,7 +1242,8 @@ QToolButton#renderToggle:enabled:focus {
   border-color: @focusRing@;
 }
 QFrame#studioOutputBar QToolButton#btnPrimary:enabled:focus,
-QFrame#itemInspector QToolButton#btnPrimary:enabled:focus { border-color: @ink@; }
+QFrame#itemInspector QToolButton#btnPrimary:enabled:focus,
+QWidget#studioOutputFoot QToolButton#btnPrimary:enabled:focus { border-color: @ink@; }
 /* Ribbon chips keep their size when focused: the 2 px ring takes the 1 px of padding. */
 QWidget#beginnerRibbon QToolButton:enabled:focus {
   border: 2px solid @focusRing@;
@@ -1507,6 +1516,10 @@ QProgressDialog[kaPlate="true"] QProgressBar { min-height: 4px; max-height: 4px;
 QProgressDialog[kaPlate="true"] QProgressBar::chunk { background: @ink@; border-radius: 0; }
 /* 도면 (2차 보드 판 4): 「PDF 내보내기 | 인쇄」 at the foot of the right panel under a hairline. */
 QWidget#studioOutputFoot { border: none; border-top: 1px solid @border@; }
+/* 새 모양 view tab ✕ (2차 보드 판 4): a bare 16 px mark, without the tool-button padding and edge. */
+QTabBar QToolButton#viewTabClose { padding: 0; border: none; border-radius: 3px; background: transparent; min-width: 0; min-height: 0; }
+QTabBar QToolButton#viewTabClose:enabled:hover { background: @hover@; }
+QTabBar QToolButton#viewTabClose:enabled:pressed { background: @pressed@; }
 /* 도면 아래 도구 줄 (2차 보드 판 4): one white strip, joined 96 × 52 cells with a hairline between them, 11 px words. */
 QWidget#layoutBottomTools[kaPlate="true"] { background: @surface@; border: 1px solid @borderStrong@; border-radius: 8px; }
 QWidget#layoutBottomTools[kaPlate="true"] QToolButton { border: none; border-radius: 0; background: transparent; padding: 6px 0 0 0; font-size: 11px; color: @ink@; }

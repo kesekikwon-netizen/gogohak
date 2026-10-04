@@ -52,8 +52,10 @@ QWidget* inspectorColumn(QScrollArea* scroll) {
     button->setParent(foot);  // out of the card's row; the row's layout lets go of it
     button->show();
   }
-  row->addWidget(pdf, 2);
-  row->addWidget(print, 1);
+  print->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Fixed);  // 「인쇄」 keeps its own width; PDF takes the rest
+  print->setMinimumWidth(88);
+  row->addWidget(pdf, 1);
+  row->addWidget(print);
   stack->addWidget(foot);
   column->setMinimumWidth(scroll->minimumWidth());
   column->setMaximumWidth(scroll->maximumWidth());

@@ -59,7 +59,7 @@ void KaFileRowDelegate::paint(QPainter* painter, const QStyleOptionViewItem& opt
   const bool folder = index.data(Qt::UserRole + 1).toBool();
   const auto [name, extension] = parts(text, folder);
   const QColor muted = option.palette.color(QPalette::PlaceholderText);
-  const QColor ink = option.palette.color(option.state & QStyle::State_Selected ? QPalette::HighlightedText : QPalette::Text);
+  const QColor ink = option.palette.color(QPalette::Text);  // the sheet's selection is a light wash, not Highlight
   const QRect row = option.rect.adjusted(4, 0, -6, 0);
   drawMark(painter, QRectF(row.left(), row.center().y() - 6, 12, 12), folder, muted);
   int right = row.right();
