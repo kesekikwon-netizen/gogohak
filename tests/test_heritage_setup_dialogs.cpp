@@ -10,6 +10,7 @@
 #include <QUuid>
 #include <QCheckBox>
 #include <QFile>
+#include <QGroupBox>
 #include <QLabel>
 #include "app/KaHeritageSetupDialogs.h"
 #include "core/HeritageIntranetSettings.h"
@@ -112,6 +113,30 @@ private slots:
     auto* city = dialog.findChild<QComboBox*>(QStringLiteral("heritageCity"));
     city->setCurrentIndex(city->findData(QStringLiteral("의성군")));
     QVERIFY(dialog.plan().followUps.isEmpty());
+  }
+
+  // 「조용한 도판」 (2차 보드 판 5): two plain lines, 96 px words beside 240 px lists, the nearby 시·군 under a section
+  // word instead of a framed box with the hint after them, the pledge as a muted note (no colour of its own).
+  void regionWindowReadsLikeTheBoardInPaper() {
+    HeritageRegion region;
+    region.sido = QStringLiteral("경상북도");
+    region.city = QStringLiteral("안동시");
+    region.nearby = {{QStringLiteral("경상북도"), QStringLiteral("예천군")}};
+    qApp->setProperty("kaPaperLook", true);
+    KaHeritageRegionDialog dialog(region);
+    qApp->setProperty("kaPaperLook", QVariant());
+    QCOMPARE(dialog.findChild<QLabel*>(QStringLiteral("heritageRegionText"))->text(),
+             QStringLiteral("조사구역이 속한 시·군을 확인하세요.") + QLatin1Char(0x0A) +
+                 QStringLiteral("자료는 선택한 시·군 단위로만 받습니다."));
+    QCOMPARE(dialog.findChild<QComboBox*>(QStringLiteral("heritageSido"))->maximumWidth(), 240);
+    auto* group = dialog.findChild<QGroupBox*>(QStringLiteral("heritageNearbyGroup"));
+    QVERIFY(group && group->title().isEmpty());
+    QCOMPARE(dialog.findChild<QLabel*>(QStringLiteral("heritageNearbyHead"))->text(),
+             QStringLiteral("조사구역 주변 5km에 걸친 다른 시·군"));
+    QVERIFY(dialog.findChild<QLabel*>(QStringLiteral("heritagePledgeNote"))->styleSheet().isEmpty());
+    KaHeritageRegionDialog stock(region);
+    QCOMPARE(stock.findChild<QGroupBox*>(QStringLiteral("heritageNearbyGroup"))->title(),
+             QStringLiteral("조사구역 주변 5km에 걸친 다른 시·군"));
   }
 
   void nearbyLookupNoteIsShownNotHidden() {

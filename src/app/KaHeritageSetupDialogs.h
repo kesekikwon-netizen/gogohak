@@ -5,6 +5,7 @@
 #include "core/HeritageFetchPlan.h"
 
 class QCheckBox;
+class QLabel;
 class QComboBox;
 class QVBoxLayout;
 struct HeritageRegion;
@@ -39,5 +40,7 @@ private:
   QComboBox* m_sido = nullptr;
   QComboBox* m_city = nullptr;
   QList<QCheckBox*> m_nearby;
+  QLabel* m_reuseWhen = nullptr;  // 새 모양: when the recent data was fetched, under the check
+  bool m_paper = false;           // 새 모양 when the window was built
   QCheckBox* m_reuse = nullptr;
 };

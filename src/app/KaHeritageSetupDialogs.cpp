@@ -4,11 +4,14 @@
 #include "core/HeritageRecentDownloads.h"
 #include "core/HeritageRegionResolver.h"
 #include "core/KoreaRegionCatalog.h"
+#include <QApplication>
 #include <QCheckBox>
 #include <QComboBox>
 #include <QDialogButtonBox>
 #include <QFormLayout>
+#include <QFrame>
 #include <QGroupBox>
+#include <QHBoxLayout>
 #include <QLabel>
 #include <QLineEdit>
 #include <QPushButton>
@@ -77,12 +80,19 @@ KaHeritageAccountDialog::KaHeritageAccountDialog(QWidget* parent) : QDialog(pare
 
 KaHeritageRegionDialog::KaHeritageRegionDialog(const QString& initialSido, const QString& initialCity,
                                              const QString& reason, QWidget* parent) : QDialog(parent) {
+  // 새 모양 (2차 보드 판 5, 520): two plain lines, 96 px words beside 240 px lists, the nearby 시·군 under a section
+  // word, the pledge as a muted note (KaHeritageSetupDialogs.h).
+  m_paper = qApp && qApp->property("kaPaperLook").toBool();
   setObjectName(QStringLiteral("heritageRegionDialog"));
+  setProperty("kaPlate", m_paper);
   setWindowTitle(QStringLiteral("주변유적 받을 시·군 선택"));
   m_layout = new QVBoxLayout(this);
+  if (m_paper) m_layout->setContentsMargins(24, 24, 24, 16);
   auto* description = new QLabel(reason.isEmpty()
-      ? QStringLiteral("조사구역이 속한 시·군을 확인하세요. 자료는 선택한 시·군 단위로만 받습니다.")
+      ? QStringLiteral("조사구역이 속한 시·군을 확인하세요.") + (m_paper ? QString(QLatin1Char(0x0A)) : QStringLiteral(" ")) +
+            QStringLiteral("자료는 선택한 시·군 단위로만 받습니다.")
       : reason + QStringLiteral("\n조사구역이 속한 시·군을 아래에서 직접 선택하면 계속 받을 수 있습니다."), this);
+  description->setObjectName(QStringLiteral("heritageRegionText"));
   description->setWordWrap(true);
   description->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Preferred);
   m_layout->addWidget(description);
@@ -95,6 +105,18 @@ KaHeritageRegionDialog::KaHeritageRegionDialog(const QString& initialSido, const
   for (const auto& name : KoreaRegionCatalog::sidoNames()) m_sido->addItem(name, name);
   form->addRow(QStringLiteral("시·도"), m_sido);
   form->addRow(QStringLiteral("시·군·구"), m_city);
+  if (m_paper) {
+    form->setHorizontalSpacing(0);
+    form->setVerticalSpacing(12);
+    for (QComboBox* list : {m_sido, m_city}) {
+      list->setFixedWidth(240);
+      if (auto* word = qobject_cast<QLabel*>(form->labelForField(list))) {
+        word->setFixedWidth(96);
+        word->setProperty("kaFormWord", true);
+      }
+    }
+    m_layout->addSpacing(8);
+  }
   m_layout->addLayout(form);
   // F174: reusing a recent download is the user's choice, never automatic.
   m_reuse = new QCheckBox(this);
@@ -103,12 +125,16 @@ KaHeritageRegionDialog::KaHeritageRegionDialog(const QString& initialSido, const
                                      "끄면 서버에서 새로 받습니다."));
   m_reuse->hide();
   m_layout->addWidget(m_reuse);
+  m_reuseWhen = new QLabel(this);  // 새 모양: 「2026-10-02 17:05 받음 · 없는 자료만 서버에서 받음」 under the check
+  m_reuseWhen->setObjectName(QStringLiteral("heritageReuseWhen"));
+  m_reuseWhen->hide();
+  m_layout->addWidget(m_reuseWhen);
   // F169: the pledge is still agreed automatically; say so before anything is fetched.
   auto* pledge = new QLabel(HeritagePledge::preDisclosure(), this);
   pledge->setObjectName(QStringLiteral("heritagePledgeNote"));
   pledge->setWordWrap(true);
   pledge->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Preferred);
-  pledge->setStyleSheet(QStringLiteral("color: palette(mid);"));
+  if (!m_paper) pledge->setStyleSheet(QStringLiteral("color: palette(mid);"));  // 새 모양: muted note in the QSS
   m_layout->addWidget(pledge);
   auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, this);
   auto* ok = buttons->button(QDialogButtonBox::Ok);
@@ -147,10 +173,26 @@ KaHeritageRegionDialog::KaHeritageRegionDialog(const HeritageRegion& region, con
 
 void KaHeritageRegionDialog::addNearby(const QList<HeritageCity>& nearby, const QString& note) {
   if (nearby.isEmpty() && note.isEmpty()) return;
-  auto* group = new QGroupBox(QStringLiteral("조사구역 주변 5km에 걸친 다른 시·군"), this);
+  const QString heading = QStringLiteral("조사구역 주변 5km에 걸친 다른 시·군");
+  auto* group = new QGroupBox(m_paper ? QString() : heading, this);
   group->setObjectName(QStringLiteral("heritageNearbyGroup"));
   auto* inner = new QVBoxLayout(group);
-  if (!nearby.isEmpty()) {
+  if (m_paper) {  // the section word with a hairline, the boxes, then the hint (2차 보드 판 5)
+    inner->setContentsMargins(0, 8, 0, 0);
+    inner->setSpacing(2);
+    auto* head = new QHBoxLayout;
+    head->setSpacing(8);
+    auto* word = new QLabel(heading, group);
+    word->setObjectName(QStringLiteral("heritageNearbyHead"));
+    auto* rule = new QFrame(group);
+    rule->setObjectName(QStringLiteral("heritageNearbyRule"));
+    rule->setFixedHeight(1);
+    head->addWidget(word);
+    head->addWidget(rule, 1, Qt::AlignVCenter);
+    inner->addLayout(head);
+    inner->addSpacing(6);
+  }
+  if (!nearby.isEmpty() && !m_paper) {
     auto* hint = new QLabel(QStringLiteral("체크한 시·군도 하나씩 차례로 받습니다. 시·군마다 따로 요청하며 "
                                            "전국 자료는 받지 않습니다."), group);
     hint->setWordWrap(true);
@@ -167,6 +209,11 @@ void KaHeritageRegionDialog::addNearby(const QList<HeritageCity>& nearby, const 
     connect(box, &QCheckBox::toggled, this, [this] { refreshReuse(); });
     inner->addWidget(box);
     m_nearby.append(box);
+  }
+  if (!nearby.isEmpty() && m_paper) {
+    auto* hint = new QLabel(QStringLiteral("체크한 시·군도 하나씩 차례로 받습니다."), group);
+    hint->setObjectName(QStringLiteral("heritageNearbyHint"));
+    inner->addWidget(hint);
   }
   if (!note.isEmpty()) {
     auto* noteLabel = new QLabel(note, group);
@@ -195,11 +242,15 @@ void KaHeritageRegionDialog::refreshReuse() {
   if (!newest.isValid()) {
     m_reuse->setChecked(false);
     m_reuse->hide();
+    m_reuseWhen->hide();
     return;
   }
-  m_reuse->setText(QStringLiteral("최근 받은 자료 다시 쓰기 (%1 받음 · 없는 자료만 서버에서 받음)")
-                       .arg(newest.toString(QStringLiteral("yyyy-MM-dd HH:mm"))));
+  const QString when = newest.toString(QStringLiteral("yyyy-MM-dd HH:mm"));
+  m_reuse->setText(m_paper ? QStringLiteral("최근 받은 자료 다시 쓰기")
+                           : QStringLiteral("최근 받은 자료 다시 쓰기 (%1 받음 · 없는 자료만 서버에서 받음)").arg(when));
+  m_reuseWhen->setText(QStringLiteral("%1 받음 · 없는 자료만 서버에서 받음").arg(when));
   m_reuse->show();
+  m_reuseWhen->setVisible(m_paper);
 }
 
 HeritageFetchPlan KaHeritageRegionDialog::plan() const {
