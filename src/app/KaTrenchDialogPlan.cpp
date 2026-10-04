@@ -1,6 +1,7 @@
 // KaTrenchDialog preview: debounced, cached, computed off the UI thread (F097), and the
 // prompt before a re-generation replaces a hand-adjusted grid (F156).
 #include "KaTrenchDialog.h"
+#include "KaAzimuthDial.h"
 #include "core/TrenchPlanCache.h"
 
 #include <QCheckBox>
@@ -41,6 +42,10 @@ void KaTrenchDialog::refreshRows() {
     form->setRowVisible(m_prefix, !ratio);
   }
   m_az->setEnabled(!useTerrainAzimuth());
+  if (m_dial) {  // the dial shows the direction the grid will be laid in (the terrain's when that is on)
+    m_dial->setAzimuth(effectiveAzimuth());
+    m_dialNote->setText(KaAzimuthDial::note(effectiveAzimuth()));
+  }
 }
 
 void KaTrenchDialog::refreshPlan() {
@@ -52,6 +57,7 @@ void KaTrenchDialog::refreshPlan() {
     const TrenchGridGenerator::Spec sp = spec();
     const double t = sp.rows * sp.cols * sp.trenchWidth * sp.trenchLength;
     setSummaryTone("plain");
+    showMeter(-1.0, 0.0);
     m_ratio->setText(QStringLiteral("수동 배치: %1개 · 총 %2㎡ — 「맵에 찍기」로 맵에서 위치를 정하세요.")
                          .arg(sp.rows * sp.cols)
                          .arg(QLocale().toString(t, 'f', 0)));
@@ -99,9 +105,11 @@ void KaTrenchDialog::refreshPlan() {
 void KaTrenchDialog::showRatioPlan(const TrenchGridGenerator::RatioFill& plan, double azimuth) {
   if (plan.cells.empty()) {
     setSummaryTone("warn");
+    showMeter(-1.0, 0.0);
     m_ratio->setText(plan.error);
     return;
   }
+  showMeter(plan.ratioPct, targetPct());
   {
     const QSignalBlocker blocker(m_balk);
     m_balk->setValue(plan.balk);
@@ -124,6 +132,7 @@ void KaTrenchDialog::showFillPlan(const std::vector<TrenchGridGenerator::Cell>& 
   if (cells.empty()) {
     // Say why (invalid boundary, spec, nothing fits) instead of 「트렌치 0개」.
     setSummaryTone("warn");
+    showMeter(-1.0, 0.0);
     m_ratio->setText(reason.isEmpty()
                          ? QStringLiteral("현재 규격과 방향으로는 구역 안에 들어가는 트렌치가 없습니다.")
                          : reason);
@@ -133,6 +142,7 @@ void KaTrenchDialog::showFillPlan(const std::vector<TrenchGridGenerator::Cell>& 
   const double pct = m_areaM2 > 0.0 ? t / m_areaM2 * 100.0 : 0.0;
   const bool over = pct > 10.0;
   setSummaryTone(over ? "warn" : "ok");
+  showMeter(pct, 10.0);
   m_ratio->setText(QStringLiteral("트렌치 %1개 · 총 %2㎡ · 시굴 비율 %3% (기준: 시굴 10% · 표본 2%)%4")
                        .arg(cells.size())
                        .arg(QLocale().toString(t, 'f', 0))

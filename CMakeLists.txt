@@ -541,6 +541,8 @@ add_executable(ka-hgis
   src/app/KaTabClose.cpp
   src/app/KaFileRowDelegate.cpp
   src/app/KaStageRail.cpp
+  src/app/KaTargetMeter.cpp
+  src/app/KaAzimuthDial.cpp
   src/app/KaPrintDialog.cpp
   src/app/KaPrintDialogPlate.cpp
   src/app/KaTilePreview.cpp
@@ -554,6 +556,8 @@ add_executable(ka-hgis
   src/app/KaTabClose.h
   src/app/KaFileRowDelegate.h
   src/app/KaStageRail.h
+  src/app/KaTargetMeter.h
+  src/app/KaAzimuthDial.h
   src/app/KaPrintDialog.h
   src/app/KaTilePreview.h
   src/app/MainWindow.h
@@ -973,6 +977,7 @@ if(KA_HGIS_BUILD_TESTS)
   add_executable(ka_trench_edit_tests tests/test_trench_edit.cpp
     src/app/KaTrenchMoveTool.cpp src/app/KaTrenchMoveTool.h
     src/app/KaTrenchDialog.cpp src/app/KaTrenchDialogPlan.cpp src/app/KaTrenchDialog.h
+    src/app/KaTargetMeter.cpp src/app/KaTargetMeter.h src/app/KaAzimuthDial.cpp src/app/KaAzimuthDial.h
     src/app/KaCanvasGridOverlay.cpp src/app/KaCanvasGridOverlay.h
     src/app/KaCrashGuard.cpp src/app/KaCrashGuard.h)
   target_link_libraries(ka_trench_edit_tests PRIVATE ${KA_TEST_LIBS})
@@ -984,6 +989,20 @@ if(KA_HGIS_BUILD_TESTS)
   endif()
   ka_add_qtest(trench_edit ka_trench_edit_tests)
   set_tests_properties(trench_edit PROPERTIES TIMEOUT 120)
+  # 「조용한 도판」 시굴격자 속성 meter and dial (board 5); tests/test_trench_edit.cpp is at its line limit.
+  add_executable(ka_trench_plate_tests tests/test_trench_plate.cpp
+    src/app/KaTargetMeter.cpp src/app/KaTargetMeter.h src/app/KaAzimuthDial.cpp src/app/KaAzimuthDial.h
+    src/app/KaTrenchDialog.cpp src/app/KaTrenchDialogPlan.cpp src/app/KaTrenchDialog.h
+    src/app/KaCrashGuard.cpp src/app/KaCrashGuard.h)
+  target_link_libraries(ka_trench_plate_tests PRIVATE ${KA_TEST_LIBS})
+  target_include_directories(ka_trench_plate_tests PRIVATE ${KA_INCLUDES})
+  target_link_directories(ka_trench_plate_tests PRIVATE ${KA_LIBDIRS})
+  target_compile_definitions(ka_trench_plate_tests PRIVATE ${KA_TEST_DEFS})
+  if (MSVC)
+    target_compile_options(ka_trench_plate_tests PRIVATE /utf-8)
+  endif()
+  ka_add_qtest(trench_plate ka_trench_plate_tests)
+  set_tests_properties(trench_plate PROPERTIES TIMEOUT 120)
 
   add_executable(ka_survey_contour_tests tests/test_survey_contour.cpp tests/test_survey_contour_clip.cpp)
   target_link_libraries(ka_survey_contour_tests PRIVATE ${KA_TEST_LIBS})
@@ -1851,7 +1870,7 @@ if(KA_HGIS_BUILD_TESTS)
     set_tests_properties(topographic_import PROPERTIES ENVIRONMENT "GDAL_DATA=${OSGEO4W_ROOT}/apps/gdal-dev/share/gdal;PATH=${_ka_path_esc};QGIS_PREFIX_PATH=${QGIS_PREFIX_PATH};QT_QPA_PLATFORM=offscreen" TIMEOUT 300)
     set_tests_properties(reference_status PROPERTIES ENVIRONMENT "GDAL_DATA=${OSGEO4W_ROOT}/apps/gdal-dev/share/gdal;PATH=${_ka_path_esc};QGIS_PREFIX_PATH=${QGIS_PREFIX_PATH};QT_QPA_PLATFORM=offscreen" TIMEOUT 60)
     set_tests_properties(heritage_flow PROPERTIES ENVIRONMENT "PATH=${_ka_path_esc};QT_QPA_PLATFORM=offscreen" TIMEOUT 60)
-    set_tests_properties(trench_plan trench_edit PROPERTIES ENVIRONMENT "GDAL_DATA=${OSGEO4W_ROOT}/apps/gdal-dev/share/gdal;PATH=${_ka_path_esc};QGIS_PREFIX_PATH=${QGIS_PREFIX_PATH};QT_QPA_PLATFORM=offscreen")
+    set_tests_properties(trench_plan trench_edit trench_plate PROPERTIES ENVIRONMENT "GDAL_DATA=${OSGEO4W_ROOT}/apps/gdal-dev/share/gdal;PATH=${_ka_path_esc};QGIS_PREFIX_PATH=${QGIS_PREFIX_PATH};QT_QPA_PLATFORM=offscreen")
     set_tests_properties(heritage_style PROPERTIES ENVIRONMENT "GDAL_DATA=${OSGEO4W_ROOT}/apps/gdal-dev/share/gdal;PATH=${_ka_path_esc};QGIS_PREFIX_PATH=${QGIS_PREFIX_PATH};QT_QPA_PLATFORM=offscreen" TIMEOUT 180)
     set_tests_properties(heritage_form PROPERTIES ENVIRONMENT "PATH=${_ka_path_esc};QT_QPA_PLATFORM=offscreen" TIMEOUT 60)
     set_tests_properties(theme_options theme_render ribbon_overflow ribbon_pixels toolbar_fit icon_glyphs icon_mockup PROPERTIES ENVIRONMENT "PATH=${_ka_path_esc};QT_QPA_PLATFORM=offscreen" TIMEOUT 60)

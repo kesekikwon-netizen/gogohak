@@ -1,5 +1,8 @@
 #include "KaTrenchDialog.h"
+#include "KaAzimuthDial.h"
+#include "KaTargetMeter.h"
 
+#include <QApplication>
 #include <QCheckBox>
 #include <QComboBox>
 #include <QDoubleSpinBox>
@@ -80,7 +83,20 @@ KaTrenchDialog::KaTrenchDialog(QWidget* parent) : QDialog(parent) {
   m_az->setSingleStep(1.0);
   m_az->setSuffix(QStringLiteral(" °"));
   m_az->setToolTip(QStringLiteral("격자 회전(북 기준 시계 방향). 「구역에 깔기」를 누르면 회전된 격자로 다시 배치합니다."));
-  form->addRow(QStringLiteral("회전(방위)"), m_az);
+  const bool paper = qApp && qApp->property("kaPaperLook").toBool();
+  if (paper) {  // 2차 보드 판 5: a dial beside the box and one plain sentence on where the grid points
+    auto* turn = new QHBoxLayout;
+    turn->setSpacing(8);
+    m_dial = new KaAzimuthDial(this);
+    m_dialNote = new QLabel(KaAzimuthDial::note(0.0), this);
+    m_dialNote->setObjectName(QStringLiteral("trenchDialNote"));
+    turn->addWidget(m_az);
+    turn->addWidget(m_dial);
+    turn->addWidget(m_dialNote, 1);
+    form->addRow(QStringLiteral("회전(방위)"), turn);
+  } else {
+    form->addRow(QStringLiteral("회전(방위)"), m_az);
+  }
 
   m_prefix = new QLineEdit(QStringLiteral("Tr-"), this);
   form->addRow(QStringLiteral("이름 접두"), m_prefix);
@@ -90,6 +106,11 @@ KaTrenchDialog::KaTrenchDialog(QWidget* parent) : QDialog(parent) {
   m_ratio->setObjectName(QStringLiteral("trenchSummary"));
   m_ratio->setWordWrap(true);
   form->addRow(m_ratio);
+  if (paper) {  // 2차 보드 판 5: the 시굴 비율 on a bar with the 목표 marked
+    m_meter = new KaTargetMeter(this);
+    m_meter->hide();
+    form->addRow(m_meter);
+  }
 
   // 깐 뒤에 쓰는 도구는 격자가 생긴 다음에만 보인다. 한 줄에 단추 다섯 개는 좁았다.
   m_afterPlace = new QWidget(this);
@@ -243,6 +264,14 @@ void KaTrenchDialog::setGridPlaced(bool placed) {
   if (m_afterPlace)
     m_afterPlace->setVisible(placed);
   adjustSize();
+}
+
+void KaTrenchDialog::showMeter(double percent, double target) {
+  if (!m_meter) return;
+  m_meter->setVisible(percent >= 0.0);
+  if (percent < 0.0) return;
+  m_meter->setTarget(target);
+  m_meter->setValue(percent);
 }
 
 void KaTrenchDialog::setSummaryTone(const char* tone) {

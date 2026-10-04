@@ -5,6 +5,8 @@
 
 #include "core/TrenchGridGenerator.h"
 
+class KaAzimuthDial;
+class KaTargetMeter;
 class QCheckBox;
 class QComboBox;
 class QDoubleSpinBox;
@@ -80,6 +82,11 @@ private:
   QDoubleSpinBox* m_az = nullptr;
   QLineEdit* m_prefix = nullptr;
   QLabel* m_ratio = nullptr;
+  // 새 모양 (2차 보드 판 5): the 시굴 비율 bar under the summary and the dial beside 회전(방위); null in stock.
+  KaTargetMeter* m_meter = nullptr;
+  KaAzimuthDial* m_dial = nullptr;
+  QLabel* m_dialNote = nullptr;
+  void showMeter(double percent, double target);  // a negative percent hides the bar
   QWidget* m_afterPlace = nullptr;
   QByteArray m_areaWkb;
   double m_areaM2 = 0.0;
