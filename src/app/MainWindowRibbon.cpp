@@ -9,6 +9,7 @@
 #include "KaThemeOptions.h"
 #include "KaUserError.h"
 #include "KaIcons.h"
+#include "KaMenuCaption.h"
 #include "KaCaptureMapTool.h"
 #include "KaAttributeMapTool.h"
 #include "KaAlignMapTool.h"
@@ -628,8 +629,8 @@ void MainWindow::buildMenus() {
   more->setToolButtonStyle(Qt::ToolButtonTextUnderIcon);
   more->setToolTip(QStringLiteral("가끔 쓰는 기능"));
   auto* moreMenu = new QMenu(more);
-  moreMenu->addAction(KaIcons::icon(QStringLiteral("open")), QStringLiteral("벡터·도면 불러오기"),
-                      this, &MainWindow::openVectorLayer);
+  QAction* loadGroup = moreMenu->addAction(KaIcons::icon(QStringLiteral("open")), QStringLiteral("벡터·도면 불러오기"),
+                                          this, &MainWindow::openVectorLayer);
   moreMenu->addAction(KaIcons::icon(QStringLiteral("layer")),
                       QStringLiteral("참조 벡터를 조사 파일 밖으로…"), this,
                       &MainWindow::extractEmbeddedReferenceVectors);
@@ -649,7 +650,7 @@ void MainWindow::buildMenus() {
   moreMenu->addAction(KaIcons::icon(QStringLiteral("satellite")), QStringLiteral("Google 위성"),
                       this, &MainWindow::addBasemapGoogle);
   moreMenu->addSeparator();
-  moreMenu->addAction(QStringLiteral("파일함 보이기/숨기기"), this, [this]() {
+  QAction* viewGroup = moreMenu->addAction(QStringLiteral("파일함 보이기/숨기기"), this, [this]() {
     if (auto* toggle = findChild<QToolButton*>(QStringLiteral("sidebarFilesToggle")))
       toggle->click();
   });
@@ -676,7 +677,7 @@ void MainWindow::buildMenus() {
   });
   addAction(actLeftPanel);
   moreMenu->addAction(actLeftPanel);
-  moreMenu->addAction(QStringLiteral("API 키 입력"), this, &MainWindow::configureVworldKey);
+  QAction* keyGroup = moreMenu->addAction(QStringLiteral("API 키 입력"), this, &MainWindow::configureVworldKey);
   moreMenu->addAction(QStringLiteral("VWorld 지적도 아이디·비밀번호"), this, &MainWindow::configureCadastralAccount);
   moreMenu->addAction(QStringLiteral("수치지형도 아이디·비밀번호"), this, &MainWindow::configureTopographicAccount);
   moreMenu->addAction(QStringLiteral("국가유산 인트라넷 아이디·비밀번호"), this, &MainWindow::configureHeritageAccount);
@@ -706,6 +707,8 @@ void MainWindow::buildMenus() {
   webMenu->addAction(KaIcons::icon(QStringLiteral("layer")),
                      QStringLiteral("토양도 SHP 불러오기(흙토람 다운로드)…"), this,
                      &MainWindow::importSoilShapefile);
+  KaMenuCaption::install(moreMenu, {{QStringLiteral("불러오기·배경"), loadGroup}, {QStringLiteral("화면"), viewGroup},  // 보드 판 5
+      {QStringLiteral("계정과 키"), keyGroup}, {QStringLiteral("상태와 정보"), moreMenu->findChild<QAction*>(QStringLiteral("actionReferenceStatus"))}});
   more->setMenu(moreMenu);
   more->setPopupMode(QToolButton::InstantPopup);
   ribbon->addWidget(QStringLiteral("more"), more);

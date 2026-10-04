@@ -6,12 +6,16 @@
 #include <QDir>
 #include <QLabel>
 #include <QLineEdit>
+#include <QMenu>
 #include <QMessageBox>
 #include <QPushButton>
+#include <QPixmap>
 #include <QStandardPaths>
+#include <QWidgetAction>
 
 #include "app/KaApiKeyDialog.h"
 #include "app/KaClosePrompt.h"
+#include "app/KaMenuCaption.h"
 #include "app/KaTheme.h"
 #include "app/KaUserError.h"
 
@@ -130,6 +134,33 @@ class TestWindowPlate : public QObject {
     paper(false);
     KaApiKeyDialog stock{QString(), QString()};
     QVERIFY(!stock.findChild<QLabel*>(QStringLiteral("apiKeyVworldHint"))->text().contains(QStringLiteral("주소 찾기")));
+  }
+
+  // 더보기 (보드 판 5): small group captions over the items and no item icons in 새 모양; stock keeps its icons and
+  // shows no captions. The menu follows a switch of the look each time it opens.
+  void menuGroupsHaveCaptionsInPaper() {
+    QMenu menu;
+    QPixmap dot(8, 8);
+    dot.fill(Qt::black);
+    QAction* first = menu.addAction(QIcon(dot), QStringLiteral("벡터·도면 불러오기"));
+    QAction* caption = KaMenuCaption::insert(&menu, QStringLiteral("불러오기·배경"), first);
+    QCOMPARE(menu.actions().first(), caption);
+    auto* word = qobject_cast<QLabel*>(static_cast<QWidgetAction*>(caption)->defaultWidget());
+    QVERIFY(word);
+    QCOMPARE(word->text(), QStringLiteral("불러오기·배경"));
+    paper(true);
+    KaMenuCaption::follow(&menu);
+    QVERIFY(caption->isVisible() && !first->isIconVisibleInMenu());
+    paper(false);
+    KaMenuCaption::follow(&menu);
+    QVERIFY(!caption->isVisible() && first->isIconVisibleInMenu());
+    QMenu grouped;  // install(): the captions go in hidden in stock and come back when the menu opens in 새 모양
+    QAction* view = grouped.addAction(QStringLiteral("지도 넓게 보기"));
+    KaMenuCaption::install(&grouped, {{QStringLiteral("화면"), view}});
+    QVERIFY(!grouped.actions().first()->isVisible());
+    paper(true);
+    emit grouped.aboutToShow();
+    QVERIFY(grouped.actions().first()->isVisible());
   }
 
   // 「광령리1을」 · 「테스트를」 · 「광령리2를」: the object particle follows how the name ends.

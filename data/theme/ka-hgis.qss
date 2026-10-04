@@ -1476,3 +1476,5 @@ QDialog#referenceStatusDialog[kaPlate="true"] QTreeWidget#referenceStatusTable {
 QDialog#referenceStatusDialog[kaPlate="true"] QTreeWidget#referenceStatusTable::item { height: 32px; border: none; }
 QDialog#referenceStatusDialog[kaPlate="true"] QTreeWidget#referenceStatusTable QHeaderView::section { background: transparent; border: none; border-bottom: 1px solid @border@; font-size: 11px; color: @inkMuted@; min-height: 28px; padding: 0 4px; }
 QFrame#referenceStatusFoot { border: none; border-top: 1px solid @border@; }
+/* 더보기 group captions (2차 보드 판 5), shown only in 새 모양: 11 px muted rows 24 px high. */
+QLabel#kaMenuCaption { font-size: 11px; color: @inkMuted@; background: transparent; padding: 0 12px; min-height: 24px; }

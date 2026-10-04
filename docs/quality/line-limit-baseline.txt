@@ -27,7 +27,7 @@
 552 src/app/MainWindowExport.cpp
 501 src/app/MainWindowOffline.cpp
 696 src/app/MainWindowOverlay.cpp
-958 src/app/MainWindowRibbon.cpp
+961 src/app/MainWindowRibbon.cpp
 1819 src/app/MainWindowSession.cpp
 565 src/app/MainWindowUndo.cpp
 2572 src/core/BasemapOps.cpp
