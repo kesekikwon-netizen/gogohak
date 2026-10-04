@@ -1339,3 +1339,5 @@ QLabel#startHeroName { font-family: @wordmarkFont@; font-weight: @wordmarkWeight
 QLabel#startContinueName { font-family: @titleFont@; font-weight: @titleWeight@; font-size: @bigNameSize@px; }
 QLabel#startRecentTitle { font-family: @sectionFont@; font-weight: @sectionWeight@; font-size: 15px; }
 QLabel#kaFeatureCardName { font-family: @titleFont@; font-weight: @titleWeight@; font-size: @nameSize@px; }
+/* 「조용한 도판」: the drawing's scale presets read as mono figures (the UI face in stock). */
+QToolButton#scaleChip { font-family: @figureFont@; }

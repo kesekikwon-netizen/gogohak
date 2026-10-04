@@ -74,6 +74,7 @@ QHash<QString, QString> replacementTable() {
   values.insert(QStringLiteral("bigNameSize"), paper ? QStringLiteral("28") : QStringLiteral("20"));  // serif Title
   // Home section heads (최근 조사·작업 순서): the 15 px sans Lead in 새 모양, the title face in stock.
   values.insert(QStringLiteral("sectionFont"), paper ? quotedFamilies(uiFontStack()) : titleFontFamilies());
+  values.insert(QStringLiteral("figureFont"), quotedFamilies(paper ? monoFontStack() : uiFontStack()));  // scale chips
   values.insert(QStringLiteral("sectionWeight"), paper ? QStringLiteral("400") : QString::number(titleFontWeight()));
   // The drawing row's tools (QToolBar#subToolbar): buttons in 새 모양, the flat row in the stock look.
   const QString none = QStringLiteral("transparent");

@@ -115,6 +115,16 @@ private slots:
     QCOMPARE(both(), (QStringList{ink, ink}));
   }
 
+  // 축척 단추: the drawing's scale presets (20 … 25000) are mono figures in 새 모양; stock keeps the UI face.
+  void scaleChipsAreMonoInPaper() {
+    const QString family = QStringLiteral("(?m)^QToolButton#scaleChip \\{ font-family: ([^;]+);");
+    QVERIFY2(captured(family).contains(QStringLiteral("malgun gothic")), qPrintable(captured(family)));
+    KaTheme::DisplayOptions paper;
+    paper.paperLook = true;
+    KaTheme::setDisplayOptions(qApp, paper);
+    QVERIFY2(captured(family).startsWith(QStringLiteral("\"consolas\"")), qPrintable(captured(family)));
+  }
+
   // 창 너비: 새 모양 windows come in three widths (S 440 · M 560 · L 860); stock keeps each window's own width.
   void windowWidthsAreTheThreeSizesInPaper() {
     QCOMPARE(KaWindowSize::width(KaWindowSize::Medium, 460), 460);
