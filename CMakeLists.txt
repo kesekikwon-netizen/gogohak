@@ -1195,6 +1195,13 @@ if(KA_HGIS_BUILD_TESTS)
     target_include_directories(${_ka_theme_target} PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_BINARY_DIR}/generated)
   endforeach()
   ka_add_qtest(theme_options ka_theme_options_tests)
+  # 화면 보기 기본값: first start in 새 모양 with 고대비 on (user request 2026-10-05).
+  add_executable(ka_display_defaults_tests tests/test_display_defaults.cpp
+    src/app/KaTheme.cpp src/app/KaThemeSheet.cpp src/app/KaThemeStyle.cpp src/app/KaThemeOptions.cpp)
+  set_target_properties(ka_display_defaults_tests PROPERTIES WIN32_EXECUTABLE FALSE)
+  target_link_libraries(ka_display_defaults_tests PRIVATE Qt6::Test Qt6::Core Qt6::Gui Qt6::Widgets)
+  target_include_directories(ka_display_defaults_tests PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_BINARY_DIR}/generated)
+  ka_add_qtest(display_defaults ka_display_defaults_tests)
   ka_add_qtest(theme_render ka_theme_render_tests)
   ka_add_qtest(ribbon_overflow ka_ribbon_overflow_tests)
   ka_add_qtest(ribbon_pixels ka_ribbon_pixels_tests)

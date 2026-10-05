@@ -93,6 +93,9 @@ void applySavedDisplayOptions(QApplication* app) {
   // starts in it until the user has ticked or unticked 「새 모양」 once.
   if (!QSettings().contains(kPaperLookKey))
     options.paperLook = true;
+  // 고대비 화면 starts on as well (user request 2026-10-05) until the user ticks or unticks it once.
+  if (!QSettings().contains(kHighContrastKey))
+    options.highContrast = true;
   if (app && !app->findChild<QObject*>(QStringLiteral("kaCaptionTint"), Qt::FindDirectChildrenOnly)) {
     auto* tint = new CaptionTint(app);
     tint->setObjectName(QStringLiteral("kaCaptionTint"));
