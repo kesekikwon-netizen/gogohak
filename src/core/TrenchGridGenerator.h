@@ -86,6 +86,7 @@ struct SlopeAspect {
   double azimuthDeg = 0.0;  // 오르막 방위(북 기준 시계 방향) = 트렌치 장축 방위
   double slopePct = 0.0;    // 평균 경사(%)
   bool valid = false;       // 표본 부족·평지면 false
+  int samples = 0;          // 표고 표본 수: 3 미만이면 지형 자료가 없는 것
 };
 // 경사가 minSlopePct보다 완만하면 방향에 의미가 없어 valid=false.
 SlopeAspect upslopeAspect(const std::vector<ElevSample>& samples, double minSlopePct = 0.5);

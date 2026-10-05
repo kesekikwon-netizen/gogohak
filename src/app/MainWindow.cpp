@@ -55,6 +55,7 @@
 #include "KaTrenchDialog.h"
 #include "core/TrenchLayerEdit.h"  // [pkg B2] F003/F156 grid placement
 #include "core/TrenchPlanCache.h"  // [pkg B2] F097 cached 10%/2% plans
+#include "core/TrenchTerrain.h"    // 시굴 사면 방향 from the 수치지형도 contours without a DEM
 #include "core/BasemapDsm.h"       // [int W1] DEM lookup by kind, not by title
 #include "KaDemClassDialog.h"
 #include "KaTopographicBrowser.h"
@@ -1864,8 +1865,8 @@ void MainWindow::startTrenchGrid() {
 #endif
 }
 
-// 조사구역 안에서 DEM 표고를 격자로 뽑아 오르막 방위를 낸다.
-// DEM이 없거나 평지면 valid=false — 그때는 방위 칸 값을 그대로 쓴다.
+// 조사구역 안에서 DEM 표고를 격자로 뽑아 오르막 방위를 낸다. DEM이 없으면 수치지형도 등고선 표고로 낸다.
+// 지형 자료가 없거나 평지면 valid=false — 그때는 방위 칸 값(기본 남북)을 그대로 쓴다.
 TrenchGridGenerator::SlopeAspect MainWindow::terrainAspectForArea(const QByteArray& areaWkb,
                                                                  const QString& areaCrs) {
 #if KA_HGIS_HAS_QGIS
@@ -1877,7 +1878,7 @@ TrenchGridGenerator::SlopeAspect MainWindow::terrainAspectForArea(const QByteArr
   // [int W1] By kind (ka_hgis/reference_kind = dem), so the renamed Copernicus DSM and an
   // older project's untagged "DEM" layer are both found.
   QgsRasterLayer* dem = BasemapDsm::findDem(proj);
-  if (!dem || !dem->dataProvider()) return none;
+  if (!dem || !dem->dataProvider()) return TrenchTerrain::contourAspect(proj, areaWkb, areaCrs);
 
   QgsGeometry area;
   area.fromWkb(areaWkb);

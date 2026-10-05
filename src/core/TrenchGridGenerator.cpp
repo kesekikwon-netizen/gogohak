@@ -1,4 +1,5 @@
 #include "TrenchGridGenerator.h"
+#include "TrenchTerrain.h"
 
 #include <cmath>
 #include <cstring>
@@ -389,11 +390,13 @@ std::vector<Cell> buildInArea(const Spec& spec, const QByteArray& areaWkb, QStri
   if (out.empty())
     return fail(QStringLiteral("현재 규격과 방향으로는 구역 안에 들어가는 트렌치가 없습니다. 구역이 좁거나 "
                                "짧으면 회전이나 규격을 바꿔 보세요."));
+  TrenchTerrain::numberFromHighSide(out, spec.azimuthDeg, spec.namePrefix);  // Tr-1 on the high (north) side
   return out;
 }
 
 SlopeAspect upslopeAspect(const std::vector<ElevSample>& samples, double minSlopePct) {
   SlopeAspect out;
+  out.samples = static_cast<int>(samples.size());
   if (samples.size() < 3)
     return out;
 

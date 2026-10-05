@@ -215,6 +215,7 @@ add_library(ka_core STATIC
   src/core/DemAnalyzer.cpp
   src/core/DemHillshadeFile.cpp
   src/core/TrenchGridGenerator.cpp
+  src/core/TrenchTerrain.cpp
   src/core/TrenchLayerEdit.cpp
   src/core/TrenchPlanCache.cpp
   src/core/TilePackService.cpp
@@ -977,6 +978,16 @@ if(KA_HGIS_BUILD_TESTS)
   endif()
   ka_add_qtest(trench_plan ka_trench_plan_tests)
   set_tests_properties(trench_plan PROPERTIES TIMEOUT 120)
+  # 시굴격자 사면 방향 from the 수치지형도 contours when there is no DEM (user request 2026-10-05).
+  add_executable(ka_trench_terrain_tests tests/test_trench_terrain.cpp)
+  target_link_libraries(ka_trench_terrain_tests PRIVATE ${KA_TEST_LIBS})
+  target_include_directories(ka_trench_terrain_tests PRIVATE ${KA_INCLUDES})
+  target_link_directories(ka_trench_terrain_tests PRIVATE ${KA_LIBDIRS})
+  target_compile_definitions(ka_trench_terrain_tests PRIVATE ${KA_TEST_DEFS})
+  if (MSVC)
+    target_compile_options(ka_trench_terrain_tests PRIVATE /utf-8)
+  endif()
+  ka_add_qtest(trench_terrain ka_trench_terrain_tests)
 
   add_executable(ka_trench_edit_tests tests/test_trench_edit.cpp
     src/app/KaTrenchMoveTool.cpp src/app/KaTrenchMoveTool.h

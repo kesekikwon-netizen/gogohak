@@ -60,6 +60,31 @@ class TestTrenchPlan : public QObject {
 private slots:
   void cleanup() { QgsProject::instance()->removeAllMapLayers(); }
 
+  // 번호는 높은 쪽부터 (사용자 요청 2026-10-05): Tr-1 is the far end along the azimuth (uphill, north on flat
+  // ground); the numbers walk back down it, west to east within a row.
+  void numbersRunFromTheHighSideDown() {
+    TrenchGridGenerator::Spec spec;
+    spec.trenchLength = 10.0;
+    spec.balkWidth = 6.0;
+    const auto centre = [](const TrenchGridGenerator::Cell& c) {
+      return QPointF((c.ring[0].first + c.ring[2].first) / 2, (c.ring[0].second + c.ring[2].second) / 2);
+    };
+    const auto number = [](const TrenchGridGenerator::Cell& c) { return c.name.mid(3).toInt(); };
+    auto north = TrenchGridGenerator::buildInArea(spec, squareWkb(0, 0, 60, 60));
+    QVERIFY(north.size() > 4);
+    std::sort(north.begin(), north.end(), [&](const auto& a, const auto& b) { return number(a) < number(b); });
+    for (std::size_t i = 1; i < north.size(); ++i) {
+      const QPointF before = centre(north[i - 1]), after = centre(north[i]);
+      QVERIFY2(before.y() > after.y() + 0.5 || (qAbs(before.y() - after.y()) <= 0.5 && before.x() < after.x()),
+               qPrintable(north[i].name));
+    }
+    spec.azimuthDeg = 90.0;  // uphill to the east
+    const auto east = TrenchGridGenerator::buildInArea(spec, squareWkb(0, 0, 60, 60));
+    const auto first = std::find_if(east.begin(), east.end(), [&](const auto& c) { return number(c) == 1; });
+    QVERIFY(first != east.end());
+    for (const auto& cell : east) QVERIFY(centre(*first).x() >= centre(cell).x() - 0.5);
+  }
+
   // A self-intersecting boundary (vertex edit gone wrong) yields no grid AND a reason.
   void invalidAreaExplainsWhyGridIsEmpty() {
     const QByteArray bowtie = wktWkb("POLYGON((0 0,100 100,100 0,0 100,0 0))");

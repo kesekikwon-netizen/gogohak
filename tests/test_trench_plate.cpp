@@ -51,6 +51,23 @@ private slots:
     QCOMPARE(KaAzimuthDial::note(90.0), QStringLiteral("북에서 시계 방향 90°"));
   }
 
+  // 사면 방향 안내 (사용자 요청 2026-10-05): no terrain data and flat ground are told apart; both lay north-south.
+  void terrainNoteSaysWhyTheGridRunsNorthSouth() {
+    KaTrenchDialog dialog;
+    const auto note = [&dialog] {
+      QString all;
+      for (auto* label : dialog.findChildren<QLabel*>(QStringLiteral("dialogHint"))) all += label->text();
+      return all;
+    };
+    dialog.setTerrainAspect({});  // no DEM and no contour with a 표고
+    QVERIFY2(note().contains(QStringLiteral("지형 자료가 없어 남북으로")), qPrintable(note()));
+    TrenchGridGenerator::SlopeAspect flat;
+    flat.samples = 40;
+    flat.slopePct = 0.2;
+    dialog.setTerrainAspect(flat);
+    QVERIFY2(note().contains(QStringLiteral("평지")) && note().contains(QStringLiteral("남북으로")), qPrintable(note()));
+  }
+
   void paperWindowCarriesTheMeterAndTheDial() {
     qApp->setProperty("kaPaperLook", true);
     KaTrenchDialog dialog;

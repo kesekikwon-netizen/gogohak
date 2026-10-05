@@ -226,8 +226,12 @@ void KaTrenchDialog::setTerrainAspect(const TrenchGridGenerator::SlopeAspect& as
   m_terrain->setEnabled(aspect.valid);
   if (!aspect.valid) {
     m_terrain->setChecked(false);
-    m_terrainInfo->setText(QStringLiteral(
-        "지형 방향을 쓰려면 DEM을 올리세요. 평지이거나 DEM이 없으면 방위 칸 값으로 깝니다."));
+    // 사용자 요청 2026-10-05: no terrain data and flat ground are told apart; both lay north-south (방위 칸 0°).
+    m_terrainInfo->setText(
+        (aspect.samples < 3 ? QStringLiteral("지형 자료가 없어 남북으로 깝니다(DEM·수치지형도 등고선 없음).")
+                            : QStringLiteral("평지(평균 경사 %1%)라 남북으로 깝니다.")
+                                  .arg(QLocale().toString(aspect.slopePct, 'f', 1))) +
+        QStringLiteral(" 방위 칸에 다른 값을 넣으면 그 방향으로 깝니다."));
   } else {
     // 사면이 있으면 기본으로 켠다 — 층서를 자르는 쪽이 조사 기본이다.
     m_terrain->setChecked(true);

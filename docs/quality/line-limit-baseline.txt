@@ -58,7 +58,7 @@
 487 src/core/TilePrint.cpp
 398 src/core/TopographicCatalog.cpp
 370 src/core/TopographicSourceCrs.cpp
-686 src/core/TrenchGridGenerator.cpp
+689 src/core/TrenchGridGenerator.cpp
 393 tests/test_buffer.cpp
 903 tests/test_cadastral.cpp
 973 tests/test_checklist.cpp
