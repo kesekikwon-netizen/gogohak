@@ -857,6 +857,36 @@ private slots:
             .arg(window.frameGeometry().width()).arg(window.frameGeometry().height())));
     QgsProject::instance()->setDirty(false);
   }
+  // 사용자 신고 2026-10-05: in 새 모양 the window asked for 2415 px on a 1920 screen, so the 단면도 right panel sat
+  // off screen. Every tab must fit a 1920 screen.
+  void everyTabFitsA1920ScreenInPaper() {
+    KaTheme::DisplayOptions paper;
+    paper.paperLook = true;
+    KaTheme::setDisplayOptions(qApp, paper);
+    const auto restore = qScopeGuard([] { KaTheme::setDisplayOptions(qApp, KaTheme::DisplayOptions()); });
+    MainWindow window;
+    disableRendering(window);
+    window.resize(1600, 1000);
+    window.show();
+    QCoreApplication::processEvents();
+    auto* tabs = window.findChild<QTabWidget*>(QStringLiteral("viewTabs"));
+    QVERIFY(tabs);
+    for (int i = 0; i < tabs->count(); ++i) {
+      QWidget* page = tabs->widget(i);
+      QWidget* widest = page;
+      for (QWidget* child : page->findChildren<QWidget*>())
+        if (child->isVisibleTo(page) && child->minimumSizeHint().width() > 1500 &&
+            child->minimumSizeHint().width() <= widest->minimumSizeHint().width())
+          widest = child;
+      QVERIFY2(page->minimumSizeHint().width() <= 1880,
+               qPrintable(QStringLiteral("%1: %2 px, narrowest wide part %3 (%4) %5 px")
+                              .arg(tabs->tabText(i)).arg(page->minimumSizeHint().width())
+                              .arg(widest->objectName(), QString::fromLatin1(widest->metaObject()->className()))
+                              .arg(widest->minimumSizeHint().width())));
+    }
+    QVERIFY2(window.minimumSizeHint().width() <= 1880, qPrintable(QString::number(window.minimumSizeHint().width())));
+    QgsProject::instance()->setDirty(false);
+  }
   void homePageShowsStrataHeroWithoutOpeningASurvey() {
     // Two remembered surveys give the continue card and the list something to show.
     const QString first = m_files.filePath(QStringLiteral("home-first/광령리.gpkg"));

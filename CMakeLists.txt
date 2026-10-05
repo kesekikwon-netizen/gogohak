@@ -1755,6 +1755,7 @@ if(KA_HGIS_BUILD_TESTS)
     geoTiffButtonOnlyEnabledOnMapTab
     windowGeometryFitsLogicalMonitors
     mainWindowFitsAvailableScreenOnShow
+    everyTabFitsA1920ScreenInPaper
     homePageShowsStrataHeroWithoutOpeningASurvey
     mapControlsZoomTheCanvasAndShowAScaleBar
     drawingToolsGetTheirOwnRowBelowTheRibbon

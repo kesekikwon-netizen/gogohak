@@ -46,6 +46,7 @@ KaHomeTitleBlock::KaHomeTitleBlock(QWidget* parent) : QFrame(parent) {
   tagRow->addWidget(m_state);
   head->addLayout(tagRow);
   m_name = label(QString(), "startTitleName", this);
+  m_name->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Preferred);  // a long name must not widen the window
   head->addWidget(m_name);
   m_left->addLayout(head);
   m_left->addWidget(rule(Qt::Horizontal, this));
@@ -74,6 +75,8 @@ KaHomeTitleBlock::KaHomeTitleBlock(QWidget* parent) : QFrame(parent) {
 QLabel* KaHomeTitleBlock::cell(const char* caption, const char* name, QLayout* row) {
   if (row->count() > 0) row->addWidget(rule(Qt::Vertical, this));
   auto* box = new QWidget(this);
+  // The six cells share the block's width; a long folder never asks the window for more (사용자 신고 2026-10-05).
+  box->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Preferred);
   auto* lines = new QVBoxLayout(box);
   lines->setContentsMargins(24, 10, 16, 12);
   lines->setSpacing(2);
@@ -88,6 +91,7 @@ void KaHomeTitleBlock::addNote(QWidget* note) {
   m_left->addWidget(rule(Qt::Horizontal, this));
   auto* row = new QHBoxLayout;
   row->setContentsMargins(24, 8, 16, 8);  // 2차 보드: a row under the cells, in from the edge like them
+  note->setSizePolicy(QSizePolicy::Ignored, note->sizePolicy().verticalPolicy());
   row->addWidget(note);
   m_left->addLayout(row);
 }
