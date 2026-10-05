@@ -6,8 +6,11 @@
 #include <QApplication>
 #include <QFrame>
 #include <QHBoxLayout>
+#include <QHeaderView>
+#include <QLabel>
 #include <QListWidget>
 #include <QScrollArea>
+#include <QTableWidget>
 #include <QTabBar>
 #include <QTabWidget>
 #include <QToolButton>
@@ -131,6 +134,41 @@ private slots:
     QVERIFY(QTest::qWaitForWindowExposed(column.get()));
     const QColor face = pdf->grab().toImage().pixelColor(6, pdf->height() / 2);
     QVERIFY2(face.red() > face.blue() + 60, qPrintable(face.name()));  // clay, not white
+  }
+
+  // 홈 (사용자 요청 2026-10-05): the 「이어서 작업」 block and the 「최근 조사」 table have round outer corners, the
+  // table with an edge all round (its top and bottom rules used to curl up at the ends).
+  void homeBoxesHaveRoundCorners() {
+    paper(true);
+    QWidget page;
+    page.setObjectName(QStringLiteral("startPage"));
+    page.setAttribute(Qt::WA_StyledBackground);
+    auto* column = new QVBoxLayout(&page);
+    column->setContentsMargins(20, 20, 20, 20);
+    auto* block = new QFrame(&page);
+    block->setObjectName(QStringLiteral("startTitleBlock"));
+    block->setFixedSize(300, 120);
+    (new QHBoxLayout(block))->addWidget(new QLabel(QStringLiteral("테스트"), block));
+    auto* table = new QTableWidget(3, 2, &page);
+    table->setObjectName(QStringLiteral("recentSurveyList"));
+    table->setHorizontalHeaderLabels({QStringLiteral("조사"), QStringLiteral("상태")});
+    table->verticalHeader()->hide();
+    table->setFixedSize(300, 160);
+    column->addWidget(block);
+    column->addWidget(table);
+    page.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&page));
+    const QImage image = page.grab().toImage();
+    const QString out = qEnvironmentVariable("KA_HGIS_QA_OUTPUT_DIR");  // a picture for a look
+    if (!out.isEmpty()) image.save(out + QStringLiteral("/home-boxes-paper.png"));
+    const QColor ground = image.pixelColor(5, 5);
+    for (QWidget* box : {static_cast<QWidget*>(block), static_cast<QWidget*>(table)}) {
+      const QPoint at = box->mapTo(&page, QPoint());
+      const QColor corner = image.pixelColor(at);
+      QVERIFY2(corner == ground, qPrintable(box->objectName() + QLatin1Char(' ') + corner.name()));
+      QVERIFY(image.pixelColor(at + QPoint(box->width() - 1, box->height() - 1)) == ground);
+      QVERIFY2(image.pixelColor(at + QPoint(0, box->height() / 2)).lightness() < 100, qPrintable(box->objectName()));
+    }
   }
 
   void chosenFileRowNameStaysReadable() {

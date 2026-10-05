@@ -1278,6 +1278,9 @@ QLabel#xyReadout, QLabel#kaMeasureValue { font-family: @monoFont@; }
 QTableWidget#recentSurveyList QHeaderView::section { background: @surface@; color: @inkMuted@; font-size: 12px;
   font-weight: 400; border: none; border-bottom: 1px solid @border@; padding: 6px 12px; }
 QTableWidget#recentSurveyList { border-top: 1px solid @plateRule@; border-bottom: 1px solid @plateRule@; }
+/* 홈 상자 바깥 모서리 (사용자 요청 2026-10-05): an edge all round and round corners in 새 모양 (stock: white, r0). */
+QTableWidget#recentSurveyList { border-left: 1px solid @plateRule@; border-right: 1px solid @plateRule@;
+  border-radius: @homeRadius@px; }
 QTableWidget#recentSurveyList::item:selected { border-left: 2px solid @selectedBar@; }
 QPushButton#startContinueBtn { min-height: 40px; }
 QFrame#startGuideCard2, QFrame#startConnectionCard { background: @surface@; border: 1px solid @border@; border-radius: 10px; }
@@ -1374,7 +1377,7 @@ QLabel#kaControlX, QLabel#kaControlY, QLabel#kaControlZ { font-family: @monoFont
 QFrame#kaLeader { border: none; border-bottom: 1px dotted @borderStrong@; background: transparent; }
 /* 「조용한 도판」 홈 (2차 보드 판 2): 「이어서 작업」 is a title block in an ink frame; 「새 조사」 is quiet
    while there is a survey to continue (one main button per view). These objects exist only in 새 모양. */
-QFrame#startTitleBlock { background: @surface@; border: 1px solid @ink@; border-radius: 0; }
+QFrame#startTitleBlock { background: @surface@; border: 1px solid @ink@; border-radius: @homeRadius@px; }
 QFrame#startTitleRule { background: @border@; border: none; }
 QLabel#startTitleTag, QLabel#startCellCaption { color: @inkMuted@; font-size: 11px; }
 QLabel#startTitleState { color: @inkMuted@; font-size: 12px; }

@@ -93,6 +93,7 @@ QHash<QString, QString> replacementTable() {
   values.insert(QStringLiteral("subGap"), paper ? QStringLiteral("1") : QStringLiteral("0"));
   values.insert(QStringLiteral("subPadSide"), paper ? QStringLiteral("6") : QStringLiteral("7"));
   values.insert(QStringLiteral("mapRadius"), paper ? QStringLiteral("0") : QStringLiteral("10"));  // 지도는 그림: square in 새 모양
+  values.insert(QStringLiteral("homeRadius"), paper ? QStringLiteral("8") : QStringLiteral("0"));  // 홈 상자 바깥 모서리 (2026-10-05)
   // 홈 판 (2차 보드 판 2): no box around the home cards, a smaller wordmark.
   values.insert(QStringLiteral("cardFace"), paper ? QStringLiteral("transparent") : c.surface.name());
   values.insert(QStringLiteral("cardEdge"), paper ? QStringLiteral("transparent") : c.border.name());
