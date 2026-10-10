@@ -131,16 +131,19 @@ KaHomeGuideCard::KaHomeGuideCard(QWidget* parent) : QFrame(parent) {
     if (i == 2) {
       m_ready = new QFrame(this);
       m_ready->setObjectName(QStringLiteral("startSubmitReady"));
+      m_ready->setProperty("kaPlate", KaTheme::displayOptions().paperLook);  // 새 모양: one plain line, no box
       auto* ready = new QHBoxLayout(m_ready);
       ready->setContentsMargins(0, 0, 0, 0);
       ready->setSpacing(8);
       ready->addWidget(label(QStringLiteral("제출 준비:"), "startStepBody", m_ready));
       m_errors = new KaChip(QString(), KaChip::Tone::Ok, m_ready);
       m_errors->setObjectName(QStringLiteral("startSubmitErrors"));
+      m_errors->setFigures(true);
       ready->addWidget(m_errors);
       ready->addWidget(label(QStringLiteral("·"), "startStepBody", m_ready));
       m_warnings = new KaChip(QString(), KaChip::Tone::Ok, m_ready);
       m_warnings->setObjectName(QStringLiteral("startSubmitWarnings"));
+      m_warnings->setFigures(true);
       ready->addWidget(m_warnings);
       ready->addStretch(1);
       text->addWidget(m_ready);

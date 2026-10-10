@@ -2113,6 +2113,19 @@ if(KA_HGIS_BUILD_TESTS)
   set_target_properties(ka_home_plate_tests PROPERTIES WIN32_EXECUTABLE FALSE)
   ka_add_qtest(home_plate ka_home_plate_tests)
   set_tests_properties(home_plate PROPERTIES TIMEOUT 90)
+  # 세부 디자인 보완(홈 항목들): test_home_plate.cpp is at the 300-line limit, so these live beside it.
+  add_executable(ka_home_polish_tests tests/test_home_polish.cpp
+    src/app/KaStartPage.cpp src/app/KaStartHero.cpp src/app/KaSplashArt.cpp src/app/KaHomeTitleBlock.cpp
+    src/app/KaHomeRecentCard.cpp src/app/KaHomeStatus.cpp src/app/KaHomeText.cpp
+    src/app/KaRecoverySnapshots.cpp
+    src/app/KaTheme.cpp src/app/KaThemeSheet.cpp src/app/KaThemeStyle.cpp src/app/KaIcons.cpp
+    ${_ka_p3_app_sources} ${_ka_p1_chip_sources} ${_ka_p1_font_sources} ${_ka_p2_outline_sources})
+  target_link_libraries(ka_home_polish_tests PRIVATE ${KA_TEST_LIBS} Qt6::Network)
+  target_include_directories(ka_home_polish_tests PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_BINARY_DIR}/generated)
+  target_compile_definitions(ka_home_polish_tests PRIVATE ${KA_TEST_DEFS})
+  set_target_properties(ka_home_polish_tests PROPERTIES WIN32_EXECUTABLE FALSE)
+  ka_add_qtest(home_polish ka_home_polish_tests)
+  set_tests_properties(home_polish PROPERTIES TIMEOUT 90)
   # SurveyFacts records and the GDAL probe (no QGIS).
   add_executable(ka_survey_facts_tests tests/test_survey_facts.cpp)
   target_link_libraries(ka_survey_facts_tests PRIVATE ka_core Qt6::Test)

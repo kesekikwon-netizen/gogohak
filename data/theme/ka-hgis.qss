@@ -1375,6 +1375,7 @@ QPushButton#startNewBtn[kaQuiet="true"]:enabled:hover { background: @hover@; bor
 QLabel#startRecentNote { color: @inkMuted@; font-size: 12px; }
 QFrame#startStepLine { background: @borderStrong@; border: none; }
 /* 「조용한 도판」 연결 상태: plain words, no box per item; 설정됨 muted, ● 설정 필요 in ink. */
+QFrame#startSubmitReady[kaPlate="true"] { background: transparent; border: none; border-radius: 0; padding: 0; }
 QFrame#startConnRow[kaPlate="true"] { background: transparent; border-radius: 0; }
 QLabel#startConnState[kaPlate="true"] { color: @inkMuted@; font-weight: 400; }
 QLabel#startConnState[kaPlate="true"][ready="false"] { color: @ink@; }

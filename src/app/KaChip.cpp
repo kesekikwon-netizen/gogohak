@@ -4,6 +4,7 @@
 
 #include "KaIcons.h"
 #include "KaTheme.h"
+#include "KaThemeFonts.h"
 
 #include <QFontMetrics>
 #include <QHash>
@@ -97,13 +98,42 @@ void KaChip::setGlyph(const QString& iconId) {
   syncProperties();
 }
 
+void KaChip::setFigures(bool on) {
+  if (m_figures == on) return;
+  m_figures = on;
+  updateGeometry();
+  update();
+}
+
+QList<QPair<QString, bool>> KaChip::figureRuns(const QString& text) {
+  QList<QPair<QString, bool>> runs;
+  for (const QChar c : text) {
+    const bool digit = c >= QLatin1Char('0') && c <= QLatin1Char('9');
+    if (runs.isEmpty() || runs.last().second != digit) runs.append({QString(), digit});
+    runs.last().first += c;
+  }
+  return runs;
+}
+
 bool KaChip::hasGlyph() const {
   if (KaTheme::displayOptions().paperLook && m_glyph.isEmpty() && (m_tone == Tone::Ok || m_tone == Tone::Accent))
     return m_tone == Tone::Accent;  // 새 모양: a clay dot, but a saved/set chip is words only
   return !resolvedGlyph(m_tone, m_glyph).isEmpty();
 }
 
-QSize KaChip::sizeHint() const { return sizeForText(QFontMetrics(chipFont(font())), text(), hasGlyph()); }
+QSize KaChip::sizeHint() const {
+  if (m_figures && KaTheme::displayOptions().paperLook) {
+    const QFontMetrics words(chipFont(font()));
+    QFont mono = chipFont(font());
+    mono.setFamilies(KaTheme::monoFontStack());
+    mono.setWeight(QFont::Normal);
+    const QFontMetrics figures(mono);
+    int width = hasGlyph() ? kGlyphPx + kGlyphGap : 0;
+    for (const auto& run : figureRuns(text())) width += (run.second ? figures : words).horizontalAdvance(run.first);
+    return QSize(width, KaTheme::buttonMetrics().chipHeight);
+  }
+  return sizeForText(QFontMetrics(chipFont(font())), text(), hasGlyph());
+}
 
 QSize KaChip::minimumSizeHint() const { return sizeHint(); }
 
@@ -111,7 +141,8 @@ void KaChip::paintEvent(QPaintEvent* event) {
   Q_UNUSED(event);
   QPainter p(this);
   p.setFont(font());
-  paintChip(p, rect(), text(), m_tone, m_glyph);
+  if (m_figures && KaTheme::displayOptions().paperLook) paintPlate(p, rect(), text(), m_tone, m_glyph, true);
+  else paintChip(p, rect(), text(), m_tone, m_glyph);
 }
 
 void KaChip::syncProperties() {
@@ -126,7 +157,7 @@ void KaChip::syncProperties() {
 
 // 「조용한 도판」: no pill and no edge. Saved / set / neutral are plain muted words; needs-you is a 6 px clay
 // dot plus words; caution and blocking keep their glyph with the words in ink / the blocking red.
-void KaChip::paintPlate(QPainter& p, const QRect& rect, const QString& text, Tone tone, const QString& glyphId) {
+void KaChip::paintPlate(QPainter& p, const QRect& rect, const QString& text, Tone tone, const QString& glyphId, bool figures) {
   const auto& t = KaTheme::tokens();
   // The words that ask for the user's hand are a clay dot with ink words whatever the chip's tone is.
   const bool needsYou = text.contains(QStringLiteral("저장 안 됨")) || text.contains(QStringLiteral("설정 필요"));
@@ -150,7 +181,18 @@ void KaChip::paintPlate(QPainter& p, const QRect& rect, const QString& text, Ton
   font.setWeight(QFont::Normal);
   p.setFont(font);
   p.setPen(words);
-  p.drawText(QRect(x, rect.top(), rect.right() - x + 1, rect.height()), Qt::AlignLeft | Qt::AlignVCenter | Qt::TextSingleLine, text);
+  if (figures) {  // the digits in the mono face, the words as they were
+    for (const auto& run : figureRuns(text)) {
+      QFont part = font;
+      if (run.second) part.setFamilies(KaTheme::monoFontStack());
+      const int width = QFontMetrics(part).horizontalAdvance(run.first);
+      p.setFont(part);
+      p.drawText(QRect(x, rect.top(), width + 1, rect.height()), Qt::AlignLeft | Qt::AlignVCenter | Qt::TextSingleLine, run.first);
+      x += width;
+    }
+  } else {
+    p.drawText(QRect(x, rect.top(), rect.right() - x + 1, rect.height()), Qt::AlignLeft | Qt::AlignVCenter | Qt::TextSingleLine, text);
+  }
   p.restore();
 }
 

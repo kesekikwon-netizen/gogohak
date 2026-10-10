@@ -2,6 +2,8 @@
 #include <QColor>
 #include <QFont>
 #include <QLabel>
+#include <QList>
+#include <QPair>
 #include <QSize>
 #include <QString>
 
@@ -29,13 +31,17 @@ class KaChip : public QLabel {
   QString glyph() const { return m_glyph; }
   void setGlyph(const QString& iconId);
   bool hasGlyph() const;
+  // 새 모양: the digits of the words read in the mono face (「오류 5」「주의 3」: a count is a measure).
+  void setFigures(bool on);
+  // The text cut into runs of digits (true) and everything else (false), in order.
+  static QList<QPair<QString, bool>> figureRuns(const QString& text);
 
   QSize sizeHint() const override;
   QSize minimumSizeHint() const override;
 
   // Paints a chip into rect (vertically centred, chipHeight tall, full width).
   static void paintChip(QPainter& p, const QRect& rect, const QString& text, Tone tone, const QString& glyphId);
-  static void paintPlate(QPainter& p, const QRect& rect, const QString& text, Tone tone, const QString& glyphId);
+  static void paintPlate(QPainter& p, const QRect& rect, const QString& text, Tone tone, const QString& glyphId, bool figures = false);
   // Width and height a chip needs; fm must measure chipFont().
   static QSize sizeForText(const QFontMetrics& fm, const QString& text, bool hasGlyph);
   // The chip type: base at 11 px, bold.
@@ -56,4 +62,5 @@ class KaChip : public QLabel {
 
   Tone m_tone = Tone::Neutral;
   QString m_glyph;
+  bool m_figures = false;
 };
