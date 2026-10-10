@@ -203,6 +203,42 @@ class ParcelCopyTest : public QObject {
     QCOMPARE(int(featuresOf(ParcelClipboard::copyLayer(&reopened)).size()), 4);
   }
 
+
+  void pasteAgainAfterReopenStillSaves() {
+    // 앱의 저장으로 붙이기 → 저장 → 다시 열기 → 또 붙이기 → 저장. 다시 연 복사본은 조사 파일(GPKG) 안의 줄이다.
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    QString error;
+    const QString survey = SurveyProjectFactory::createNewSurvey(dir.path(), QStringLiteral("again"), &error);
+    QVERIFY2(!survey.isEmpty(), qPrintable(error));
+    const QString outside = savedMap(dir, square(200000, 450000, 10));
+    QVERIFY(!outside.isEmpty());
+    const QString recovery = dir.filePath(QStringLiteral("복구사본"));
+    {
+      QgsProject project;
+      auto* received =
+          new QgsVectorLayer(outside + QStringLiteral("|layername=cadastral"), kSource, QStringLiteral("ogr"));
+      project.addMapLayer(received, false);
+      LayerOps::markCadastralLayer(received);
+      QCOMPARE(ParcelClipboard::paste(&project, ParcelClipboard::copyFeatures({{received, firstFid(received)}})), 1);
+      const auto saved = SurveyStorage::persistWorkspace(&project, survey, recovery);
+      QVERIFY2(saved.saved, qPrintable(saved.error));
+    }
+    {
+      QgsProject project;
+      QVERIFY2(SurveyStorage::readEmbedded(&project, survey, nullptr, &error), qPrintable(error));
+      QCOMPARE(int(featuresOf(ParcelClipboard::copyLayer(&project)).size()), 1);
+      const QList<QgsMapLayer*> sources = project.mapLayersByName(kSource);
+      QCOMPARE(int(sources.size()), 1);
+      auto* received = qobject_cast<QgsVectorLayer*>(sources.first());
+      QCOMPARE(ParcelClipboard::paste(&project, ParcelClipboard::copyFeatures({{received, firstFid(received)}})), 1);
+      const auto saved = SurveyStorage::persistWorkspace(&project, survey, recovery);
+      QVERIFY2(saved.saved, qPrintable(saved.error));
+    }
+    QgsProject reopened;
+    QVERIFY2(SurveyStorage::readEmbedded(&reopened, survey, nullptr, &error), qPrintable(error));
+    QCOMPARE(int(featuresOf(ParcelClipboard::copyLayer(&reopened)).size()), 2);
+  }
 };
 
 int main(int argc, char** argv) {
