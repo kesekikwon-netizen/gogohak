@@ -1,3 +1,7 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
 # Strata (ka-hgis) 작업 지침
 
 사용자는 개발자가 아닌 고고학 현장 전문가다. 요청은 짧은 한국어, 증상("안 돼요"), 스크린샷으로 온다. 전역 `~/.claude/CLAUDE.md`를 따른다. 가끔 필요한 절차·경위·경로: docs/agent/strata-reference.md.
@@ -16,6 +20,7 @@
 
 - 주변 코드의 이름·주석·모양에 맞춘다. 바뀐 줄은 모두 요청에서 바로 이어져야 하고, 상관없는 옆 코드·죽은 코드는 고치지 말고 보고에 한 줄(내 변경으로 안 쓰이게 된 것만 지운다).
 - 요청하지 않은 설정·확장성·추상화, 일어날 수 없는 경우의 처리는 넣지 않는다.
+- Architecture: `src/core` → static lib `ka_core` (services, no window code); `src/app` → `ka-hgis` exe (MainWindow split over `MainWindow*.cpp`, Ka* widgets and map tools). Test exes link `ka_core` and compile the `src/app` files they need by listing them in their own `add_executable` in CMakeLists.txt, so a new app file used by a test goes into that list too. Critical path diagram: docs/architecture/data-flow.md (its "error blocks" edge predates 2026-10-10); code map: docs/agent/strata-reference.md.
 - Hotspots, keep edits narrow: KaDrawingStudio.cpp, MainWindow.cpp, LayerOps.cpp, BasemapOps.cpp. CMake source lists are explicit (no GLOB). data/ is copied next to the exe: a data/ edit needs a ka-hgis rebuild.
 - C++ definitions, references, errors: LSP (clangd) before grep. No build/compile_commands.json → `cmake -S . -B build` (no build/ at all: the first-build command), then build.
 - 보안 검토 결과는 이 앱(Windows 데스크톱, 서버·웹 없음)에 해당하는 것만 이번 변경 안에서 고치고 나머지는 보고에 한 줄.
@@ -23,7 +28,7 @@
 ## Product rules (do not break)
 
 - Standalone C++20/Qt 6 Widgets app on OSGeo4W qgis-dev (`qgis_core`, `qgis_gui`). Never fork QGIS or reimplement PROJ, GDAL, rendering or CRS transforms. Keep the GPLv2+ About notices.
-- Domain layers `survey_area`, `feature_poly`, `feature_line`, `section_line`, `control_points`, `artifact_point`: identity is the `ka_hgis/layer_key` property (Korean titles are labels). Only `LayerOps::ensureDomainLayer` adds one; never auto-add empty ones or add one because a GPKG table exists. `loadSurveyLayers` never calls `removeAllMapLayers()`.
+- Domain layers `survey_area`, `feature_poly`, `feature_line`, `section_line`, `control_points`, `artifact_point`, `trial_trench` (schema `data/schemas/ka_hgis_layers.yaml`): identity is the `ka_hgis/layer_key` property (Korean titles are labels). Only `LayerOps::ensureDomainLayer` adds one; never auto-add empty ones or add one because a GPKG table exists. `loadSurveyLayers` never calls `removeAllMapLayers()`.
 - Legend groups 조사 데이터 / 참조 지도. Basemaps, WMS/XYZ, soil, geology, aligned rasters are reference maps, never survey data. Cadastral layers (5 km download, VWorld picture) stay at the tree root, outside 참조 지도; the VWorld picture cannot be snapped to.
 - CRS: work CRS EPSG:5187 (default) or 5186; never assume 5179. Submission = EPSG:5179 SHP + PDF + MANIFEST.sha256 via `ExportService`, files only, not added to the map. Checklist errors do not block (2026-10-10, docs/intent/2026-10-10-submit-despite-checklist.md): 「제출 꾸러미 만들기」 asks once and README_submit.txt records them; without a composed user_sheet the package has no 조사도면.pdf; no SHP and no sheet = no package. DXF is not a submit path.
 - Keys: never hardcode a VWorld or personal key. `loadApiKey` order: `%LOCALAPPDATA%\ka-hgis\ka-hgis-vworld.ini` → `HKCU\Software\ka-hgis` → env `VWORLD_API_KEY` → gitignored `config/secrets.ini`. Satellite: keyed api.vworld.kr WMTS first, xdworld only without a key. Cadastral WMS: `crs=EPSG:3857` + KEY, never send DOMAIN, CRS candidates 4326→3857→900913 only. An expired key returns HTTP 200 + XML error: blank tiles, nothing logged.
@@ -45,10 +50,11 @@
 
 ## Git (main = GitHub kesekikwon-netizen/hgis)
 
-- Work in the session worktree (in `A:\qgis` itself, in place); never create another. Message `type(scope): 한국어 요약`, Korean body with a test-result line, Co-Authored-By. Commit from the Bash tool.
-- Every verified commit (2026-10-03): rebase onto main if it moved and rerun the touched tests, then `git -C A:/qgis merge --ff-only <sha>` and `git -C A:/qgis push origin main`. Never cancel, disable or wait on GitHub CI; check its last run once at the next task. PRs only when asked. If memory names a newer line the user calls the current app, say so in the first report.
+- `<main>` below = the main checkout, the first line of `git worktree list` (this PC: `C:\Users\권을\Documents\qgis`, OSGeo4W `C:\OSGeo4W`; the old PC used `A:\qgis` and `A:\OSGeo4W`).
+- Work in the session worktree (in `<main>` itself, in place); never create another. Message `type(scope): 한국어 요약`, Korean body with a test-result line, Co-Authored-By. Commit from the Bash tool.
+- Every verified commit (2026-10-03): rebase onto main if it moved and rerun the touched tests, then `git -C <main> merge --ff-only <sha>` and `git -C <main> push origin main`. Never cancel, disable or wait on GitHub CI; check its last run once at the next task. PRs only when asked. If memory names a newer line the user calls the current app, say so in the first report.
 - `.claude/hooks/commit-gate.mjs` blocks commits touching src/, tests/, cmake/, data/, CMakeLists.txt until the build and a later ctest prove them, test-weakening commits without `시험 변경:`, and C++ files past the CI line limit (raising docs/quality/line-limit-baseline.txt needs `길이 기준 변경:`). Follow its reason; no bypass.
-- Worktree-only work is lost when a desktop session is deleted. Lost-work report: check `git -C A:/qgis for-each-ref refs/snapshots` first.
+- Worktree-only work is lost when a desktop session is deleted. Lost-work report: check `git -C <main> for-each-ref refs/snapshots` first.
 - Never force-push, run scripts/auto-git-push.ps1 or scripts/commit.ps1, or commit secrets, *.gpkg/*.qgz or a portable's config.
 - 「포터블」 only when asked: skill `portable-release`; say first it is ~1 GB and C: is nearly full.
 

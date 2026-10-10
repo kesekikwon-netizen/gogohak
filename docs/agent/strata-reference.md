@@ -4,7 +4,7 @@ CLAUDE.md에서 옮긴 내용이다(2026-10-03, docs/intent/2026-10-03-dev-setup
 
 ## 바탕화면 바로가기 (앱 빌드가 성공할 때마다, 사용자의 상시 요청)
 
-Run the smoke, then create or repoint `C:\Users\kwonyoungin1\Desktop\Strata (개발).lnk` with WScript.Shell (`CreateShortcut` + `Save` makes it when missing):
+Run the smoke, then create or repoint `%USERPROFILE%\Desktop\Strata (개발).lnk` (this PC: `C:\Users\권을\Desktop`; old PC: `C:\Users\kwonyoungin1\Desktop`) with WScript.Shell (`CreateShortcut` + `Save` makes it when missing):
 - TargetPath `<worktree>\scripts\start-ka-hgis.vbs`, WorkingDirectory `<worktree>`, IconLocation `<worktree>\build\Release\ka-hgis.exe,0`, Description `Strata 개발 빌드 (워크트리 <name>)`.
 - Then call `SHChangeNotify(0x08000000)` so the icon refreshes, and tell the user which worktree it now opens.
 - 「고고학 전용 HGIS.lnk」 ran `A:\qgis\build` (exe from 2026-09-28): touch or recreate it only when asked.
@@ -22,12 +22,12 @@ Run the smoke, then create or repoint `C:\Users\kwonyoungin1\Desktop\Strata (개
 
 ## Worktrees
 
-- The desktop app runs each session in `A:\qgis\.claude\worktrees\<name>` on a `claude/<session>` branch. Once the desktop reuses a folder, the folder and branch names differ, so read `git branch --show-current` instead of assuming.
+- The desktop app runs each session in `<main>\.claude\worktrees\<name>` (`<main>`: CLAUDE.md 「Git」) on a `claude/<session>` branch. Once the desktop reuses a folder, the folder and branch names differ, so read `git branch --show-current` instead of assuming.
 - New desktop sessions start from origin/main.
 
 ## Stale docs
 
-docs/HANDOFF.md, docs/README.md and TEST_INFRA.md still mention D:\hgis, D:\OSGeo4W, C:\CMake, AGENTS.md, .codex/NOW.md, publish-desktop after every build and a Codex section. Real paths: repo A:\qgis, OSGeo4W A:\OSGeo4W (QGIS 4.3 master, Qt 6.11), CMake C:\Program Files\CMake\bin, VS 2022 BuildTools. CLAUDE.md wins over those docs. docs/COMMIT_STATUS.md is stale; leave it.
+docs/HANDOFF.md, docs/README.md and TEST_INFRA.md still mention D:\hgis, D:\OSGeo4W, C:\CMake, AGENTS.md, .codex/NOW.md, publish-desktop after every build and a Codex section. Real paths: repo `<main>` (CLAUDE.md 「Git」; old PC A:\qgis), OSGeo4W C:\OSGeo4W on this PC (old PC A:\OSGeo4W) (QGIS 4.3 master, Qt 6.11), CMake C:\Program Files\CMake\bin, VS 2022 BuildTools. CLAUDE.md wins over those docs. docs/COMMIT_STATUS.md is stale; leave it.
 
 ## Why some rules exist
 
