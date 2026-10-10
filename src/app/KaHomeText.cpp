@@ -27,6 +27,13 @@ QString folder(const QString& path) {
   return dir.split(QLatin1Char('/'), Qt::SkipEmptyParts).join(QStringLiteral(" › "));
 }
 
+QString folderTail(const QString& folder) {
+  const QString sep = QStringLiteral(" › ");
+  const QStringList steps = folder.split(sep);
+  if (steps.size() <= 2) return folder;
+  return QStringLiteral("…") + sep + steps.at(steps.size() - 2) + sep + steps.last();
+}
+
 QString when(qint64 ms) {
   if (ms <= 0) return {};
   const QDateTime at = QDateTime::fromMSecsSinceEpoch(ms);

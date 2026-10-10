@@ -17,6 +17,7 @@
 #include "app/KaChip.h"
 #include "app/KaHomeConnectionCard.h"
 #include "app/KaHomeRecentCard.h"
+#include "app/KaHomeText.h"
 #include "app/KaRecoverySnapshots.h"
 #include "app/KaStartPage.h"
 #include "app/KaTheme.h"
@@ -244,6 +245,24 @@ private slots:
         if (qAbs(c.red() - 0xD9) < 30 && qAbs(c.green() - 0x77) < 30 && qAbs(c.blue() - 0x57) < 30) ++clay;
       }
     QVERIFY2(clay >= 6, qPrintable(QString::number(clay)));
+  }
+
+  // 폴더 칸 (보완 H3): a deep folder shows its last two steps behind 「…」, never 「C: › Users › …」; a short one stays whole.
+  void folderCellKeepsTheLastTwoSteps() {
+    QCOMPARE(KaHomeText::folderTail(QStringLiteral("C: › Users › 권을 › 광령리1")), QStringLiteral("… › 권을 › 광령리1"));
+    QCOMPARE(KaHomeText::folderTail(QStringLiteral("바탕 화면 › 광령리1")), QStringLiteral("바탕 화면 › 광령리1"));
+    QCOMPARE(KaHomeText::folderTail(QStringLiteral("문서")), QStringLiteral("문서"));
+    const QString path = touch(m_dir.filePath(QStringLiteral("h/i/j/광령리1/광령리1.gpkg")));
+    {
+      QSettings st = RecentSurveys::userSettings();
+      RecentSurveys::remember(st, path, QStringLiteral("광령리1"));
+    }
+    KaStartPage page;
+    page.resize(1600, 900);
+    page.reload();
+    auto* block = page.findChild<QFrame*>(QStringLiteral("startTitleBlock"));
+    QVERIFY(block);
+    QCOMPARE(text(*block, "startCellFolder"), QStringLiteral("… › j › 광령리1"));
   }
 
   void heroDrawsNoBand() {
