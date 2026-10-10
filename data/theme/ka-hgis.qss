@@ -127,7 +127,7 @@ QToolBar#mainToolbar QLineEdit#appBarSearch {
 QToolBar#mainToolbar QLineEdit#appBarSearch:focus { border-color: @tabMark@; }
 QDialogButtonBox QPushButton {
   font-size: @uiFontSize@px;
-  min-height: 34px;
+  min-height: @btnMinHeight@px;
   font-family: "Malgun Gothic", "Segoe UI";
 }
 QMessageBox QLabel, QInputDialog QLabel {
@@ -142,8 +142,8 @@ QMessageBox QLabel, QInputDialog QLabel {
 QPushButton {
   color: @ink@;
   font-weight: 400;
-  min-height: 34px;
-  padding: 8px 16px;
+  min-height: @btnMinHeight@px;
+  padding: @btnPadding@;
   border: 1px solid @border@;
   border-bottom: @buttonEdge@px solid @borderStrong@;
   border-radius: 8px;
@@ -462,7 +462,7 @@ QLineEdit, QTextEdit, QPlainTextEdit {
   color: @ink@;
   border: 1px solid @border@;
   border-radius: 8px;
-  min-height: 32px;
+  min-height: @fieldMinHeight@px;
   padding: 4px 10px;
   selection-background-color: @accent@;
   selection-color: @surface@;
@@ -474,7 +474,7 @@ QLineEdit, QTextEdit, QPlainTextEdit {
 QComboBox, QAbstractSpinBox {
   background: @surface@;
   color: @ink@;
-  min-height: 32px;
+  min-height: @fieldMinHeight@px;
   padding: 4px 10px;
   selection-background-color: @accent@;
   selection-color: @surface@;

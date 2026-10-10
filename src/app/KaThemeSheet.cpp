@@ -99,6 +99,10 @@ QHash<QString, QString> replacementTable() {
   values.insert(QStringLiteral("cardEdge"), paper ? QStringLiteral("transparent") : c.border.name());
   values.insert(QStringLiteral("heroNameSize"), paper ? QStringLiteral("34") : QStringLiteral("40"));
   values.insert(QStringLiteral("statusHeight"), paper ? QStringLiteral("31") : QStringLiteral("34"));  // 상태줄 (보완 M7): 31 + its 1 px top rule = 32
+  // 창의 단추·입력칸 높이 (보완 D1): 32 px with the border and padding in 새 모양 (stock: about 50 and 40).
+  values.insert(QStringLiteral("btnMinHeight"), paper ? QStringLiteral("30") : QStringLiteral("34"));
+  values.insert(QStringLiteral("btnPadding"), paper ? QStringLiteral("0 16px") : QStringLiteral("8px 16px"));
+  values.insert(QStringLiteral("fieldMinHeight"), paper ? QStringLiteral("22") : QStringLiteral("32"));
   // 판 틀 (보완 M1 · H1): in 새 모양 the pages have no frame, the map card no edge, and the splitters are a 7 px strip
   // (3 + 1 + 3) with one hairline in the middle (stock: the 14 px round page, the framed map, 6 px grey bars).
   values.insert(QStringLiteral("pageEdge"), paper ? QStringLiteral("transparent") : c.border.name());

@@ -2316,6 +2316,16 @@ if(KA_HGIS_BUILD_TESTS)
   ka_add_qtest(page_polish ka_page_polish_tests)
   set_tests_properties(page_polish PROPERTIES
     ENVIRONMENT "GDAL_DATA=${OSGEO4W_ROOT}/apps/gdal-dev/share/gdal;PATH=${_ka_path_esc};QGIS_PREFIX_PATH=${QGIS_PREFIX_PATH};QT_QPA_PLATFORM=offscreen" TIMEOUT 90)
+  # 세부 디자인 보완(창 항목: D1 단추·입력칸 높이).
+  add_executable(ka_window_polish_tests tests/test_window_polish.cpp
+    ${_ka_p1_chip_sources} ${_ka_p4_theme_sources})
+  target_link_libraries(ka_window_polish_tests PRIVATE ${KA_TEST_LIBS})
+  target_include_directories(ka_window_polish_tests PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_BINARY_DIR}/generated)
+  target_compile_definitions(ka_window_polish_tests PRIVATE ${KA_TEST_DEFS})
+  set_target_properties(ka_window_polish_tests PROPERTIES WIN32_EXECUTABLE FALSE)
+  ka_add_qtest(window_polish ka_window_polish_tests)
+  set_tests_properties(window_polish PROPERTIES
+    ENVIRONMENT "GDAL_DATA=${OSGEO4W_ROOT}/apps/gdal-dev/share/gdal;PATH=${_ka_path_esc};QGIS_PREFIX_PATH=${QGIS_PREFIX_PATH};QT_QPA_PLATFORM=offscreen" TIMEOUT 90)
   set_tests_properties(map_plate PROPERTIES ENVIRONMENT
     "GDAL_DATA=${OSGEO4W_ROOT}/apps/gdal-dev/share/gdal;PATH=${_ka_path_esc};QGIS_PREFIX_PATH=${QGIS_PREFIX_PATH};QT_QPA_PLATFORM=offscreen" TIMEOUT 90)
   # 「조용한 도판」 windows (board 5): message boxes with a serif question and no icon disc (no QGIS).
