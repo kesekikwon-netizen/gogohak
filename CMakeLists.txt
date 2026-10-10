@@ -1565,7 +1565,7 @@ if(KA_HGIS_BUILD_TESTS)
   set_tests_properties(download_ui PROPERTIES TIMEOUT 90)
   add_executable(ka_tile_print_tests tests/test_tile_print.cpp
     src/app/KaPrintDialog.cpp src/app/KaPrintDialogPlate.cpp src/app/KaTilePreview.cpp src/app/KaPrintDialog.h
-    src/app/KaTilePreview.h)
+    src/app/KaTilePreview.h src/app/KaUserError.cpp src/app/KaUserError.h)
   target_include_directories(ka_tile_print_tests PRIVATE src)
   target_link_libraries(ka_tile_print_tests PRIVATE ka_core Qt6::Test)
   set_target_properties(ka_tile_print_tests PROPERTIES WIN32_EXECUTABLE FALSE)
@@ -1574,7 +1574,7 @@ if(KA_HGIS_BUILD_TESTS)
   # 「조용한 도판」 도면 인쇄: two columns, the dotted ledger, 「A4 | A3」 words (tests/test_tile_print.cpp is full).
   add_executable(ka_print_plate_tests tests/test_print_plate.cpp src/app/KaProgressPlate.cpp src/app/KaProgressPlate.h
     src/app/KaPrintDialog.cpp src/app/KaPrintDialogPlate.cpp src/app/KaTilePreview.cpp src/app/KaPrintDialog.h
-    src/app/KaTilePreview.h)
+    src/app/KaTilePreview.h src/app/KaUserError.cpp src/app/KaUserError.h)
   target_include_directories(ka_print_plate_tests PRIVATE src)
   target_link_libraries(ka_print_plate_tests PRIVATE ka_core Qt6::Test)
   set_target_properties(ka_print_plate_tests PROPERTIES WIN32_EXECUTABLE FALSE)

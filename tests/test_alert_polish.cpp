@@ -45,6 +45,12 @@ private slots:
     expectNone({QStringLiteral("MainWindowSession.cpp"), QStringLiteral("MainWindowExport.cpp")});
   }
 
+  // 셋째 묶음 — 도면·인쇄·3D (KaDrawingStudio · KaDrawingStudioSheets · KaPrintDialog · KaTerrain3dStudio · KaTerrain3dLayoutStudio).
+  void drawingPrintAndTerrainAlertsUseTheOneFrame() {
+    expectNone({QStringLiteral("KaDrawingStudio.cpp"), QStringLiteral("KaDrawingStudioSheets.cpp"), QStringLiteral("KaPrintDialog.cpp"),
+                QStringLiteral("KaTerrain3dStudio.cpp"), QStringLiteral("KaTerrain3dLayoutStudio.cpp")});
+  }
+
   // 둘째 묶음 — 지도·정합·지적 (MainWindow · MainWindowAlign · MainWindowCadastral · MainWindowOverlay).
   void mapAlignAndCadastralAlertsUseTheOneFrame() {
     expectNone({QStringLiteral("MainWindow.cpp"), QStringLiteral("MainWindowAlign.cpp"), QStringLiteral("MainWindowCadastral.cpp"),

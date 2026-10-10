@@ -1,4 +1,5 @@
 #include "KaPrintDialog.h"
+#include "KaUserError.h"
 #include "KaTilePreview.h"
 #include "KaWindowSize.h"
 
@@ -606,7 +607,7 @@ void KaPrintDialog::saveTilesAs() {
   }
   if (cancelled || !ok) {
     QFile::remove(path);  // 반쯤 쓴 파일은 남기지 않는다
-    if (!cancelled) QMessageBox::warning(this, QStringLiteral("나눈 장 PDF"), error);
+    if (!cancelled) KaUserError::warn(this, {QStringLiteral("나눈 장 PDF"), QStringLiteral("나눈 장을 PDF로 저장하지 못했습니다"), error, {}});
     return;
   }
   saveSettings();
@@ -622,9 +623,8 @@ void KaPrintDialog::printNow() {
   const QString name = printerName();
   if (name.isEmpty()) return;
   if (!printerSupports(sheetSize().id())) {
-    QMessageBox::warning(this, QStringLiteral("인쇄"),
-                         QStringLiteral("이 프린터는 %1 용지를 지원하지 않습니다. 다른 용지를 고르세요.")
-                             .arg(m_sheet->currentText()));
+    KaUserError::warn(this, {QStringLiteral("인쇄"), QStringLiteral("이 용지로는 인쇄할 수 없습니다"),
+                             QStringLiteral("이 프린터는 %1 용지를 지원하지 않습니다.").arg(m_sheet->currentText()), QStringLiteral("다른 용지를 고르세요.")});
     return;
   }
   QPrinter printer(QPrinterInfo::printerInfo(name), QPrinter::HighResolution);
@@ -656,7 +656,7 @@ void KaPrintDialog::printNow() {
     return;
   }
   if (!ok) {
-    QMessageBox::warning(this, QStringLiteral("인쇄"), error);
+    KaUserError::warn(this, {QStringLiteral("인쇄"), QStringLiteral("인쇄하지 못했습니다"), error, {}});
     return;
   }
   saveSettings();

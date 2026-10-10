@@ -1,6 +1,7 @@
 // Drawing studio: stored sheets (도면 목록), named layer sets and the optional
 // title block. Split from KaDrawingStudio.cpp to keep that file smaller.
 #include "KaDrawingStudio.h"
+#include "KaUserError.h"
 
 #include "KaDrawingLayerSets.h"
 #include "KaDrawingSheetSet.h"
@@ -95,7 +96,7 @@ void KaDrawingStudio::storeCurrentSheet() {
   }
   QString error;
   if (!KaDrawingSheetSet::store(m_project, kWorkingSheet, title, &error)) {
-    QMessageBox::warning(this, QStringLiteral("도면 보관"), error);
+    KaUserError::warn(this, {QStringLiteral("도면 보관"), QStringLiteral("도면을 보관하지 못했습니다"), error, {}});
     return;
   }
   // The sheet's layer combination is kept as a layer set of the same name.
@@ -121,7 +122,7 @@ void KaDrawingStudio::restoreStoredSheet(const QString& title) {
   QgsPrintLayout* restored = KaDrawingSheetSet::restore(m_project, title, kWorkingSheet, &error);
   if (!restored) {
     attachLayoutToView();
-    QMessageBox::warning(this, QStringLiteral("도면 열기"), error);
+    KaUserError::warn(this, {QStringLiteral("도면 열기"), QStringLiteral("도면을 열지 못했습니다"), error, {}});
     return;
   }
   if (restored->pageCollection() && restored->pageCollection()->page(0)) {

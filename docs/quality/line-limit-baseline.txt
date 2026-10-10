@@ -13,7 +13,7 @@
 506 src/app/KaMeasureMapTool.cpp
 669 src/app/KaPrintDialog.cpp
 636 src/app/KaTerrain3dLayoutStudio.cpp
-547 src/app/KaTerrain3dStudio.cpp
+548 src/app/KaTerrain3dStudio.cpp
 1106 src/app/KaTopographicBrowser.cpp
 996 src/app/KaTopographicImportDialog.cpp
 632 src/app/KaTopographicScopePanel.cpp

@@ -16,6 +16,7 @@
 #include "KaDrawingTools.h"
 #include "core/LegendPlacement.h"
 #include "KaPaperDialog.h"
+#include "KaUserError.h"
 #include "KaTitleBlock.h"
 #include "core/LayoutService.h"
 #include "core/LayerOps.h"
@@ -3742,7 +3743,7 @@ void KaDrawingStudio::savePdf() {
     return;
   }
   if (!ok) {
-    QMessageBox::warning(this, QStringLiteral("PDF"), pdfError);
+    KaUserError::warn(this, {QStringLiteral("PDF"), QStringLiteral("PDF를 저장하지 못했습니다"), pdfError, {}});
     return;
   }
   markUserComposed();
@@ -3767,7 +3768,7 @@ void KaDrawingStudio::printDrawing() {
   if (m_pdfBusy) return;
   QTemporaryDir temporary;
   if (!temporary.isValid()) {
-    QMessageBox::warning(this, QStringLiteral("인쇄"), QStringLiteral("인쇄용 임시 폴더를 만들지 못했습니다."));
+    KaUserError::warn(this, {QStringLiteral("인쇄"), QStringLiteral("인쇄를 시작하지 못했습니다"), QStringLiteral("인쇄용 임시 폴더를 만들지 못했습니다."), {}});
     return;
   }
   const QString pdf = temporary.filePath(QStringLiteral("drawing-print.pdf"));
@@ -3788,7 +3789,7 @@ void KaDrawingStudio::printDrawing() {
     return;
   }
   if (!ok) {
-    QMessageBox::warning(this, QStringLiteral("인쇄"), error);
+    KaUserError::warn(this, {QStringLiteral("인쇄"), QStringLiteral("인쇄하지 못했습니다"), error, {}});
     return;
   }
   markUserComposed();

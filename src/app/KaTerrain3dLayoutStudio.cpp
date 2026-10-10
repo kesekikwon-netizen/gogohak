@@ -1,4 +1,5 @@
 #include "KaTerrain3dLayoutStudio.h"
+#include "KaUserError.h"
 
 #include "KaBeginnerRibbon.h"
 #include "KaIcons.h"
@@ -487,8 +488,7 @@ void KaTerrain3dLayoutStudio::exportPdf() {
   const QString saved = LayoutService::exportLayoutPdf(
       m_project, QString::fromUtf8(Terrain3dLayoutService::kSheetName), path, &err);
   if (saved.isEmpty()) {
-    QMessageBox::warning(this, QStringLiteral("입체지형 도면"),
-                         err.isEmpty() ? QStringLiteral("PDF를 쓰지 못했습니다.") : err);
+    KaUserError::warn(this, {QStringLiteral("입체지형 도면"), QStringLiteral("PDF를 저장하지 못했습니다"), err.isEmpty() ? QStringLiteral("PDF를 쓰지 못했습니다.") : err, {}});
     return;
   }
   if (m_status)

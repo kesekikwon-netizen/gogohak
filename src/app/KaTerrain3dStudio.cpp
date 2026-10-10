@@ -1,6 +1,7 @@
 #include "KaCrashGuard.h"
 #include "core/KaLogExcept.h"
 #include "KaTerrain3dStudio.h"
+#include "KaUserError.h"
 
 #include "KaTerrain3dView.h"
 #include "core/LayerOps.h"
@@ -473,7 +474,7 @@ void KaTerrain3dStudio::saveImage() {
     return;
   QString err;
   if (!exportImage(path, &err)) {
-    QMessageBox::warning(this, QStringLiteral("입체지형"), err);
+    KaUserError::warn(this, {QStringLiteral("입체지형"), QStringLiteral("입체지형 그림을 저장하지 못했습니다"), err, {}});
     return;
   }
   m_status->setText(QStringLiteral("저장함 · 축척자·방위 포함\n%1").arg(QFileInfo(path).fileName()));
