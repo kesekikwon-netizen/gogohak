@@ -18,7 +18,7 @@ ctest --test-dir build -C Release -R '<아래 이름>' --output-on-failure
 | B CRS·변환 | `export_survey_areas` | 5179 SHP 좌표 ≤1mm |
 | B | `topographic_source_crs` | 수치지형 원본 CRS |
 | C 편집 | `workflow_engine` | undoStack, 스냅, 위상 편집 |
-| C | `save_open_edit` | 정점 Undo·메뉴 (ctrlZ 슬롯 실패 이력) |
+| C | `save_open_edit` · `save_open_edit_delete` · `save_open_edit_draw` | 정점 Undo·메뉴 (ctrlZ 슬롯 실패 이력), 레이어 Delete 키, 그리기 중 기록 칸 |
 | C | `parcel_copy` | 받은 지적도 필지 Ctrl+C·V: 같은 자리, 여러 조각, 원본 줄을 지워도 복사본이 남음, 저장 뒤 다시 열어도 남음 |
 | C | `parcel_copy_keys` | 도형선택에서만 Ctrl+C·V, 누르고 있어도 한 번만 붙음 |
 | D 성능·안정 | `perf_engine` | 15만 필지·열기·조판 상한 |
@@ -45,7 +45,7 @@ ctest --test-dir build -C Release -R '<아래 이름>' --output-on-failure
 
 한 exe, 최장 ≤60초. `RESOURCE_LOCK ka_save_open`.
 
-`save_open_window` · `save_open_topo` · `save_open_drawing` · `save_open_edit` · `save_open_roundtrip` · `save_open_open` · `save_open_open_invalid` · `save_open_commit` · `save_open_saveas`
+`save_open_window` · `save_open_topo` · `save_open_drawing` · `save_open_edit` · `save_open_edit_delete` · `save_open_edit_draw` · `save_open_roundtrip` · `save_open_open` · `save_open_open_invalid` · `save_open_commit` · `save_open_saveas` · `save_open_saveas_fail`
 
 ## 이 표가 아닌 것
 

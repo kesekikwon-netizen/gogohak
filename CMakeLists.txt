@@ -1778,20 +1778,24 @@ if(KA_HGIS_BUILD_TESTS)
     ribbonPrintOpensTheDrawingThenThePrintWindow
     scaleControlFollowsActiveDrawingWithoutChangingMapCanvas
     scaleControl_isSingleWidgetAcceptingBothForms)
+  # save_open_edit 은 한 묶음 70초(이 PC)라 GitHub 실행기(약 2.4배 느림)에서 180초 한도에 걸렸다(CI 38051687016).
+  # 세 묶음으로 나눈다. 시험 함수는 그대로다.
   ka_add_qtest_filter(save_open_edit ka_save_open_tests
     layerContextMenu_matchesLayerKind
     changingLabelFontKeepsEveryLayerAndItsVisibility
-    trenchPresetRespectsAreaAndDimensions
+    trenchPresetRespectsAreaAndDimensions)
+  ka_add_qtest_filter(save_open_edit_delete ka_save_open_tests
     layerDeleteKeyPreservesSourceAndUndoRestoresPendingEdits
     layerDeleteKeyRemovesReferenceFromMap
     layerDeleteKeyRemovesCadastralAndKeepsItGone
     cadastralGroupDeleteKeyRemovesChildren
+    cadastralGroupContextMenuCanRemove
+    referenceGroupMenuRemovesEveryRowAndCtrlZRestores
+    emptyGroupDeleteKeyRemovesRowAndCtrlZRestores)
+  ka_add_qtest_filter(save_open_edit_draw ka_save_open_tests
     surveyAreaDrawingContinuesTheExistingAreaWithoutAWindow
     drawnShapeShowsItsRecordInTheInspector
     cardKeysLeaveTheSketchAlone
-    cadastralGroupContextMenuCanRemove
-    referenceGroupMenuRemovesEveryRowAndCtrlZRestores
-    emptyGroupDeleteKeyRemovesRowAndCtrlZRestores
     ctrlZRestoresVertexEditsAndGroupedFeatureDeletion
     clearDrawnFeaturesLeavesOtherLayersSelectionAlone
     layerContextMenu_usesClickedRowAndLeavesSourceIntact
@@ -1823,12 +1827,14 @@ if(KA_HGIS_BUILD_TESTS)
   ka_add_qtest_filter(save_open_commit ka_save_open_tests
     partialCommit_preservesRemainingBufferAndCreatesIndependentRecovery
     failedCommit_doesNotOverwriteSavedWorkspace)
+  # save_open_saveas 도 42초(이 PC)로 GitHub 에서 한도에 두 번 걸렸다. 두 묶음으로 나눈다.
   ka_add_qtest_filter(save_open_saveas ka_save_open_tests
     newSurvey_selectedCrsSurvivesSaveAndOpen
     embeddedOpenRestoresDemInActualTree
     saveAs_preservesActualTablesAndReopensCopy
     newSurvey_existingNamePreservesUnsavedCurrentSurvey
-    closeSave_preservesMemoryReferenceVectorOnReopen
+    closeSave_preservesMemoryReferenceVectorOnReopen)
+  ka_add_qtest_filter(save_open_saveas_fail ka_save_open_tests
     saveAs_embeddedFailureRestoresSourcesAndRemainsUnsaved
     saveAs_existingDestinationIsNotOverwritten
     save_qgisExceptionStaysInsideSlot
@@ -1848,8 +1854,8 @@ if(KA_HGIS_BUILD_TESTS)
     monitorFitDialogs)
   set(KA_SAVE_OPEN_TESTS
     save_open_window save_open_topo save_open_drawing
-    save_open_edit save_open_erase save_open_roundtrip save_open_open
-    save_open_open_invalid save_open_commit save_open_saveas save_open_portable save_open_monitor)
+    save_open_edit save_open_edit_delete save_open_edit_draw save_open_erase save_open_roundtrip save_open_open
+    save_open_open_invalid save_open_commit save_open_saveas save_open_saveas_fail save_open_portable save_open_monitor)
   set_tests_properties(${KA_SAVE_OPEN_TESTS} PROPERTIES TIMEOUT 180 RESOURCE_LOCK ka_save_open)
 
   add_executable(ka_e2e_tests tests/test_e2e_opaque.cpp)
