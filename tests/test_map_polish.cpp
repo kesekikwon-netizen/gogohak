@@ -7,6 +7,7 @@
 #include <QLabel>
 #include <QMainWindow>
 #include <QSignalSpy>
+#include <QToolBar>
 #include <QTabBar>
 #include <QToolButton>
 #include <QWidget>
@@ -15,6 +16,7 @@
 
 #include "app/KaDrawGuideBand.h"
 #include "app/KaFeatureCard.h"
+#include "app/KaIcons.h"
 #include "app/KaInspectorPanel.h"
 #include "app/KaStatusBar.h"
 #include "app/KaTheme.h"
@@ -121,6 +123,42 @@ private slots:
     QTest::mouseClick(chip, Qt::LeftButton);
     QCOMPARE(clicked.count(), 1);
     QTRY_COMPARE(bar->height(), 32);
+  }
+
+  // 그리기 줄 (보완 M3): the tool in hand is a slate fill with ivory words, the same "in hand" look as the ribbon's 그리기 tile;
+  // the other tools stay plain white.
+  void chosenDrawToolIsInkFilled() {
+    QMainWindow window;
+    window.setAttribute(Qt::WA_DontShowOnScreen);
+    auto* sub = new QToolBar(&window);
+    sub->setObjectName(QStringLiteral("subToolbar"));
+    sub->setIconSize(QSize(20, 20));
+    sub->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
+    sub->setMovable(false);
+    QAction* chosen = nullptr;
+    for (const char* id : {"select", "draw_area", "draw_poly"}) {
+      QAction* action = sub->addAction(KaIcons::icon(QString::fromLatin1(id)), QString::fromLatin1(id));
+      action->setCheckable(true);
+      if (QLatin1String(id) == QLatin1String("draw_area")) chosen = action;
+    }
+    chosen->setChecked(true);
+    window.addToolBar(sub);
+    window.setCentralWidget(new QWidget(&window));
+    window.resize(900, 200);
+    window.show();
+    QCoreApplication::processEvents();
+    int chosenButtons = 0;
+    for (QToolButton* button : sub->findChildren<QToolButton*>()) {
+      if (!button->defaultAction()) continue;
+      const QColor face = button->grab().toImage().pixelColor(3, button->height() / 2);
+      if (button->defaultAction() == chosen) {
+        ++chosenButtons;
+        QVERIFY2(face.lightness() < 70, qPrintable(QStringLiteral("chosen face %1").arg(face.name())));
+      } else {
+        QVERIFY2(face.lightness() > 200, qPrintable(QStringLiteral("plain face %1").arg(face.name())));
+      }
+    }
+    QCOMPARE(chosenButtons, 1);
   }
 };
 

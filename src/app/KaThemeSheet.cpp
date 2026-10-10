@@ -127,11 +127,13 @@ QHash<QString, QString> replacementTable() {
   values.insert(QStringLiteral("menuItemMin"), paper ? QStringLiteral("20") : QStringLiteral("22"));
   values.insert(QStringLiteral("menuHover"), (paper ? c.desk : c.selected).name());
   values.insert(QStringLiteral("figureSize"), paper ? QStringLiteral("16") : QStringLiteral("13"));  // 수치 대장 (spec 20: 16 keeps 12,000,000.00 m² inside the 272 px panel)
-  values.insert(QStringLiteral("subCheckedFace"), paper ? c.selected.name() : none);
-  values.insert(QStringLiteral("subCheckedEdge"), paper ? c.accent.name() : none);
+  // 그리기 줄에서 손에 든 도구 (보완 M3): the slate fill with ivory words, as the ribbon's 그리기 tile (stock: unchanged).
+  values.insert(QStringLiteral("subCheckedFace"), paper ? c.tileOn.name() : none);
+  values.insert(QStringLiteral("subCheckedEdge"), paper ? c.tileOn.name() : none);
   values.insert(QStringLiteral("subCheckedEdgeWidth"), paper ? QStringLiteral("1") : QStringLiteral("2"));
+  values.insert(QStringLiteral("subCheckedInk"), (paper ? c.glyphOn : c.ribbonActiveInk).name());
   values.insert(QStringLiteral("subUnderline"),
-                paper ? QStringLiteral("1px solid ") + c.accent.name() : QStringLiteral("2px solid ") + c.ribbonActiveInk.name());
+                paper ? QStringLiteral("1px solid ") + c.tileOn.name() : QStringLiteral("2px solid ") + c.ribbonActiveInk.name());
   return values;
 }
 

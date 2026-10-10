@@ -260,8 +260,8 @@ void TestThemeRender::paperLook_mainButtonIsClayAndBandIsPaper() {
 }
 
 // 새 모양: the tools of the drawing row (#subToolbar) are buttons — a face with a thin rounded edge,
-// and the chosen tool in the clay wash with a clay edge (user 2026-10-04 「이것들도 버튼 형태로
-// 엔트로픽스타일로」). The stock look keeps its flat row.
+// and the chosen tool the slate "in hand" fill, as the ribbon's 그리기 tile (user 2026-10-04 「이것들도 버튼 형태로
+// 엔트로픽스타일로」; the fill was the clay wash until 보완 M3). The stock look keeps its flat row.
 void TestThemeRender::paperLook_drawingRowToolsAreButtons() {
   QToolBar row;
   row.setObjectName(QStringLiteral("subToolbar"));
@@ -291,8 +291,8 @@ void TestThemeRender::paperLook_drawingRowToolsAreButtons() {
   KaTheme::setDisplayOptions(qApp, KaTheme::DisplayOptions());  // restore before any check can return early
   QVERIFY2(near(edge, t.border), qPrintable(edge.name()));
   QVERIFY2(near(face, t.surface), qPrintable(face.name()));
-  QVERIFY2(near(chosenEdge, t.accent), qPrintable(chosenEdge.name()));
-  QVERIFY2(near(chosenFace, t.selected), qPrintable(chosenFace.name()));
+  QVERIFY2(near(chosenEdge, t.tileOn), qPrintable(chosenEdge.name()));
+  QVERIFY2(near(chosenFace, t.tileOn), qPrintable(chosenFace.name()));
 }
 
 QTEST_MAIN(TestThemeRender)

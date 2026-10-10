@@ -276,7 +276,7 @@ QToolBar#subToolbar QToolButton {
 QToolBar#subToolbar QToolButton:enabled:hover { background: @hover@; }
 QToolBar#subToolbar QToolButton:enabled:checked {
   background: @subCheckedFace@;
-  color: @ribbonActiveInk@;
+  color: @subCheckedInk@;
   font-weight: 700;
   border: @subCheckedEdgeWidth@px solid @subCheckedEdge@;
   border-bottom: @subUnderline@;
