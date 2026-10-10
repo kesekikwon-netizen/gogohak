@@ -9,6 +9,7 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QLocale>
+#include <QMouseEvent>
 #include <QToolButton>
 
 namespace {
@@ -108,6 +109,9 @@ KaStatusBar::KaStatusBar(QWidget* parent) : QStatusBar(parent) {
 
   m_uploadChip = new QLabel(this);
   m_uploadChip->setObjectName(QStringLiteral("uploadCrsChip"));
+  // It looks like the 작업 chip beside it, so people click it to submit (2026-10-10 현장 보고).
+  m_uploadChip->setCursor(Qt::PointingHandCursor);
+  m_uploadChip->installEventFilter(this);
   addPermanentWidget(m_uploadChip);
 
   QFrame* afterCrs = makeSeparator(this);
@@ -190,8 +194,20 @@ void KaStatusBar::refreshCrsText() {
       QStringLiteral("지금 그리는 좌표계는 %1입니다. 눌러서 바꿀 수 있습니다.").arg(m_workCrs));
   m_uploadChip->setText(QStringLiteral("→ 제출 %1").arg(upload));
   m_uploadChip->setToolTip(
-      QStringLiteral("제출용 파일은 작업 좌표계와 상관없이 항상 %1로 변환되어 나갑니다.")
+      QStringLiteral("제출용 파일은 작업 좌표계와 상관없이 항상 %1로 변환되어 나갑니다. 누르면 「검수·제출」을 엽니다.")
           .arg(m_uploadCrs));
+}
+
+bool KaStatusBar::eventFilter(QObject* watched, QEvent* event) {
+  if (watched == m_uploadChip && event->type() == QEvent::MouseButtonRelease) {
+    // Like a button: a release after dragging off the words does nothing.
+    const auto* mouse = static_cast<QMouseEvent*>(event);
+    if (mouse->button() == Qt::LeftButton && m_uploadChip->rect().contains(mouse->position().toPoint())) {
+      emit submitClicked();
+      return true;
+    }
+  }
+  return QStatusBar::eventFilter(watched, event);
 }
 
 void KaStatusBar::changeEvent(QEvent* event) {

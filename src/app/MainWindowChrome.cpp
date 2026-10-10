@@ -127,6 +127,8 @@ void MainWindow::setupStrataShell() {
     m_viewTabs->setCornerWidget(m_surveyBadge, Qt::TopRightCorner);
     connect(m_surveyBadge, &KaSurveyBadge::clicked, this, &MainWindow::showMapWorkspace);
   }
+  // 「→ 제출 5179」 in the status bar looked clickable and did nothing (2026-10-10): it opens 검수·제출 like Ctrl+E.
+  if (m_status) connect(m_status, &KaStatusBar::submitClicked, this, &MainWindow::openSubmitReview);
   // 4. Guide band over the canvas; the opacity card moves down while the pill shows.
   QWidget* host = m_canvas->viewport() ? m_canvas->viewport() : static_cast<QWidget*>(m_canvas);
   m_drawGuide = new KaDrawGuideBand(host);

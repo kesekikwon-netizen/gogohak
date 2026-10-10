@@ -166,7 +166,9 @@ void KaMeasureMapTool::placeHud() {
   if (host) {
     if (auto* rail = host->findChild<QWidget*>(QStringLiteral("layerOpacityRail"))) {
       if (rail->isVisible()) {
-        x = rail->geometry().right() + 8;
+        // Beside the card; a card dragged to the right edge gets the panel on its left (2026-10-10).
+        const bool roomRight = rail->geometry().right() + 18 + m_hud->width() <= host->width();
+        x = roomRight ? rail->geometry().right() + 8 : qMax(10, rail->geometry().left() - 8 - m_hud->width());
         y = rail->geometry().top();
       }
     }

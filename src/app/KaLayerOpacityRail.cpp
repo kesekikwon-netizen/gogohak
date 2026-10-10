@@ -3,11 +3,20 @@
 #include <QEvent>
 #include <QGridLayout>
 #include <QLabel>
+#include <QMouseEvent>
+#include <QSettings>
 #include <QShowEvent>
 #include <QSlider>
 #include <QStyle>
 
-KaLayerOpacityRail::KaLayerOpacityRail(QWidget* host) : QFrame(host), m_host(host) {
+namespace {
+QString placementSettingsKey(const QString& placementKey) {
+  return QStringLiteral("ui/opacityRail/%1").arg(placementKey);
+}
+}  // namespace
+
+KaLayerOpacityRail::KaLayerOpacityRail(QWidget* host, const QString& placementKey)
+    : QFrame(host), m_host(host), m_placementKey(placementKey) {
   setObjectName(QStringLiteral("layerOpacityRail"));
   setAttribute(Qt::WA_StyledBackground, true);
   setFocusPolicy(Qt::NoFocus);
@@ -82,6 +91,18 @@ KaLayerOpacityRail::KaLayerOpacityRail(QWidget* host) : QFrame(host), m_host(hos
       m_value->setText(QStringLiteral("%1%").arg(value));
     emit percentChanged(value);
   });
+
+  // 2026-10-10 현장 요청: 「화면 맞춤」한 도면이나 지도를 가리면 빈 곳을 잡고 끌어 옮긴다.
+  // 놓은 자리는 지도·도면 따로 기억한다. 슬라이더는 값만 바꾼다.
+  setCursor(Qt::OpenHandCursor);
+  m_slider->setCursor(Qt::ArrowCursor);
+  m_bright->setCursor(Qt::ArrowCursor);
+  setToolTip(QStringLiteral("빈 곳을 잡고 끌면 옮길 수 있습니다. 놓은 자리는 다음에도 그대로입니다."));
+  if (!m_placementKey.isEmpty()) {
+    const QVariant saved = QSettings().value(placementSettingsKey(m_placementKey));
+    m_placed = saved.isValid();
+    m_placedPos = saved.toPoint();
+  }
 
   setTarget(QString(), false);
   if (m_host) {
@@ -180,9 +201,51 @@ void KaLayerOpacityRail::setTopInset(int px) {
 void KaLayerOpacityRail::reposition() {
   if (!m_host)
     return;
-  move(10, 10 + m_topInset);
   if (auto* lay = layout())
     lay->activate();
   resize(260, m_adjustable ? qMax(88, sizeHint().height()) : qMax(34, sizeHint().height()));
+  move(m_placed ? keptInside(m_placedPos) : QPoint(10, 10 + m_topInset));
   raise();
+}
+
+QPoint KaLayerOpacityRail::keptInside(const QPoint& wanted) const {
+  // 창이 줄거나 그리기 안내 띠가 떠도 카드 전체가 보이게 당겨 온다.
+  const int top = m_topInset > 0 ? m_topInset + 10 : 0;
+  return {qBound(0, wanted.x(), qMax(0, m_host->width() - width())),
+          qBound(top, wanted.y(), qMax(top, m_host->height() - height()))};
+}
+
+void KaLayerOpacityRail::mousePressEvent(QMouseEvent* event) {
+  if (event->button() != Qt::LeftButton || !m_host) {
+    QFrame::mousePressEvent(event);
+    return;
+  }
+  m_dragging = true;
+  m_grab = event->position().toPoint();
+  setCursor(Qt::ClosedHandCursor);
+  event->accept();
+}
+
+void KaLayerOpacityRail::mouseMoveEvent(QMouseEvent* event) {
+  if (!m_dragging || !(event->buttons() & Qt::LeftButton)) {
+    QFrame::mouseMoveEvent(event);
+    return;
+  }
+  m_placed = true;
+  m_placedPos = mapToParent(event->position().toPoint()) - m_grab;
+  reposition();
+  m_placedPos = pos();  // remember the place actually shown
+  event->accept();
+}
+
+void KaLayerOpacityRail::mouseReleaseEvent(QMouseEvent* event) {
+  if (!m_dragging || event->button() != Qt::LeftButton) {
+    QFrame::mouseReleaseEvent(event);
+    return;
+  }
+  m_dragging = false;
+  setCursor(Qt::OpenHandCursor);
+  if (m_placed && !m_placementKey.isEmpty())
+    QSettings().setValue(placementSettingsKey(m_placementKey), m_placedPos);
+  event->accept();
 }

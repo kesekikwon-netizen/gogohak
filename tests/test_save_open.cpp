@@ -3999,6 +3999,21 @@ private slots:
     QCOMPARE(canvas->mapSettings().destinationCrs().authid(), authId);
     QCOMPARE(chip->text(), QStringLiteral("작업 %1").arg(authId.mid(5)));
     QCOMPARE(upload->text(), QStringLiteral("→ 제출 5179"));
+    // 「→ 제출 5179」 글씨를 누르면 검수·제출 창이 열린다(2026-10-10 현장 보고: 눌러도 아무 일이 없었다).
+    QString submitTitle;
+    QTimer closeSubmit;
+    connect(&closeSubmit, &QTimer::timeout, [&] {
+      if (auto* dialog = qobject_cast<QDialog*>(QApplication::activeModalWidget())) {
+        submitTitle = dialog->windowTitle();
+        closeSubmit.stop();
+        dialog->reject();
+      }
+    });
+    closeSubmit.start(20);
+    QCOMPARE(upload->cursor().shape(), Qt::PointingHandCursor);
+    QTest::mouseClick(upload, Qt::LeftButton);
+    closeSubmit.stop();
+    QCOMPARE(submitTitle, QStringLiteral("검수·제출"));
     {
       QgsVectorLayer stored(path + QStringLiteral("|layername=survey_area"), name, QStringLiteral("ogr"));
       QVERIFY(stored.isValid());
@@ -4601,6 +4616,23 @@ private slots:
         QCoreApplication::processEvents();
         check(QStringLiteral("처음 열기"));
         if (QTest::currentTestFailed()) return;
+        // 예전 판 조사를 새 판에서 열자마자 EPSG:5179 제출 꾸러미를 만들 수 있어야 한다
+        // (2026-10-10 현장 보고: 예전 판에서 저장한 조사가 새 판에서 5179로 내보내지지 않는다).
+        // 표본에는 기준점·유구가 없어 검수는 원래 막힌다(그 판에서도 같은 error 규칙). 여기서는 꾸러미 쓰기만 본다.
+        {
+          QTemporaryDir out;
+          QVERIFY(out.isValid());
+          QString submitError;
+          const QString package = ExportService::exportSubmissionPackage(
+              QgsProject::instance(), QDir(out.path()).filePath(QStringLiteral("제출")), QStringLiteral("UTF-8"),
+              QString(), /*blockOnError=*/true, /*hasChecklistErrors=*/false, &submitError);
+          QVERIFY2(!package.isEmpty(), qPrintable(version + QStringLiteral(": 제출 꾸러미를 만들지 못했습니다: ") + submitError));
+          QgsVectorLayer shp(QDir(package).filePath(QStringLiteral("survey_area.shp")), QStringLiteral("submitted"),
+                             QStringLiteral("ogr"));
+          QVERIFY2(shp.isValid(), qPrintable(version + QStringLiteral(": survey_area.shp 가 없습니다")));
+          QCOMPARE(shp.crs().authid(), QStringLiteral("EPSG:5179"));
+          QCOMPARE(shp.featureCount(), areaCount);
+        }
         // 새 판에서 이어서 작업하고 저장한 뒤 다시 열어도 그대로여야 한다.
         QVERIFY2(saveNow(window), qPrintable(version + QStringLiteral(": 새 판으로 저장하지 못했습니다")));
         QgsProject::instance()->setDirty(false);

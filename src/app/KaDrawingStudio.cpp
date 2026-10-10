@@ -1278,7 +1278,7 @@ void KaDrawingStudio::buildUi() {
     // viewport()->scroll() 을 부르고, 그러면 viewport 의 자식 위젯까지 같이 밀린다.
     // 지도(QgsMapCanvas)는 스크롤 없이 범위를 다시 그려서 이 문제가 없었다.
     // 스크롤하지 않는 desk 에 붙여 페이지를 움직여도 제자리에 남게 한다.
-    m_opacityRail = new KaLayerOpacityRail(desk);
+    m_opacityRail = new KaLayerOpacityRail(desk, QStringLiteral("drawing"));
   }
   connect(m_opacityRail, &KaLayerOpacityRail::brightnessChanged, this, [this](int value) {
     // 막대를 켤 때 잡아 둔 레이어를 쓴다. 조판에서는 용지를 클릭하는 사이에

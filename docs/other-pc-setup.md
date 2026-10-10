@@ -204,6 +204,7 @@ git push
 | `qgis-dev missing` | OSGeo4W에서 `qgis-dev` |
 | DLL 없음 / 즉시 종료 | `dev-env.ps1` 후 실행; `pdal-dev\bin` PATH |
 | CMake 없음 | `winget install Kitware.CMake` |
+| 시작 때 「모듈(wms)이 없습니다」, 위성·지적 배경 안 나옴 | OSGeo4W 경로에 한글이 있다(예: `C:\Users\<한글 이름>\OSGeo4W`). `C:\OSGeo4W`를 그 폴더로 연결(`New-Item -ItemType Junction -Path C:\OSGeo4W -Target <원래 폴더>`)하고 사용자 환경변수 `OSGEO4W_ROOT=C:\OSGeo4W`, 그 뒤 `cmake --preset vs` (docs/ERROR_REGRESSION.md) |
 | VS 제너레이터 실패 | VS 2022 Build Tools + C++ 워크로드 |
 | VWorld 배경 안 됨 | 더보기 → API 키 입력 (로컬) |
 | 조판 창 안 뜸 | Release 빌드 후 `도구 → 조판 편집 창` |

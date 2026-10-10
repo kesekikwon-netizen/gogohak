@@ -52,10 +52,13 @@ public:
 
 signals:
   void crsClicked();
+  // 「→ 제출 5179」 was clicked: the window opens 검수·제출, the only way to make the 5179 package.
+  void submitClicked();
   void renderingToggled(bool on);
 
 protected:
   void changeEvent(QEvent* event) override;
+  bool eventFilter(QObject* watched, QEvent* event) override;
 
 private:
   void refreshCrsText();

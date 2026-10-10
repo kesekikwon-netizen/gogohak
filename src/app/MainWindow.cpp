@@ -954,7 +954,7 @@ void MainWindow::buildUi() {
   mapLay->addWidget(m_canvas, 1);
   {
     QWidget* railHost = m_canvas->viewport() ? m_canvas->viewport() : static_cast<QWidget*>(m_canvas);
-    m_layerOpacityRail = new KaLayerOpacityRail(railHost);
+    m_layerOpacityRail = new KaLayerOpacityRail(railHost, QStringLiteral("map"));
     // Zoom buttons and a scale bar float on the map like the opacity card.
     auto* controls = new KaMapControls(m_canvas, railHost);
     controls->setFitHandler([this]() {

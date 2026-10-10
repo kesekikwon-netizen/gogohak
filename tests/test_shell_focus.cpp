@@ -4,8 +4,11 @@
 #include <QtTest>
 
 #include <QApplication>
+#include <QMouseEvent>
+#include <QSettings>
 #include <QSignalSpy>
 #include <QSplitter>
+#include <QTemporaryDir>
 
 #include "app/KaLayerOpacityRail.h"
 #include "app/KaShellFocus.h"
@@ -31,6 +34,14 @@ bool within(int a, int b, int tolerance) { return qAbs(a - b) <= tolerance; }
 class TestShellFocus : public QObject {
   Q_OBJECT
  private slots:
+  void initTestCase() {
+    // The rail remembers its place in QSettings: keep it in a throwaway ini, never the app's settings.
+    QVERIFY(m_settings.isValid());
+    QSettings::setDefaultFormat(QSettings::IniFormat);
+    QSettings::setPath(QSettings::IniFormat, QSettings::UserScope, m_settings.path());
+    QCoreApplication::setOrganizationName(QStringLiteral("ka-shell-focus-tests"));
+  }
+
   void focus_threeWidgetSplitKeepsRightSize() {
     ThreePane pane;
     QCOMPARE(KaShellFocus::sizesWithLeft(&pane.split, 260), (QList<int>{260, 1366 - 260 - 272, 272}));
@@ -128,6 +139,35 @@ class TestShellFocus : public QObject {
     QCOMPARE(rail.topInset(), 0);
     QCOMPARE(rail.pos(), QPoint(10, 10));
   }
+
+  // 2026-10-10 현장 요청: 투명도·밝기 상자가 도면·지도를 가린다. 빈 곳을 잡고 끌어 옮기고, 놓은 자리는
+  // 지도·도면 따로 다음에도 그대로다. 창이 줄면 상자 전체가 보이는 곳으로 당겨 온다.
+  void rail_dragMovesAndRemembersPlace() {
+    QSettings().remove(QStringLiteral("ui/opacityRail"));
+    QWidget host;
+    host.resize(800, 600);
+    host.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&host));
+    {
+      KaLayerOpacityRail rail(&host, QStringLiteral("map"));
+      QCOMPARE(rail.pos(), QPoint(10, 10));  // nothing saved yet: the old corner
+      QTest::mousePress(&rail, Qt::LeftButton, {}, QPoint(4, 4));  // the margin, not a slider
+      QMouseEvent move(QEvent::MouseMove, QPointF(304, 204), rail.mapToGlobal(QPointF(304, 204)), Qt::NoButton,
+                       Qt::LeftButton, Qt::NoModifier);
+      QApplication::sendEvent(&rail, &move);
+      QTest::mouseRelease(&rail, Qt::LeftButton, {}, QPoint(4, 4));
+      QCOMPARE(rail.pos(), QPoint(310, 210));
+    }
+    KaLayerOpacityRail again(&host, QStringLiteral("map"));
+    QCOMPARE(again.pos(), QPoint(310, 210));
+    KaLayerOpacityRail drawing(&host, QStringLiteral("drawing"));
+    QCOMPARE(drawing.pos(), QPoint(10, 10));
+    host.resize(400, 300);
+    QVERIFY2(QRect(QPoint(), host.size()).contains(again.geometry()), "창이 줄어도 상자는 보이는 곳에 있다");
+  }
+
+ private:
+  QTemporaryDir m_settings;
 };
 
 QTEST_MAIN(TestShellFocus)
