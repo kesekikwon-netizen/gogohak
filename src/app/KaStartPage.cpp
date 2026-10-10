@@ -33,6 +33,7 @@ namespace {
 constexpr int kHeroCompact = 184;
 constexpr int kHeroTall = 236;
 constexpr int kCompactWindowHeight = 820;  // 1366x768 desktops sit under this
+constexpr int kCompactPageHeight = 780;  // the page itself: 3440×1440 at 150 % leaves ~720 under the ribbon (2026-10-10)
 constexpr int kRightNarrow = 340;
 constexpr int kRightWide = 400;
 constexpr int kNarrowWindowWidth = 1500;
@@ -225,7 +226,7 @@ QWidget* KaStartPage::buildRightColumn() {
 }
 
 void KaStartPage::applyWindowMetrics() {
-  if (m_hero) m_hero->setFixedHeight(heroHeightFor(window()->height()));
+  if (m_hero) m_hero->setFixedHeight(height() < kCompactPageHeight ? kHeroCompact : heroHeightFor(window()->height()));
   if (m_rightColumn) m_rightColumn->setFixedWidth(rightColumnWidthFor(window()->width()));
   const bool strip = window()->height() >= kCompactWindowHeight;  // 연결 상태: one row under both cards; a short window (1366x768) keeps 최근 조사 its rows
   if (m_connection && m_rightColumn) m_connection->placeIn(qobject_cast<QBoxLayout*>(strip ? layout() : m_rightColumn->widget()->layout()), strip);

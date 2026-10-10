@@ -69,6 +69,16 @@ void KaLayerInformationView::protectSidebarList(QSplitter* split, QgsLayerTreeVi
     const int layers = qMax(need + chrome, split->height() - handle);
     split->setSizes({layers, 0});
   }
+  // A short column (the user's 3440×1440 at 150 % leaves ~700 px, a 1080p screen ~830): the list keeps ¾ and an open
+  // 파일함 at most ¼ (2026-10-10). Taller columns keep the 3:2 share. Once per column height: a tab switch keeps
+  // a 파일함 the user dragged larger.
+  if (!tight && filesOpen && split->count() >= 2 && split->height() < 900 &&
+      split->property("kaCappedHeight").toInt() != split->height()) {
+    split->setProperty("kaCappedHeight", split->height());
+    const QList<int> sizes = split->sizes();
+    const int total = sizes.at(0) + sizes.at(1);
+    if (sizes.at(1) * 4 > total) split->setSizes({total - total / 4, total / 4});
+  }
 }
 
 // A 파일함 shut to 0 px (protectSidebarList, or MainWindow/leftSplit saved that way) came
@@ -107,17 +117,22 @@ void KaLayerInformationView::drawBranches(QPainter* painter, const QRect& rect, 
   QgsLayerTreeView::drawBranches(painter, band > 0 ? rect.adjusted(0, band, 0, 0) : rect, index);
 }
 
-void KaLayerInformationModel::configureView(QgsLayerTreeView* view) {
-  if (auto* model = qobject_cast<KaLayerInformationModel*>(view->layerTreeModel())) view->installEventFilter(model);
-  view->setProperty("kaLayerInformation", true);
+void KaLayerInformationModel::applyListFont(QgsLayerTreeView* view) {
   QFont compactFont = view->font();
-  compactFont.setPixelSize(10); // The application layer list previously used 13 px.
+  // 10 px rows (the list previously used 13 px; 2026-10-03). 큰 글자 grows them in the same ratio (2026-10-10).
+  compactFont.setPixelSize(KaTheme::scaledUiPx(10));
   view->setFont(compactFont);
   if (auto* model = view->layerTreeModel()) {
     model->setLayerTreeNodeFont(QgsLayerTreeNode::NodeLayer, compactFont);
     compactFont.setBold(true);
     model->setLayerTreeNodeFont(QgsLayerTreeNode::NodeGroup, compactFont);
   }
+}
+
+void KaLayerInformationModel::configureView(QgsLayerTreeView* view) {
+  if (auto* model = qobject_cast<KaLayerInformationModel*>(view->layerTreeModel())) view->installEventFilter(model);
+  view->setProperty("kaLayerInformation", true);
+  applyListFont(view);
   view->setAlternatingRowColors(true);
   view->setHeaderHidden(false);
   view->header()->setStretchLastSection(false);

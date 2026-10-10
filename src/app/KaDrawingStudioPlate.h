@@ -24,4 +24,9 @@ void joinScaleTable(QWidget* content);
 // In 새 모양 「축척 글자 · 좌표계 · 좌표 격자」 (by their tooltip word; the grid button by its name) become words
 // without icons, 32 px high, sharing their row (the board's bottom of the panel). Nothing in stock.
 void wordTiles(QWidget* content);
+// The right column (the inspector scroll area's panel) on a short drawing tab: its vertical margins and spacing halve
+// under 860 px so the last row
+// stays above 「PDF 내보내기」 (the user's 3440×1440 at 150 % leaves 753 px; 2026-10-10). Buttons keep their size;
+// a taller tab gets the full spacing back. Both looks.
+void fitToHeight(QScrollArea* inspector, int studioHeight);
 }  // namespace KaDrawingStudioPlate

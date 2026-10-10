@@ -129,6 +129,30 @@ void wordTiles(QWidget* content) {
   }
 }
 
+void fitToHeight(QScrollArea* inspector, int studioHeight) {
+  QWidget* side = inspector ? inspector->widget() : nullptr;
+  if (!side || !side->layout()) return;
+  const bool compact = studioHeight < 860;
+  if (side->property("kaCompact").isValid() && side->property("kaCompact").toBool() == compact) return;
+  side->setProperty("kaCompact", compact);
+  // The rows' own gaps stay: preset rows keep their 8 px separation (drawingInspectorUsesHeightWithoutOverlapping).
+  const auto fit = [compact](QLayout* lay) {
+    if (!lay->property("kaFullSpacing").isValid()) {  // the spacing as built, kept for a taller tab
+      lay->setProperty("kaFullTop", lay->contentsMargins().top());
+      lay->setProperty("kaFullBottom", lay->contentsMargins().bottom());
+      lay->setProperty("kaFullSpacing", lay->spacing());
+    }
+    const int half = compact ? 2 : 1;
+    const QMargins m = lay->contentsMargins();
+    lay->setContentsMargins(m.left(), lay->property("kaFullTop").toInt() / half, m.right(),
+                            lay->property("kaFullBottom").toInt() / half);
+    if (lay->property("kaFullSpacing").toInt() > 0) lay->setSpacing(lay->property("kaFullSpacing").toInt() / half);
+  };
+  fit(side->layout());
+  for (QWidget* card : side->findChildren<QWidget*>(QString(), Qt::FindDirectChildrenOnly))
+    if (card->layout()) fit(card->layout());
+}
+
 void setWord(QToolButton* button) {
   button->setText(paperLook() ? QStringLiteral("세트 ▾") : QStringLiteral("세트"));
   button->installEventFilter(new SetWordFollower(button));

@@ -887,6 +887,94 @@ private slots:
     QVERIFY2(window.minimumSizeHint().width() <= 1880, qPrintable(QString::number(window.minimumSizeHint().width())));
     QgsProject::instance()->setDirty(false);
   }
+  // 2026-10-10 사용자 모니터(3440×1440, 150 %)는 앱에 2293×912로 보인다(작업표시줄 제외). 세로가 낮아도 홈·지도·
+  // 도면이 잘리지 않아야 한다(docs/intent/2026-10-10-monitor-3440x1440-fit.md). 1920×1040은 흔한 1080p 작업 영역.
+  // ctest save_open_monitor 는 2560×1440 가상 화면(cmake/offscreen-2560.json)에서 돈다.
+  void monitorFitHomeMapDrawing_data() {
+    QTest::addColumn<QSize>("size");
+    QTest::addColumn<bool>("largeText");
+    QTest::newRow("2293x912-large") << QSize(2293, 912) << true;
+    QTest::newRow("2293x912") << QSize(2293, 912) << false;
+    QTest::newRow("1920x1040-large") << QSize(1920, 1040) << true;
+    QTest::newRow("1920x1040") << QSize(1920, 1040) << false;
+  }
+  void monitorFitHomeMapDrawing() {
+    QFETCH(QSize, size);
+    QFETCH(bool, largeText);
+    KaTheme::DisplayOptions look;
+    look.paperLook = look.highContrast = true;
+    look.largeText = largeText;
+    KaTheme::setDisplayOptions(qApp, look);
+    const auto restore = qScopeGuard([] { KaTheme::setDisplayOptions(qApp, KaTheme::DisplayOptions()); });
+    const QString tag = QString::fromLatin1(QTest::currentDataTag());
+    const QString path = makeSurvey(QStringLiteral("모니터맞춤-") + tag);
+    QVERIFY(!path.isEmpty());
+    MainWindow window;
+    disableRendering(window);
+    window.setWindowState(Qt::WindowNoState);
+    window.resize(size);
+    window.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&window));
+    QCOMPARE(window.size(), size);
+    QVERIFY(window.openSurveyGpkg(path));
+    auto* tabs = window.findChild<QTabWidget*>(QStringLiteral("viewTabs"));
+    QVERIFY(tabs);
+    const QString out = qEnvironmentVariable("KA_HGIS_QA_OUTPUT_DIR");
+    QStringList clipped;  // every cut part at once, so one run shows the whole screen
+    const auto shot = [&](QWidget* widget, const QString& name) {
+      if (!out.isEmpty()) QVERIFY(QDir().mkpath(out) && widget->grab().save(QDir(out).filePath(tag + name)));
+    };
+    // 홈: 「작업 순서」는 스크롤 없이 다 보이고, 「최근 조사」는 세 줄이 들어가고, 폴더 칸은 말줄임표로 줄인다.
+    tabs->setCurrentIndex(0);
+    QCoreApplication::processEvents();
+    shot(&window, QStringLiteral("-home.png"));
+    auto* steps = window.findChild<QScrollArea*>(QStringLiteral("startRightColumn"));
+    auto* recent = window.findChild<QTableWidget*>(QStringLiteral("recentSurveyList"));
+    auto* folder = window.findChild<QLabel*>(QStringLiteral("startCellFolder"));
+    QVERIFY(steps && recent && folder);
+    const int folderNeeds = folder->fontMetrics().horizontalAdvance(folder->text());
+    qInfo() << tag << "home: steps scroll" << steps->verticalScrollBar()->maximum() << "recent viewport"
+            << recent->viewport()->height() << "folder" << folderNeeds << "/" << folder->contentsRect().width();
+    if (steps->verticalScrollBar()->maximum() > 0)
+      clipped << QStringLiteral("작업 순서 %1 px 잘림").arg(steps->verticalScrollBar()->maximum());
+    if (recent->viewport()->height() < 3 * 48)
+      clipped << QStringLiteral("최근 조사 %1 px(세 줄 안 됨)").arg(recent->viewport()->height());
+    if (folderNeeds > folder->contentsRect().width())
+      clipped << QStringLiteral("폴더 칸 %1/%2 px").arg(folderNeeds).arg(folder->contentsRect().width());
+    // 지도: 레이어 목록이 왼쪽 칸을 주로 쓰고 파일함은 ¼ 이하.
+    QVERIFY(QMetaObject::invokeMethod(&window, "showMapWorkspace", Qt::DirectConnection));
+    QCoreApplication::processEvents();
+    shot(&window, QStringLiteral("-map.png"));
+    auto* split = window.findChild<QSplitter*>(QStringLiteral("leftSplit"));
+    auto* files = window.findChild<QWidget*>(QStringLiteral("sidebarFilesScroll"));
+    QVERIFY(split && files);
+    const int filesHeight = files->isVisible() ? files->height() : 0;
+    qInfo() << tag << "map: left split" << split->height() << "files" << filesHeight;
+    if (filesHeight * 4 > split->height())
+      clipped << QStringLiteral("파일함 %1 px / 왼쪽 칸 %2 px").arg(filesHeight).arg(split->height());
+    // 도면: 같은 높이의 도면 탭에서 오른쪽 「도면 항목」 칸이 스크롤 없이 다 보인다.
+    QgsProject project;
+    project.setCrs(QgsCoordinateReferenceSystem(QStringLiteral("EPSG:5187")));
+    QgsMapCanvas canvas;
+    canvas.setRenderFlag(false);
+    canvas.setDestinationCrs(project.crs());
+    canvas.setExtent(QgsRectangle(190000, 560000, 191000, 561000));
+    QTabWidget studioTabs;
+    KaDrawingStudio studio(&project, &canvas, 210., 297., &studioTabs);
+    studio.setParent(&studioTabs, Qt::Widget);
+    studioTabs.addTab(&studio, QStringLiteral("도면"));
+    studioTabs.resize(tabs->size());
+    studioTabs.show();
+    QCoreApplication::processEvents();
+    shot(&studioTabs, QStringLiteral("-drawing.png"));
+    auto* inspector = studio.findChild<QScrollArea*>(QStringLiteral("drawingInspectorScroll"));
+    QVERIFY(inspector);
+    qInfo() << tag << "drawing: tab" << studioTabs.size() << "inspector scroll" << inspector->verticalScrollBar()->maximum();
+    if (inspector->verticalScrollBar()->maximum() > 0)
+      clipped << QStringLiteral("도면 항목 %1 px 잘림").arg(inspector->verticalScrollBar()->maximum());
+    QgsProject::instance()->setDirty(false);
+    QVERIFY2(clipped.isEmpty(), qPrintable(tag + QStringLiteral(": ") + clipped.join(QStringLiteral(" · "))));
+  }
   void homePageShowsStrataHeroWithoutOpeningASurvey() {
     // Two remembered surveys give the continue card and the list something to show.
     const QString first = m_files.filePath(QStringLiteral("home-first/광령리.gpkg"));
@@ -1012,7 +1100,8 @@ private slots:
     const auto filesShown = [](MainWindow& window) {
       auto* files = window.findChild<QWidget*>(QStringLiteral("sidebarFilesScroll"));
       auto* split = window.findChild<QSplitter*>(QStringLiteral("leftSplit"));
-      return files && split && files->isVisible() && files->height() >= split->height() * 7 / 20;
+      // Open, not a 0 px strip. A short column (< 900 px) gives it ¼, a taller one 2/5 (2026-10-10 monitor fit).
+      return files && split && files->isVisible() && files->height() >= split->height() / 5;
     };
     const auto toggleOf = [](MainWindow& window) {
       return window.findChild<QToolButton*>(QStringLiteral("sidebarFilesToggle"));

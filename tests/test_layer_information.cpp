@@ -137,6 +137,23 @@ private slots:
   }
   // 유구 표지: in 새 모양 a survey layer's patch is a 20 × 14 square-cornered swatch of its own map symbol in a
   // 1 px ink frame, and the list makes room for it; stock keeps QGIS's square symbol icon.
+  // 2026-10-10 사용자 모니터(150 %): 큰 글자를 켜면 목록 글자도 다른 글자와 같은 비율로 커지고(10→12 px), 끄면
+  // 10 px로 돌아온다(2026-10-03 결정). 앱을 켠 채 바꿔도 따라간다(StyleChange).
+  void listTextFollowsLargeText() {
+    QgsProject project;
+    KaLayerInformationModel model(&project, false);
+    QgsLayerTreeView view; view.setModel(&model); KaLayerInformationModel::configureView(&view);
+    QCOMPARE(view.font().pixelSize(), 10);
+    const auto restore = qScopeGuard([] { KaTheme::setDisplayOptions(nullptr, KaTheme::DisplayOptions()); });
+    KaTheme::DisplayOptions large; large.largeText = true; KaTheme::setDisplayOptions(nullptr, large);
+    QEvent restyle(QEvent::StyleChange); QCoreApplication::sendEvent(&view, &restyle);
+    const int grown = view.font().pixelSize();
+    KaTheme::setDisplayOptions(nullptr, KaTheme::DisplayOptions());
+    QCoreApplication::sendEvent(&view, &restyle);
+    QCOMPARE(grown, 12);
+    QCOMPARE(view.font().pixelSize(), 10);
+  }
+
   void surveyLayerPatchIsAFramedSwatchInPaper() {
     QgsProject project;
     auto* layer = add(project, project.layerTreeRoot()->addGroup(QStringLiteral("조사 데이터")), QStringLiteral("유구 (면)"));

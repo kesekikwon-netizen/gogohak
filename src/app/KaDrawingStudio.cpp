@@ -3327,6 +3327,7 @@ bool KaDrawingStudio::eventFilter(QObject* watched, QEvent* event) {
           splitter, m_layerTree, findChild<QToolButton*>(QStringLiteral("sidebarFilesToggle")),
           findChild<QWidget*>(QStringLiteral("sidebarFilesScroll")),
           findChild<KaLayerInformationPanel*>(QStringLiteral("layerInformationPanel")));
+      KaDrawingStudioPlate::fitToHeight(findChild<QScrollArea*>(QStringLiteral("drawingInspectorScroll")), height());
     }
   }
   const bool onTree = m_layerTree && event && (watched == m_layerTree || watched == m_layerTree->viewport());

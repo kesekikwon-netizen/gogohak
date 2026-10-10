@@ -1847,10 +1847,14 @@ if(KA_HGIS_BUILD_TESTS)
     saveAgainAfterAddingSurveyAreaKeepsEveryFeature
     oldVersionSurveysStillOpen
     samplesOpenAsSurveys)
+  # 사용자 모니터(2293×912)와 1080p 작업 영역에서 홈·지도·도면이 잘리지 않는다(2026-10-10). 2293 폭이 들어가는
+  # 가상 화면 cmake/offscreen-2560.json 에서 돈다(아래 ENVIRONMENT).
+  ka_add_qtest_filter(save_open_monitor ka_save_open_tests
+    monitorFitHomeMapDrawing)
   set(KA_SAVE_OPEN_TESTS
     save_open_window save_open_topo save_open_drawing
     save_open_edit save_open_erase save_open_roundtrip save_open_open
-    save_open_open_invalid save_open_commit save_open_saveas save_open_portable)
+    save_open_open_invalid save_open_commit save_open_saveas save_open_portable save_open_monitor)
   set_tests_properties(${KA_SAVE_OPEN_TESTS} PROPERTIES TIMEOUT 180 RESOURCE_LOCK ka_save_open)
 
   add_executable(ka_e2e_tests tests/test_e2e_opaque.cpp)
@@ -1878,6 +1882,8 @@ if(KA_HGIS_BUILD_TESTS)
     string(JOIN "\\;" _ka_path_esc ${_ka_path})
     set_tests_properties(layer_labels layer_information checklist_engine workflow_engine georef_engine feature_presets buffer_ring measure_tape dem_trench_engine theme_qss user_error recent_surveys section_layout_engine section_studio_engine terrain_3d_engine ${KA_SAVE_OPEN_TESTS} e2e_opaque_suite network_services storage_safety reference_download region_locator_popup layer_state_regressions map_render above_labels above_labels_125 above_labels_150 above_labels_200 PROPERTIES
       ENVIRONMENT "GDAL_DATA=${OSGEO4W_ROOT}/apps/gdal-dev/share/gdal;PATH=${_ka_path_esc};QGIS_PREFIX_PATH=${QGIS_PREFIX_PATH};QT_QPA_PLATFORM=offscreen")
+    # A relative configfile: Qt splits the platform string at ':', so C:\... would break it (docs/ERROR_REGRESSION.md).
+    set_tests_properties(save_open_monitor PROPERTIES ENVIRONMENT "GDAL_DATA=${OSGEO4W_ROOT}/apps/gdal-dev/share/gdal;PATH=${_ka_path_esc};QGIS_PREFIX_PATH=${QGIS_PREFIX_PATH};QT_QPA_PLATFORM=offscreen:configfile=cmake/offscreen-2560.json")
     set_tests_properties(layer_roles layer_styles layer_edits layer_panel layer_tree_undo undo_group survey_save_as above_labels_names PROPERTIES ENVIRONMENT "GDAL_DATA=${OSGEO4W_ROOT}/apps/gdal-dev/share/gdal;PATH=${_ka_path_esc};QGIS_PREFIX_PATH=${QGIS_PREFIX_PATH};QT_QPA_PLATFORM=offscreen")
     set_tests_properties(georef_quality georef_backup align_tool align_image_view PROPERTIES
       ENVIRONMENT "GDAL_DATA=${OSGEO4W_ROOT}/apps/gdal-dev/share/gdal;PATH=${_ka_path_esc};QGIS_PREFIX_PATH=${QGIS_PREFIX_PATH};QT_QPA_PLATFORM=offscreen")

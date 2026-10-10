@@ -269,6 +269,7 @@ void KaLayerInformationModel::notifyEdited() {
 }
 bool KaLayerInformationModel::eventFilter(QObject* watched, QEvent* event) {
   auto* view = qobject_cast<QgsLayerTreeView*>(watched);
+  if (view && event->type() == QEvent::StyleChange) applyListFont(view);  // 큰 글자 turned on or off
   if (view && event->type() == QEvent::KeyPress && view->currentIndex().column() == 1) {
     auto* key = static_cast<QKeyEvent*>(event);
     if (key->key() == Qt::Key_Space && key->modifiers() == Qt::NoModifier) {

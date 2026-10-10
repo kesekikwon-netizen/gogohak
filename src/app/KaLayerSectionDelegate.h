@@ -34,7 +34,9 @@ class KaLayerSectionDelegate : public QStyledItemDelegate {
   bool enabled() const;
   // True for a top-level row that starts a section: row 0, or a section change.
   bool hasBand(const QModelIndex& index) const;
-  int bandHeight(const QModelIndex& index) const { return hasBand(index) ? kBandHeight : 0; }
+  int bandHeight(const QModelIndex& index) const { return hasBand(index) ? bandPx() : 0; }
+  // kBandHeight, grown with 큰 글자 like the caption in it (16 px, 18 px with large text).
+  static int bandPx();
   QAbstractItemDelegate* inner() const { return m_inner.data(); }
 
   void paint(QPainter* painter, const QStyleOptionViewItem& option, const QModelIndex& index) const override;

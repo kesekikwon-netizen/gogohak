@@ -112,6 +112,8 @@ struct ButtonMetrics {
 const ButtonMetrics& buttonMetrics();
 // Body text size for the active display options (13 px, or 15 px for large text).
 int uiFontSize();
+// A size designed at the 13 px body size, grown in the same ratio for large text (10 → 12, 11 → 13 px).
+inline int scaledUiPx(int basePx) { return (basePx * uiFontSize() + 6) / 13; }
 // Title face for names and headings: a quoted family list for the sheet, and its weight. Stock: the
 // body stack at 700. 새 모양: Noto Serif KR first (Batang, then Malgun Gothic where it is missing) at 500.
 QString titleFontFamilies();

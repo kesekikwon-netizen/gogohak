@@ -27,8 +27,12 @@ public:
   // "5186 중부원점" for a work CRS auth id, "—" when unknown.
   static QString crsText(const QString& authId);
 
+protected:
+  bool eventFilter(QObject* watched, QEvent* event) override;
+
 private:
   QLabel* cell(const char* caption, const char* name, QLayout* row);
+  void showFolder();
 
   QLabel* m_state = nullptr;
   QLabel* m_name = nullptr;
@@ -40,4 +44,5 @@ private:
   QLabel* m_check = nullptr;
   QPushButton* m_resume = nullptr;
   QVBoxLayout* m_left = nullptr;
+  QString m_folderText;
 };

@@ -74,12 +74,12 @@ void KaLayerSectionDelegate::paintBand(QPainter* painter, const QStyleOptionView
   if (index.column() != 0) return;
   const auto* view = qobject_cast<const QAbstractItemView*>(option.widget);
   const int width = view && view->viewport() ? view->viewport()->width() : option.rect.right() + 1;
-  const QRect band(0, option.rect.top(), width, kBandHeight);
+  const QRect band(0, option.rect.top(), width, bandPx());
   painter->save();
   painter->setPen(QPen(option.palette.color(QPalette::Mid), 1));
   painter->drawLine(band.topLeft(), band.topRight());
   QFont font = option.font;
-  font.setPixelSize(11);  // band caption; the list rows themselves stay 10 px (user decision)
+  font.setPixelSize(KaTheme::scaledUiPx(11));  // band caption; the rows are 10 px (user decision), both grow with 큰 글자
   font.setBold(true);
   painter->setFont(font);
   painter->setPen(option.palette.color(QPalette::PlaceholderText));
@@ -87,6 +87,8 @@ void KaLayerSectionDelegate::paintBand(QPainter* painter, const QStyleOptionView
                     sectionTitle(sectionOf(m_view->index2node(index))));
   painter->restore();
 }
+
+int KaLayerSectionDelegate::bandPx() { return KaTheme::scaledUiPx(kBandHeight); }
 
 void KaLayerSectionDelegate::paint(QPainter* painter, const QStyleOptionViewItem& option,
                                    const QModelIndex& index) const {
@@ -107,7 +109,7 @@ void KaLayerSectionDelegate::paint(QPainter* painter, const QStyleOptionViewItem
   const int margin = style->pixelMetric(QStyle::PM_FocusFrameHMargin, nullptr, item.widget) + 1;
   QFont mono(QStringLiteral("Consolas"));
   mono.setStyleHint(QFont::Monospace);
-  mono.setPixelSize(10);
+  mono.setPixelSize(KaTheme::scaledUiPx(10));
   const QString digits = QString::number(count.toLongLong());
   const int width = QFontMetrics(mono).horizontalAdvance(digits);
   const int afterName = text.left() + margin + QFontMetrics(item.font).horizontalAdvance(item.text) + 6;
@@ -139,7 +141,7 @@ void KaLayerSectionDelegate::paintPlateCheck(QPainter* painter, const QStyleOpti
 
 QSize KaLayerSectionDelegate::sizeHint(const QStyleOptionViewItem& option, const QModelIndex& index) const {
   QSize size = m_inner ? m_inner->sizeHint(option, index) : QStyledItemDelegate::sizeHint(option, index);
-  if (hasBand(index)) size.rheight() += kBandHeight;
+  if (hasBand(index)) size.rheight() += bandPx();
   return size;
 }
 

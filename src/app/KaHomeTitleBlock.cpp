@@ -3,6 +3,7 @@
 #include "KaHomeText.h"
 #include "core/SurveyFacts.h"
 
+#include <QEvent>
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QPushButton>
@@ -54,6 +55,7 @@ KaHomeTitleBlock::KaHomeTitleBlock(QWidget* parent) : QFrame(parent) {
   cells->setContentsMargins(0, 0, 0, 0);
   cells->setSpacing(0);
   m_folder = cell("폴더", "startCellFolder", cells);
+  m_folder->installEventFilter(this);  // shortened again whenever the cell's width changes (showFolder)
   m_when = cell("마지막 열림", "startCellWhen", cells);
   m_crs = cell("작업 좌표계", "startCellCrs", cells);
   m_areas = cell("조사구역", "startCellAreas", cells);
@@ -87,6 +89,19 @@ QLabel* KaHomeTitleBlock::cell(const char* caption, const char* name, QLayout* r
   return value;
 }
 
+// A long folder is shortened in the middle to the cell's width, never cut off at the edge (2026-10-10).
+void KaHomeTitleBlock::showFolder() {
+  // Not on screen yet (no real width): the whole folder until it shows.
+  const int width = m_folder->isVisible() ? m_folder->contentsRect().width() : 0;
+  m_folder->setText(width > 0 ? m_folder->fontMetrics().elidedText(m_folderText, Qt::ElideMiddle, width) : m_folderText);
+}
+
+bool KaHomeTitleBlock::eventFilter(QObject* watched, QEvent* event) {
+  if (watched == m_folder && (event->type() == QEvent::Resize || event->type() == QEvent::Show || event->type() == QEvent::FontChange))
+    showFolder();
+  return QFrame::eventFilter(watched, event);
+}
+
 void KaHomeTitleBlock::addNote(QWidget* note) {
   m_left->addWidget(rule(Qt::Horizontal, this));
   auto* row = new QHBoxLayout;
@@ -108,7 +123,8 @@ void KaHomeTitleBlock::setSurvey(const RecentSurveys::Item& item, const SurveyFa
   m_state->setText(unsaved ? QStringLiteral("<span style=\"color:#D97757\">●</span>&nbsp;저장 안 됨") : QStringLiteral("저장됨"));
   m_state->setAccessibleName(unsaved ? QStringLiteral("저장 안 됨") : QStringLiteral("저장됨"));
   m_state->setProperty("kaTone", unsaved ? QStringLiteral("needsYou") : QString());
-  m_folder->setText(KaHomeText::folder(item.path));
+  m_folderText = KaHomeText::folder(item.path);
+  showFolder();
   m_folder->setToolTip(item.path);
   m_when->setText(KaHomeText::when(item.lastOpenedMs));
   m_crs->setText(crsText(facts.known ? facts.workCrs : QString()));

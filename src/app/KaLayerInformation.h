@@ -64,6 +64,8 @@ public:
   LayerLabelControls::Info labelInfo(const QgsMapLayer* layer, bool withScale = false) const;
   int describeCallsForTests() const { return m_describeCalls; }
   static void configureView(QgsLayerTreeView* view);
+  // The list's compact text; again on StyleChange so 큰 글자 follows while the app runs.
+  static void applyListFont(QgsLayerTreeView* view);
 signals:
   void labelsEdited(); // One settled notification for a burst/group operation.
   void labelStateChanged();
