@@ -1655,8 +1655,7 @@ void MainWindow::renameSelectedLayer(QgsMapLayer* targetLayer) {
   if (!ok) return;
   const QString trimmed = name.trimmed();
   if (trimmed.isEmpty()) {
-    QMessageBox::warning(this, QStringLiteral("이름 바꾸기"),
-                         QStringLiteral("이름은 비울 수 없습니다."));
+    KaUserError::warn(this, {QStringLiteral("이름 바꾸기"), QStringLiteral("이름을 바꾸지 못했습니다"), QStringLiteral("이름은 비울 수 없습니다."), QStringLiteral("한 글자 이상 넣으세요.")});
     return;
   }
   if (trimmed == currentName) return;
@@ -2562,7 +2561,7 @@ void MainWindow::importControlCsv() {
   if (box.clickedButton() != keep && box.clickedButton() != swap) return;
   const int n = LayerOps::importControlPointsCsv(layer, path, &err, box.clickedButton() == swap);
   if (n < 0) {
-    QMessageBox::warning(this, QStringLiteral("CSV"), err);
+    KaUserError::warn(this, {QStringLiteral("CSV"), QStringLiteral("기준점 CSV를 불러오지 못했습니다"), err, {}});
     return;
   }
   m_stubGcp = int(layer->featureCount());
@@ -2598,8 +2597,7 @@ void MainWindow::openVectorLayer() {
   const QString title = QFileInfo(path).completeBaseName();
   auto* layer = new QgsVectorLayer(path, title, QStringLiteral("ogr"));
   if (!layer->isValid()) {
-    QMessageBox::warning(this, QStringLiteral("오류"),
-                         QStringLiteral("열 수 없음: %1").arg(layer->error().message()));
+    KaUserError::warn(this, {QStringLiteral("오류"), QStringLiteral("파일을 열지 못했습니다"), layer->error().message(), {}});
     delete layer;
     return;
   }
@@ -2873,7 +2871,7 @@ void MainWindow::zoomToLocation(const LocationHit& hit) {
                        e.what());
   } catch (...) {
     KA_LOG_EXCEPT();
-    QMessageBox::warning(this, QStringLiteral("위치"), QStringLiteral("좌표 변환 실패"));
+    KaUserError::warn(this, {QStringLiteral("위치"), QStringLiteral("위치를 좌표로 바꾸지 못했습니다"), QStringLiteral("좌표 변환에 실패했습니다."), QStringLiteral("작업 좌표계(5186/5187)를 확인한 뒤 다시 검색하세요.")});
   }
 #else
   Q_UNUSED(hit);

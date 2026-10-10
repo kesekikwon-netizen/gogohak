@@ -629,7 +629,7 @@ void MainWindow::applyAlignMove() {
   if (!m_alignTool) return;
   QString err;
   if (!m_alignTool->applyMove(&err)) {
-    QMessageBox::warning(this, QStringLiteral("이동"), err);
+    KaUserError::warn(this, {QStringLiteral("이동"), QStringLiteral("도면을 옮기지 못했습니다"), err, {}});
     return;
   }
   m_alignApplied = true;
@@ -824,7 +824,7 @@ void MainWindow::startAlignSession(QgsMapLayer* layer) {
   // Coordinates an image already has are backed up here before the first world-file write.
   m_alignTool->setBackupRoot(GeorefBackup::backupRootFor(m_surveyPath));
   if (!m_alignTool->beginLayer(layer, crs, &err)) {
-    QMessageBox::warning(this, QStringLiteral("맞추기"), err);
+    KaUserError::warn(this, {QStringLiteral("맞추기"), QStringLiteral("맞추기를 시작하지 못했습니다"), err, {}});
     return;
   }
   if (m_layerTree) m_layerTree->setCurrentLayer(m_alignTool->targetLayer());

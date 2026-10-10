@@ -47,7 +47,7 @@ bool MainWindow::configureCadastralAccount() {
   if (dialog.exec() != QDialog::Accepted) return false;
   QString error;
   if (!CadastralPortal::saveCredentials({id->text(), password->text()}, &error)) {
-    QMessageBox::warning(this, dialog.windowTitle(), error);
+    KaUserError::warn(this, {dialog.windowTitle(), QStringLiteral("계정을 저장하지 못했습니다"), error, {}});
     return false;
   }
   return true;

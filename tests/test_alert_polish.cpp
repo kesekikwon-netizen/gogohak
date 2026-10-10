@@ -44,6 +44,12 @@ private slots:
   void saveAndExportAlertsUseTheOneFrame() {
     expectNone({QStringLiteral("MainWindowSession.cpp"), QStringLiteral("MainWindowExport.cpp")});
   }
+
+  // 둘째 묶음 — 지도·정합·지적 (MainWindow · MainWindowAlign · MainWindowCadastral · MainWindowOverlay).
+  void mapAlignAndCadastralAlertsUseTheOneFrame() {
+    expectNone({QStringLiteral("MainWindow.cpp"), QStringLiteral("MainWindowAlign.cpp"), QStringLiteral("MainWindowCadastral.cpp"),
+                QStringLiteral("MainWindowOverlay.cpp")});
+  }
 };
 
 QTEST_APPLESS_MAIN(TestAlertPolish)

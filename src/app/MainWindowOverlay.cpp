@@ -364,8 +364,8 @@ void MainWindow::startPaleoLandform() {
         const QgsCoordinateTransform tr(canvasCrs, crs5186, QgsProject::instance());
         ext = tr.transformBoundingBox(ext);
       } catch (const QgsException&) {
-        QMessageBox::warning(this, QStringLiteral("고지형"),
-                             QStringLiteral("화면 범위를 좌표 변환하지 못했습니다."));
+        KaUserError::warn(this, {QStringLiteral("고지형"), QStringLiteral("고지형을 올리지 못했습니다"),
+                                 QStringLiteral("화면 범위를 좌표 변환하지 못했습니다."), QStringLiteral("작업 좌표계를 확인한 뒤 다시 누르세요.")});
         return;
       }
     }
