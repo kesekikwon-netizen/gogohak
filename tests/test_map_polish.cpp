@@ -25,6 +25,7 @@
 #include "app/KaInspectorPanel.h"
 #include "app/KaStatusBar.h"
 #include "app/KaTheme.h"
+#include "app/KaThemeFonts.h"
 #include "core/FeaturePresets.h"
 
 namespace {
@@ -98,6 +99,15 @@ private slots:
     QCOMPARE(rule->width(), 1);
     QVERIFY2(rule->x() >= first->geometry().right() && rule->geometry().right() <= second->x(), "the rule stands between the glyphs");
     QVERIFY2(cover->grab().toImage().pixelColor(cover->width() / 2, 0).alpha() > 0, "the cover has its own edge");
+    // A pressed half is filled, and the fill follows the cover's rounded outer corner. (grab() paints an opaque backdrop, so the
+    // corner is read as "unchanged by the press", not as alpha.)
+    const QImage resting = cover->grab().toImage();
+    first->setDown(true);
+    const QImage pressed = cover->grab().toImage();
+    first->setDown(false);
+    QVERIFY2(pressed.pixelColor(30, 30) != resting.pixelColor(30, 30), "a pressed half is filled");
+    QVERIFY2(pressed.pixelColor(1, 1) == resting.pixelColor(1, 1) && pressed.pixelColor(2, 2) == resting.pixelColor(2, 2),
+             "the fill pokes out of the cover's rounded corner");
     paper(false);  // the layout follows on the next turn of the event loop
     QTRY_COMPARE(first->size(), QSize(36, 36));
     QTRY_COMPARE(second->x() - first->geometry().right() - 1, 8);
@@ -124,6 +134,9 @@ private slots:
     QTRY_VERIFY2(chip->font().underline(), "the words are underlined under the mouse");
     QTest::mouseMove(&window, QPoint(5, 5));
     QTRY_VERIFY(!chip->font().underline());
+    paper(false);  // leaving the paper look after a hover: the pill is back in the stock face, not stuck in the mono one
+    QTRY_VERIFY2(chip->font().family() != KaTheme::monoFontFamily(), qPrintable(chip->font().family()));
+    paper(true);
     QSignalSpy clicked(bar, &KaStatusBar::submitClicked);
     QTest::mouseClick(chip, Qt::LeftButton);
     QCOMPARE(clicked.count(), 1);

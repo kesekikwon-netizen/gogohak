@@ -8,6 +8,8 @@
 #include <QLabel>
 #include <QPushButton>
 #include <QRect>
+#include <QStandardItemModel>
+#include <QStyleOptionViewItem>
 #include <QTableWidget>
 #include <QVBoxLayout>
 #include <QSettings>
@@ -18,6 +20,8 @@
 
 #include "app/KaChip.h"
 #include "app/KaHomeConnectionCard.h"
+#include "app/KaHomeRecentCard.h"
+#include "app/KaHomeRowDelegate.h"
 #include "app/KaHomeText.h"
 #include "app/KaStartPage.h"
 #include "app/KaTheme.h"
@@ -162,6 +166,16 @@ private slots:
     QVERIFY2(resume.right() <= block->width() - 24, "the button is inset 24 from the frame");
     const int below = block->height() - 1 - check.bottom();
     QVERIFY2(below <= 14, qPrintable(QStringLiteral("%1 px under the cells").arg(below)));
+  }
+
+  // 최근 조사 표 (검토): in 새 모양 the third column is plain text, so its width is the text's, not the 76 px of the old dots.
+  void plainThirdColumnIsAsWideAsItsText() {
+    QStandardItemModel model(1, 3);
+    model.setItem(0, 2, new QStandardItem(QStringLiteral("1")));
+    KaHomeRowDelegate delegate;
+    delegate.setPlainFromThird(true);
+    QStyleOptionViewItem option;
+    QVERIFY2(delegate.sizeHint(option, model.index(0, KaHomeRecentCard::DotsColumn)).width() < 60, "still the width of three dots");
   }
 
   // 최근 조사 표 (보완 H4): the mouse over a row washes the whole row (every cell), not the one cell it is over.

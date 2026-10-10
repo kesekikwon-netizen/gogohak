@@ -610,7 +610,7 @@ void MainWindow::openRecentSurvey(const QString& path) {
   if (kaQgisProjectFileIsUnsafeToRead(path) ||
       !kaSafeReadQgisProject(QgsProject::instance(), path, nullptr, /*loadLayouts=*/true)) {
     kaMarkQgisProjectUnsafeToRead(path);
-    KaUserError::warn(this, {QStringLiteral("오류"), QStringLiteral("작업 파일(.qgz)을 열 수 없습니다"), QStringLiteral("이 파일은 안전하게 읽을 수 없습니다."), {}});
+    KaUserError::warn(this, {QStringLiteral("오류"), QStringLiteral("작업 파일(.qgz)을 열 수 없습니다"), QStringLiteral("파일을 읽는 중 문제가 있었습니다."), {}});
     return;
   }
   LayerOps::pruneDuplicateSatelliteLayers(QgsProject::instance());
@@ -1010,9 +1010,9 @@ void MainWindow::reportSaveFailure(const QString& title, const QString& reason,
   const bool mapTabShown = m_viewTabs && m_mapPage && m_viewTabs->currentWidget() == m_mapPage;
   if (mapTabShown || !isVisible() || m_closingWindow) return;
   // After the save scope has unwound (wait cursor, frozen map, opening guard).
-  QTimer::singleShot(0, this, [this, title, reason]() {
+  QTimer::singleShot(0, this, [this, title, reason, details]() {
     if (m_closingWindow || !isVisible()) return;
-    KaUserError::warn(this, {title, title, reason, QStringLiteral("지도 화면 위 알림 줄에 자세한 내용이 있습니다.")});
+    KaUserError::warn(this, {title, title, reason, QStringLiteral("지도 화면 위 알림 줄에 자세한 내용이 있습니다."), {}, details});
   });
 #endif
 }
@@ -1668,7 +1668,7 @@ void MainWindow::openProject() {
   if (kaQgisProjectFileIsUnsafeToRead(path) ||
       !kaSafeReadQgisProject(QgsProject::instance(), path, nullptr, /*loadLayouts=*/true)) {
     kaMarkQgisProjectUnsafeToRead(path);
-    KaUserError::warn(this, {QStringLiteral("오류"), QStringLiteral("작업 파일(.qgz)을 열 수 없습니다"), QStringLiteral("이 파일은 안전하게 읽을 수 없습니다."), {}});
+    KaUserError::warn(this, {QStringLiteral("오류"), QStringLiteral("작업 파일(.qgz)을 열 수 없습니다"), QStringLiteral("파일을 읽는 중 문제가 있었습니다."), {}});
     return;
   }
   LayerOps::pruneDuplicateSatelliteLayers(QgsProject::instance());

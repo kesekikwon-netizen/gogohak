@@ -70,7 +70,7 @@ QSize KaHomeRowDelegate::sizeHint(const QStyleOptionViewItem& option, const QMod
   if (index.column() == KaHomeRecentCard::StateColumn) {
     const QFontMetrics fm(KaChip::chipFont(option.font));
     width = KaChip::sizeForText(fm, index.data(Qt::DisplayRole).toString(), true).width() + 2 * kCellInset;
-  } else if (index.column() == KaHomeRecentCard::DotsColumn) {
+  } else if (index.column() == KaHomeRecentCard::DotsColumn && !m_plainFrom2) {
     width = 3 * kDotPx + 2 * kDotGap + 2 * kCellInset;
   }
   return QSize(width, KaHomeRecentCard::kRowHeight);

@@ -84,6 +84,14 @@ private slots:
     QCOMPARE(page.split->handleWidth(), 10);
   }
 
+  // 스타일 탭 스크롤 칸 (검토): its transparent-background rule names the viewport only, never a deeper QWidget, because that
+  // also matches the scroll bar and turns its groove white in the stock look.
+  void styleScrollRuleStaysOffTheScrollBar() {
+    const QString sheet = KaTheme::resolvedStyleSheet(KaTheme::embeddedStyleSheet());
+    QVERIFY(sheet.contains(QStringLiteral("QScrollArea#inspectorStyleScroll")));
+    QVERIFY2(!sheet.contains(QStringLiteral("inspectorStyleScroll > QWidget > QWidget")), "the rule reaches the scroll bar");
+  }
+
   // 분할선 폭 (검토 지적 1·2): every splitter of the screens is 7 px in 새 모양, also after a saved state that held the old
   // width is restored, and the stock look keeps its own width.
   void everySplitterFollowsTheLookAndSurvivesARestore() {

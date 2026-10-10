@@ -1331,7 +1331,7 @@ QLabel#layerFilterEmpty { color: @inkMuted@; font-size: 12px; padding: 4px 6px; 
 QFrame#inspectorPanel { background: @panelFace@; border: 1px solid @panelEdge@; border-radius: @panelRadius@px; }
 QFrame#inspectorPanel QTabBar#inspectorTabs::tab { min-width: 72px; padding: 6px 0; font-size: 12px; }
 QFrame#inspectorPanel QScrollArea#inspectorAttributeScroll, QWidget#inspectorAttributePage { background: transparent; }
-QFrame#inspectorPanel QScrollArea#inspectorStyleScroll, QScrollArea#inspectorStyleScroll > QWidget > QWidget { background: transparent; }
+QFrame#inspectorPanel QScrollArea#inspectorStyleScroll, QScrollArea#inspectorStyleScroll > QWidget, QWidget#inspectorStyle { background: transparent; }
 QLabel#inspectorTitle { font-size: 14px; font-weight: 700; color: @ink@; }
 QLabel#inspectorSentence { color: @inkMuted@; font-size: 12px; padding: @emptyPad@; border: 1px dashed @emptyEdge@; border-radius: 8px; }
 QToolButton#inspectorCollapse { border: none; background: transparent; padding: 4px; }
@@ -1376,6 +1376,8 @@ QWidget#drawGuideBand QFrame#drawGuideUndoPair[kaPlate="true"] QToolButton:enabl
 QWidget#drawGuideBand QFrame#drawGuideUndoPair[kaPlate="true"] QToolButton:enabled:pressed { background: @pressed@; }
 QWidget#drawGuideBand QFrame#drawGuideUndoPair[kaPlate="true"] QToolButton:enabled:focus { border-color: @focusRing@; }
 QWidget#drawGuideBand QFrame#drawGuideUndoPair[kaPlate="true"] QToolButton:disabled { background: transparent; border-color: transparent; }
+QWidget#drawGuideBand QFrame#drawGuideUndoPair[kaPlate="true"] QToolButton#drawGuideUndo { border-top-left-radius: 7px; border-bottom-left-radius: 7px; }
+QWidget#drawGuideBand QFrame#drawGuideUndoPair[kaPlate="true"] QToolButton#drawGuideRedo { border-top-right-radius: 7px; border-bottom-right-radius: 7px; }
 QStatusBar#kaStatusBar QLabel[kaChip="true"] { margin: 0 4px; }
 /* ---- [새 모양] names and headings (append-only). The stock look resolves these to what the rules above
    already say (body stack at 700, the Segoe UI wordmark at 600, 15 and 20 px), so nothing moves there;
