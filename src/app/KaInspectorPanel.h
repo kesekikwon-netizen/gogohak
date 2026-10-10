@@ -56,13 +56,18 @@ class KaInspectorPanel : public QFrame {
  signals:
   void collapseRequested();
 
+ protected:
+  void changeEvent(QEvent* event) override;
+
  private:
+  void applyLook();
   void syncAttributeState();
 
   QLabel* m_title = nullptr;
   KaChip* m_countChip = nullptr;
   QToolButton* m_collapse = nullptr;
   QTabBar* m_tabs = nullptr;
+  bool m_plate = false;  // 새 모양: words-only tabs
   QStackedWidget* m_stack = nullptr;
   QWidget* m_attributePage = nullptr;
   QLabel* m_sentence = nullptr;

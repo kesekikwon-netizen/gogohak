@@ -98,6 +98,9 @@ QHash<QString, QString> replacementTable() {
   values.insert(QStringLiteral("cardFace"), paper ? QStringLiteral("transparent") : c.surface.name());
   values.insert(QStringLiteral("cardEdge"), paper ? QStringLiteral("transparent") : c.border.name());
   values.insert(QStringLiteral("heroNameSize"), paper ? QStringLiteral("34") : QStringLiteral("40"));
+  // 오른쪽 판의 빈 상태 문장 (보완 M5): words only in 새 모양 (stock: a dashed box).
+  values.insert(QStringLiteral("emptyEdge"), paper ? QStringLiteral("transparent") : c.border.name());
+  values.insert(QStringLiteral("emptyPad"), paper ? QStringLiteral("16px 0") : QStringLiteral("16px 12px"));
   // 지도 화면 판 (2차 보드 판 1): the layer and record panels sit on the page, no box, square corners.
   const QString clear = QStringLiteral("transparent");
   values.insert(QStringLiteral("panelFace"), paper ? clear : c.surface.name());

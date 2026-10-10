@@ -4,7 +4,9 @@
 #include "KaFeatureCard.h"
 #include "KaIcons.h"
 #include "KaInspectorStyle.h"
+#include "KaTheme.h"
 
+#include <QEvent>
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QScrollArea>
@@ -64,8 +66,9 @@ KaInspectorPanel::KaInspectorPanel(QWidget* parent) : QFrame(parent) {
   m_tabs->setExpanding(true);
   m_tabs->setDrawBase(false);
   m_tabs->setIconSize(QSize(16, 16));
-  m_tabs->addTab(KaIcons::icon(QStringLiteral("list")), QStringLiteral("속성"));
-  m_tabs->addTab(KaIcons::icon(QStringLiteral("brush")), QStringLiteral("스타일"));
+  m_tabs->addTab(QStringLiteral("속성"));
+  m_tabs->addTab(QStringLiteral("스타일"));
+  applyLook();  // 새 모양: the tabs are words and an underline, no icon (보완 M5)
   column->addWidget(m_tabs);
 
   m_stack = new QStackedWidget(this);
@@ -100,6 +103,17 @@ KaInspectorPanel::KaInspectorPanel(QWidget* parent) : QFrame(parent) {
   m_footer->setSpacing(8);
   column->addLayout(m_footer);
   syncAttributeState();
+}
+
+void KaInspectorPanel::applyLook() {
+  m_plate = KaTheme::displayOptions().paperLook;
+  m_tabs->setTabIcon(0, m_plate ? QIcon() : KaIcons::icon(QStringLiteral("list")));
+  m_tabs->setTabIcon(1, m_plate ? QIcon() : KaIcons::icon(QStringLiteral("brush")));
+}
+
+void KaInspectorPanel::changeEvent(QEvent* event) {
+  QFrame::changeEvent(event);
+  if (event->type() == QEvent::StyleChange && m_tabs && m_plate != KaTheme::displayOptions().paperLook) applyLook();
 }
 
 QWidget* KaInspectorPanel::page(int index) const {

@@ -1297,7 +1297,7 @@ QFrame#inspectorPanel { background: @panelFace@; border: 1px solid @panelEdge@; 
 QFrame#inspectorPanel QTabBar#inspectorTabs::tab { min-width: 72px; padding: 6px 0; font-size: 12px; }
 QFrame#inspectorPanel QScrollArea#inspectorAttributeScroll, QWidget#inspectorAttributePage { background: transparent; }
 QLabel#inspectorTitle { font-size: 14px; font-weight: 700; color: @ink@; }
-QLabel#inspectorSentence { color: @inkMuted@; font-size: 12px; padding: 16px 12px; border: 1px dashed @border@; border-radius: 8px; }
+QLabel#inspectorSentence { color: @inkMuted@; font-size: 12px; padding: @emptyPad@; border: 1px dashed @emptyEdge@; border-radius: 8px; }
 QToolButton#inspectorCollapse { border: none; background: transparent; padding: 4px; }
 QToolButton#inspectorCollapse:enabled:hover { background: @hover@; border-radius: 6px; }
 QToolButton#inspectorCollapse:enabled:focus { border: 1px solid @focusRing@; border-radius: 6px; }
