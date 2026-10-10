@@ -11,6 +11,7 @@
 #include "core/DemPresentation.h"
 #include "KaTheme.h"
 #include "KaUserError.h"
+#include "KaMapPagePlate.h"
 #include "KaClosePrompt.h"
 #include "KaControlCsvBox.h"
 #include "KaTabClose.h"
@@ -291,6 +292,7 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
     const int savedPanes = st.value(QStringLiteral("MainWindow/mainSplitPanes"), 2).toInt();
     if (m_mainSplit && !split.isEmpty() && savedPanes == m_mainSplit->count()) {
       m_mainSplit->restoreState(split);
+      KaMapPagePlate::applyHandle(m_mainSplit);  // the saved state held the width of an older build
       if (m_shellFocus) m_shellFocus->markUserWidthRestored();
       const int totalW = m_mainSplit->width();
       if (totalW > 300) {
@@ -918,7 +920,7 @@ void MainWindow::buildUi() {
   auto* leftSplit = new QSplitter(Qt::Vertical, central);
   leftSplit->setObjectName(QStringLiteral("leftSplit"));
   m_leftSplit = leftSplit;
-  leftSplit->setHandleWidth(8);
+  KaMapPagePlate::followHandle(leftSplit, 8);  // 새 모양: 7 px with one hairline
   leftSplit->setChildrenCollapsible(false);
   leftSplit->setCollapsible(1, true);
   leftSplit->installEventFilter(this);

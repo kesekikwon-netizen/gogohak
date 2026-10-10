@@ -83,6 +83,39 @@ private slots:
     QCOMPARE(page.mapCard->layout()->contentsMargins(), QMargins(4, 4, 4, 4));
     QCOMPARE(page.split->handleWidth(), 10);
   }
+
+  // 분할선 폭 (검토 지적 1·2): every splitter of the screens is 7 px in 새 모양, also after a saved state that held the old
+  // width is restored, and the stock look keeps its own width.
+  void everySplitterFollowsTheLookAndSurvivesARestore() {
+    QByteArray saved;
+    {
+      QSplitter old(Qt::Horizontal);
+      old.setHandleWidth(10);
+      old.addWidget(new QFrame);
+      old.addWidget(new QFrame);
+      saved = old.saveState();  // what an older build wrote at close
+    }
+    QSplitter main(Qt::Horizontal);
+    main.addWidget(new QFrame);
+    main.addWidget(new QFrame);
+    KaMapPagePlate::followHandle(&main, 10);
+    QCOMPARE(main.handleWidth(), 7);
+    QVERIFY(main.restoreState(saved));
+    QCOMPARE(main.handleWidth(), 10);  // restoreState brings the saved width back ...
+    KaMapPagePlate::applyHandle(&main);
+    QCOMPARE(main.handleWidth(), 7);   // ... until it is put right again
+    QSplitter left(Qt::Vertical), studio(Qt::Horizontal);
+    KaMapPagePlate::followHandle(&left, 8);
+    KaMapPagePlate::followHandle(&studio, 10);
+    QCOMPARE(left.handleWidth(), 7);
+    QCOMPARE(studio.handleWidth(), 7);
+    paper(false);
+    QTRY_COMPARE(main.handleWidth(), 10);
+    QTRY_COMPARE(left.handleWidth(), 8);
+    QTRY_COMPARE(studio.handleWidth(), 10);
+    paper(true);
+    QTRY_COMPARE(left.handleWidth(), 7);
+  }
 };
 
 int main(int argc, char** argv) {

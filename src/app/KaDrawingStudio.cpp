@@ -16,6 +16,7 @@
 #include "KaDrawingTools.h"
 #include "core/LegendPlacement.h"
 #include "KaPaperDialog.h"
+#include "KaMapPagePlate.h"
 #include "KaUserError.h"
 #include "KaTitleBlock.h"
 #include "core/LayoutService.h"
@@ -659,7 +660,7 @@ void KaDrawingStudio::buildUi() {
 
   auto* leftSplit = new QSplitter(Qt::Vertical, leftCol);
   leftSplit->setObjectName(QStringLiteral("studioLeftSplit"));
-  leftSplit->setHandleWidth(8);
+  KaMapPagePlate::followHandle(leftSplit, 8);  // 새 모양: 7 px with one hairline
   leftSplit->setChildrenCollapsible(false);
   leftSplit->setCollapsible(1, true);
   leftSplit->installEventFilter(this);
@@ -1237,7 +1238,7 @@ void KaDrawingStudio::buildUi() {
 
   m_studioSplit = new QSplitter(Qt::Horizontal, root);
   m_studioSplit->setObjectName(QStringLiteral("studioMainSplit"));
-  m_studioSplit->setHandleWidth(10);
+  KaMapPagePlate::followHandle(m_studioSplit, 10);
   m_studioSplit->setChildrenCollapsible(false);
   m_studioSplit->addWidget(leftCol);
   m_studioSplit->addWidget(right);
