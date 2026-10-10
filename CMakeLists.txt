@@ -1850,7 +1850,8 @@ if(KA_HGIS_BUILD_TESTS)
   # 사용자 모니터(2293×912)와 1080p 작업 영역에서 홈·지도·도면이 잘리지 않는다(2026-10-10). 2293 폭이 들어가는
   # 가상 화면 cmake/offscreen-2560.json 에서 돈다(아래 ENVIRONMENT).
   ka_add_qtest_filter(save_open_monitor ka_save_open_tests
-    monitorFitHomeMapDrawing)
+    monitorFitHomeMapDrawing
+    monitorFitDialogs)
   set(KA_SAVE_OPEN_TESTS
     save_open_window save_open_topo save_open_drawing
     save_open_edit save_open_erase save_open_roundtrip save_open_open

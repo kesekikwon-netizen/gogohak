@@ -46,6 +46,9 @@
 #include "app/KaFeatureSelectTool.h"
 #include "app/KaVertexEditTool.h"
 #include "app/KaDrawingStudio.h"
+#include "app/KaNewSurveyDialog.h"
+#include "app/KaSubmitDialog.h"
+#include "app/KaTopographicAccountDialog.h"
 #include "app/KaLayerInformation.h"
 #include "app/KaPrintDialog.h"
 #include "app/KaTheme.h"
@@ -972,7 +975,46 @@ private slots:
     qInfo() << tag << "drawing: tab" << studioTabs.size() << "inspector scroll" << inspector->verticalScrollBar()->maximum();
     if (inspector->verticalScrollBar()->maximum() > 0)
       clipped << QStringLiteral("도면 항목 %1 px 잘림").arg(inspector->verticalScrollBar()->maximum());
+    // 더보기: the whole menu fits the screen height (no scroll arrows).
+    for (auto* menu : window.findChildren<QMenu*>())
+      for (QAction* action : menu->actions())
+        if (action->text() == QStringLiteral("벡터·도면 불러오기") && menu->sizeHint().height() > size.height())
+          clipped << QStringLiteral("더보기 메뉴 %1 px").arg(menu->sizeHint().height());
     QgsProject::instance()->setDirty(false);
+    QVERIFY2(clipped.isEmpty(), qPrintable(tag + QStringLiteral(": ") + clipped.join(QStringLiteral(" · "))));
+  }
+  // The same monitor rows for the dialogs opened from those: 검수·제출, 새 조사, 수치지형도 계정. Each fits under the
+  // screen height with its buttons inside. (단면도 is left as it is on this screen: user 2026-10-10.)
+  void monitorFitDialogs_data() { monitorFitHomeMapDrawing_data(); }
+  void monitorFitDialogs() {
+    QFETCH(QSize, size);
+    QFETCH(bool, largeText);
+    KaTheme::DisplayOptions look;
+    look.paperLook = look.highContrast = true;
+    look.largeText = largeText;
+    KaTheme::setDisplayOptions(qApp, look);
+    const auto restore = qScopeGuard([] { KaTheme::setDisplayOptions(qApp, KaTheme::DisplayOptions()); });
+    const QString tag = QString::fromLatin1(QTest::currentDataTag());
+    const QString out = qEnvironmentVariable("KA_HGIS_QA_OUTPUT_DIR");
+    const int usable = size.height() - 40;  // the title bar
+    QStringList clipped;
+    const auto check = [&](QDialog* dialog, const QString& name) {
+      dialog->show();
+      QVERIFY(QTest::qWaitForWindowExposed(dialog));
+      QCoreApplication::processEvents();
+      if (!out.isEmpty()) QVERIFY(QDir().mkpath(out) && dialog->grab().save(QDir(out).filePath(tag + QStringLiteral("-") + name + QStringLiteral(".png"))));
+      if (dialog->height() > usable) clipped << QStringLiteral("%1 %2 px").arg(name).arg(dialog->height());
+      for (auto* button : dialog->findChildren<QPushButton*>())
+        if (button->isVisible() && !dialog->rect().contains(QRect(button->mapTo(dialog, QPoint()), button->size())))
+          clipped << name + QStringLiteral(" 단추 「%1」 밖").arg(button->text());
+      dialog->hide();
+    };
+    KaSubmitDialog submit;
+    check(&submit, QStringLiteral("submit"));
+    KaNewSurveyDialog newSurvey(QStringLiteral("EPSG:5187"), 128.6);
+    check(&newSurvey, QStringLiteral("new-survey"));
+    KaTopographicAccountDialog account;
+    check(&account, QStringLiteral("account"));
     QVERIFY2(clipped.isEmpty(), qPrintable(tag + QStringLiteral(": ") + clipped.join(QStringLiteral(" · "))));
   }
   void homePageShowsStrataHeroWithoutOpeningASurvey() {
