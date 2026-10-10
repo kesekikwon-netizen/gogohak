@@ -99,6 +99,20 @@ QHash<QString, QString> replacementTable() {
   values.insert(QStringLiteral("cardEdge"), paper ? QStringLiteral("transparent") : c.border.name());
   values.insert(QStringLiteral("heroNameSize"), paper ? QStringLiteral("34") : QStringLiteral("40"));
   values.insert(QStringLiteral("statusHeight"), paper ? QStringLiteral("31") : QStringLiteral("34"));  // 상태줄 (보완 M7): 31 + its 1 px top rule = 32
+  // 판 틀 (보완 M1 · H1): in 새 모양 the pages have no frame, the map card no edge, and the splitters are a 7 px strip
+  // (3 + 1 + 3) with one hairline in the middle (stock: the 14 px round page, the framed map, 6 px grey bars).
+  values.insert(QStringLiteral("pageEdge"), paper ? QStringLiteral("transparent") : c.border.name());
+  values.insert(QStringLiteral("pageRadius"), paper ? QStringLiteral("0") : QStringLiteral("14"));
+  values.insert(QStringLiteral("mapEdge"), paper ? QStringLiteral("transparent") : c.border.name());
+  values.insert(QStringLiteral("mapEdgeStrong"), paper ? QStringLiteral("transparent") : c.borderStrong.name());
+  values.insert(QStringLiteral("splitCore"), paper ? QStringLiteral("1") : QStringLiteral("6"));
+  values.insert(QStringLiteral("splitPad"), paper ? QStringLiteral("3") : QStringLiteral("0"));
+  values.insert(QStringLiteral("splitMarginH"), paper ? QStringLiteral("0") : QStringLiteral("2px 12px"));
+  values.insert(QStringLiteral("splitMarginV"), paper ? QStringLiteral("0") : QStringLiteral("12px 2px"));
+  values.insert(QStringLiteral("splitRound"), paper ? QStringLiteral("0") : QStringLiteral("3"));
+  values.insert(QStringLiteral("mainHandleCore"), paper ? QStringLiteral("1") : QStringLiteral("7"));
+  values.insert(QStringLiteral("mainHandleBorder"), paper ? QStringLiteral("3px solid transparent") : QStringLiteral("1px solid ") + c.border.name());
+  values.insert(QStringLiteral("mainHandleFace"), (paper ? c.border : c.surface).name());
   // 오른쪽 판의 빈 상태 문장 (보완 M5): words only in 새 모양 (stock: a dashed box).
   values.insert(QStringLiteral("emptyEdge"), paper ? QStringLiteral("transparent") : c.border.name());
   values.insert(QStringLiteral("emptyFace"), paper ? QStringLiteral("transparent") : c.surface.name());  // 도면 왼쪽 판 (보완 L3)

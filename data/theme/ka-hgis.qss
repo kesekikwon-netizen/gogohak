@@ -631,7 +631,8 @@ QFrame#studioBottomBar {
   border-top: 1px solid @border@;
   background: @surface@;
 }
-QFrame#mapCard { background: @surface@; border-radius: @mapRadius@px; }
+QFrame#mapCard { background: @surface@; border-radius: @mapRadius@px; border: 1px solid @mapEdge@;
+  border-bottom: 1px solid @mapEdgeStrong@; border-right: 1px solid @mapEdge@; }
 /* ---- Studio inspector: 도면 cards and a pinned output bar ---- */
 /* 도면 오른쪽 판 (보완 L1): in 새 모양 the cards are captions with a hairline, no box. */
 QFrame#itemInspector[kaPlate="true"] { background: transparent; border: none; border-radius: 0; }
@@ -752,8 +753,8 @@ QTabWidget::pane { border: none; }
 QTabWidget#viewTabs::pane { border: none; margin: 0 8px 8px 8px; }
 QWidget#centralRoot, QWidget#startPage {
   background: @desk@;
-  border: 1px solid @border@;
-  border-radius: 14px;
+  border: 1px solid @pageEdge@;
+  border-radius: @pageRadius@px;
 }
 QWidget#startMain {
   background: @desk@;
@@ -787,15 +788,21 @@ QSplitter#studioMainSplit {
 QSplitter#leftSplit::handle,
 QSplitter#studioLeftSplit::handle {
   background: @border@;
-  height: 6px;
-  margin: 2px 12px;
-  border-radius: 3px;
+  height: @splitCore@px;
+  margin: @splitMarginH@;
+  border-radius: @splitRound@px;
+  border-top: @splitPad@px solid transparent;
+  border-bottom: @splitPad@px solid transparent;
+  background-clip: content;
 }
 QSplitter#studioMainSplit::handle {
   background: @border@;
-  width: 6px;
-  margin: 12px 2px;
-  border-radius: 3px;
+  width: @splitCore@px;
+  margin: @splitMarginV@;
+  border-radius: @splitRound@px;
+  border-left: @splitPad@px solid transparent;
+  border-right: @splitPad@px solid transparent;
+  background-clip: content;
 }
 QSplitter#leftSplit::handle:hover,
 QSplitter#studioLeftSplit::handle:hover,
@@ -917,10 +924,11 @@ QSplitter::handle {
 }
 /* 왼쪽 패널 ↔ 지도 경계는 손으로 끌어야 한다. 1px 손잡이는 잡히지 않는다. */
 QSplitter#mainSplit::handle:horizontal {
-  background: @surface@;
-  width: 7px;
-  border-left: 1px solid @border@;
-  border-right: 1px solid @border@;
+  background: @mainHandleFace@;
+  width: @mainHandleCore@px;
+  border-left: @mainHandleBorder@;
+  border-right: @mainHandleBorder@;
+  background-clip: content;
 }
 QSplitter#mainSplit::handle:horizontal:hover { background: @borderStrong@; }
 

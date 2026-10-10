@@ -465,6 +465,8 @@ add_executable(ka-hgis
   src/app/KaDrawingStudio.cpp
   src/app/KaPaperDialog.cpp
   src/app/KaPaperDialog.h
+  src/app/KaMapPagePlate.cpp
+  src/app/KaMapPagePlate.h
   src/app/KaDrawingStudioSheets.cpp
   src/app/KaDrawingTools.cpp
   src/app/KaDrawingNorthArrow.cpp
@@ -2302,6 +2304,17 @@ if(KA_HGIS_BUILD_TESTS)
   set_target_properties(ka_drawing_polish_tests PROPERTIES WIN32_EXECUTABLE FALSE)
   ka_add_qtest(drawing_polish ka_drawing_polish_tests)
   set_tests_properties(drawing_polish PROPERTIES
+    ENVIRONMENT "GDAL_DATA=${OSGEO4W_ROOT}/apps/gdal-dev/share/gdal;PATH=${_ka_path_esc};QGIS_PREFIX_PATH=${QGIS_PREFIX_PATH};QT_QPA_PLATFORM=offscreen" TIMEOUT 90)
+  # 세부 디자인 보완(지도 화면 판 틀: M1 · H1).
+  add_executable(ka_page_polish_tests tests/test_page_polish.cpp
+    src/app/KaMapPagePlate.cpp src/app/KaMapPagePlate.h
+    ${_ka_p1_chip_sources} ${_ka_p4_theme_sources})
+  target_link_libraries(ka_page_polish_tests PRIVATE ${KA_TEST_LIBS})
+  target_include_directories(ka_page_polish_tests PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_BINARY_DIR}/generated)
+  target_compile_definitions(ka_page_polish_tests PRIVATE ${KA_TEST_DEFS})
+  set_target_properties(ka_page_polish_tests PROPERTIES WIN32_EXECUTABLE FALSE)
+  ka_add_qtest(page_polish ka_page_polish_tests)
+  set_tests_properties(page_polish PROPERTIES
     ENVIRONMENT "GDAL_DATA=${OSGEO4W_ROOT}/apps/gdal-dev/share/gdal;PATH=${_ka_path_esc};QGIS_PREFIX_PATH=${QGIS_PREFIX_PATH};QT_QPA_PLATFORM=offscreen" TIMEOUT 90)
   set_tests_properties(map_plate PROPERTIES ENVIRONMENT
     "GDAL_DATA=${OSGEO4W_ROOT}/apps/gdal-dev/share/gdal;PATH=${_ka_path_esc};QGIS_PREFIX_PATH=${QGIS_PREFIX_PATH};QT_QPA_PLATFORM=offscreen" TIMEOUT 90)

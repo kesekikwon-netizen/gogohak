@@ -11,6 +11,7 @@
 #include "KaFeatureCard.h"  // KaInspectorPanel.h's inline featureCard() needs the complete type
 #include "KaIcons.h"
 #include "KaInspectorPanel.h"
+#include "KaMapPagePlate.h"
 #include "KaInspectorStyle.h"
 #include "KaLayerOpacityRail.h"
 #include "KaShellFocus.h"
@@ -85,6 +86,7 @@ void MainWindow::setupStrataShell() {
   m_mainSplit->addWidget(m_inspector);
   m_mainSplit->setStretchFactor(2, 0);
   m_mainSplit->setSizes({348, 932 - KaShellFocus::kDefaultRightWidth, KaShellFocus::kDefaultRightWidth});
+  KaMapPagePlate::follow(m_mapPage, m_mainSplit, findChild<QFrame*>(QStringLiteral("mapCard")));  // 새 모양: the panels are one sheet (보완 M1)
   setupFeatureCard(m_inspector->attributeHost(), m_inspector->attributeLayout());
   m_inspector->setFeatureCard(m_featureCard);
   // 스타일 tab: the most recent choice wins, a record on the card or a layer picked in the list (user 2026-10-03).
