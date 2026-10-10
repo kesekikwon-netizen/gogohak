@@ -302,7 +302,6 @@ void TestE2EOpaque::testT1_ChecklistEngine_RuleEvaluation() {
   st.insert(QStringLiteral("layout_exists:site_location"), true);
   st.insert(QStringLiteral("layout_exists:feature_plan"), true);
   st.insert(QStringLiteral("layout_exists:feature_detail"), true);
-  st.insert(QStringLiteral("layout_exists:section"), true);
 
   const auto results = engine.evaluate(st);
   int errorCount = 0;

@@ -12,9 +12,8 @@
 1120 src/app/KaIcons.cpp
 506 src/app/KaMeasureMapTool.cpp
 669 src/app/KaPrintDialog.cpp
-1110 src/app/KaSectionDrawingStudio.cpp
 636 src/app/KaTerrain3dLayoutStudio.cpp
-546 src/app/KaTerrain3dStudio.cpp
+547 src/app/KaTerrain3dStudio.cpp
 1106 src/app/KaTopographicBrowser.cpp
 996 src/app/KaTopographicImportDialog.cpp
 632 src/app/KaTopographicScopePanel.cpp
@@ -50,7 +49,6 @@
 382 src/core/PaleoLandformService.cpp
 348 src/core/PolygonErase.cpp
 431 src/core/RiverMapService.cpp
-1160 src/core/SectionLayoutService.cpp
 431 src/core/SoilMapService.cpp
 1270 src/core/SurveyStorage.cpp
 515 src/core/Terrain3dLayoutService.cpp
@@ -80,8 +78,6 @@
 400 tests/test_polygon_erase.cpp
 802 tests/test_reference_download.cpp
 6164 tests/test_save_open.cpp
-1314 tests/test_section_layout.cpp
-411 tests/test_section_studio.cpp
 1099 tests/test_storage_safety.cpp
 327 tests/test_submit_package.cpp
 338 tests/test_survey_contour.cpp

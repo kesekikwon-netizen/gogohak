@@ -244,7 +244,6 @@ void MainWindow::goToCheckTargets(const CheckResult& result) {
 
 void MainWindow::runCheckAction(const QString& action) {
   if (action == QLatin1String("open_layout")) return openLayoutDesigner();
-  if (action == QLatin1String("open_section")) return openSectionDesigner();
   // Map tools work on the map tab; the user picked the tool, so show that tab.
   if (action != QLatin1String("set_work_crs") && m_viewTabs && m_mapPage) m_viewTabs->setCurrentWidget(m_mapPage);
   if (action == QLatin1String("draw_survey_area")) startEditSurveyArea();

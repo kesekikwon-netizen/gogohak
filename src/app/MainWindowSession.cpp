@@ -6,7 +6,6 @@
 #include "KaNewSurveyDialog.h"
 #include "KaRecoverySnapshots.h"
 #include "KaReferenceDownloadJob.h"
-#include "KaSectionDrawingStudio.h"
 #include "KaStartPage.h"
 #include "KaStatusBar.h"
 #include "KaSurveyBadge.h"
@@ -169,9 +168,6 @@ void MainWindow::finishOpenedProject(const QString& gpkgPath, const QString& sou
   LayerRole::persistLegacyRoles(QgsProject::instance());
   // Workspaces saved before layer removal pruned its group still carry empty 지적도/주변유적 titles.
   LayerOps::pruneEmptyLegendGroups(QgsProject::instance());
-  // [pkg C2] F051: section sheet display rasters are layout-owned temp files (not saved with
-  // the survey); derive them again so the checklist and 단면도.pdf see the sheet.
-  SectionLayoutService::restoreDisplayLayers(QgsProject::instance());
   auto* project = QgsProject::instance();
   for (auto* layer : project->mapLayers()) {
     auto* dem = qobject_cast<QgsRasterLayer*>(layer);
@@ -662,7 +658,7 @@ void MainWindow::onViewTabCloseRequested(int index) {
   if (!m_viewTabs || index < 0)
     return;
   QWidget* w = m_viewTabs->widget(index);
-  if (!w || (w != m_drawingStudio && w != m_sectionStudio && w != m_terrain3dStudio &&
+  if (!w || (w != m_drawingStudio && w != m_terrain3dStudio &&
              w != m_terrain3dLayoutStudio && w != m_topographicBrowser.data()))
     return;
   m_viewTabs->removeTab(index);

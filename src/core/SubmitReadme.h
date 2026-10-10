@@ -20,7 +20,6 @@ struct Inputs {
   bool unsavedEditsIncluded = false;
   bool checklistErrorsRemain = false;  // made with error checks failing or unchecked (2026-10-10)
   bool hasSheetPdf = false;
-  bool hasSectionPdf = false;
 };
 
 QString build(const Inputs& in);

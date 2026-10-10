@@ -2,7 +2,6 @@
 #include "LayerFeatures.h"
 #include "LayerOps.h"
 #include "LayoutService.h"
-#include "SectionLayoutService.h"
 #include "SubmitReadme.h"
 #include "SubmitShp.h"
 #include <QCryptographicHash>
@@ -20,19 +19,6 @@
 #include <qgsproject.h>
 #include <qgsvectorfilewriter.h>
 #include <qgsvectorlayer.h>
-
-static bool isSectionSheetComposed(QgsProject* project) {
-  if (!project || !project->layoutManager())
-    return false;
-  // Section display rasters are layout-owned temp files (not saved with the
-  // survey); derive them again after a reopen before judging the sheet.
-  SectionLayoutService::restoreDisplayLayers(project);
-  auto* ly = dynamic_cast<QgsPrintLayout*>(
-      project->layoutManager()->layoutByName(QStringLiteral("section_sheet")));
-  if (!ly || ly->itemById(QStringLiteral("empty_hint")))
-    return false;
-  return LayoutService::isComposedStudioSheet(project, QStringLiteral("section_sheet"));
-}
 
 bool ExportService::writeSha256Manifest(const QString& dir, QString* errorOut) {
   if (errorOut) errorOut->clear();
@@ -137,7 +123,7 @@ QString ExportService::exportSubmissionPackage(QgsProject* project, const QStrin
                             QStringLiteral("section_line"), QStringLiteral("artifact_point"),
                             QStringLiteral("trial_trench")};
   int done = 0;
-  const int total = (project ? keys.size() + 2 : 0) + 4;
+  const int total = (project ? keys.size() + 1 : 0) + 4;
   const auto step = [&](const QString& label) {
     if (info.progress && !info.progress(done, total, label)) return false;
     ++done;
@@ -213,19 +199,11 @@ QString ExportService::exportSubmissionPackage(QgsProject* project, const QStrin
                                                 dir.filePath(QStringLiteral("조사도면.pdf")), &pdfErr).isEmpty())
       return fail(pdfErr.isEmpty() ? QStringLiteral("조사도면.pdf 내보내기 실패")
                                    : QStringLiteral("조사도면.pdf 내보내기 실패: %1").arg(pdfErr));
-    // 2. section_sheet 가 조판돼 있으면 단면도.pdf 로 넣는다.
-    if (!step(QStringLiteral("단면도.pdf"))) return fail(canceled);
-    if (isSectionSheetComposed(project)) {
-      QString secErr;
-      if (SectionLayoutService::exportSectionPdf(project, dir.filePath(QStringLiteral("단면도.pdf")), &secErr).isEmpty())
-        return fail(secErr.isEmpty() ? QStringLiteral("단면도.pdf 내보내기 실패")
-                                     : QStringLiteral("단면도.pdf 내보내기 실패: %1").arg(secErr));
-    }
-    readme.referenceLines = SubmitReadme::referenceLines(
-        project, {QStringLiteral("user_sheet"), QStringLiteral("section_sheet")});
+    // 단면도 was removed (2026-10-10): an old survey's section_sheet never becomes 단면도.pdf.
+    readme.referenceLines = SubmitReadme::referenceLines(project, {QStringLiteral("user_sheet")});
   }
 
-  // 3. README 는 PDF 뒤에 써서 파일 유무를 정확히 적는다.
+  // 2. README 는 PDF 뒤에 써서 파일 유무를 정확히 적는다.
   if (!step(QStringLiteral("조사 파일 지문"))) return fail(canceled);
   if (!info.surveyPath.isEmpty() && QFileInfo(info.surveyPath).isFile()) {
     readme.surveyFile = QFileInfo(info.surveyPath).fileName();
@@ -234,7 +212,6 @@ QString ExportService::exportSubmissionPackage(QgsProject* project, const QStrin
     if (readme.surveySha256.isEmpty()) return fail(hashError);
   }
   readme.hasSheetPdf = QFile::exists(dir.filePath(QStringLiteral("조사도면.pdf")));
-  readme.hasSectionPdf = QFile::exists(dir.filePath(QStringLiteral("단면도.pdf")));
   QSaveFile f(dir.filePath(QStringLiteral("README_submit.txt")));
   if (!f.open(QIODevice::WriteOnly | QIODevice::Text))
     return fail(QStringLiteral("README_submit.txt를 쓸 수 없습니다(%1). 폴더 쓰기 권한과 남은 공간을 확인하세요.")

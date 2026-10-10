@@ -26,8 +26,7 @@ public:
     SurveyAreaMap,
     SiteLocation,
     FeaturePlan,
-    FeatureDetail,
-    Section
+    FeatureDetail
   };
 
   enum class ExtentMode {
@@ -73,13 +72,13 @@ public:
 
   static int ensureDefaultLayouts(QgsProject* project);
   static int rebuildDefaultLayouts(QgsProject* project);
-  /// 사용자가 직접 도면만들기(KaDrawingStudio) 또는 단면도에서 배치한 조판이 실질적인 내용을 갖는지.
+  /// 사용자가 직접 도면만들기(KaDrawingStudio)에서 배치한 조판이 실질적인 내용을 갖는지.
   /// 유효한 축척(scale > 0), 유한한 지도 범위, 비-참조 유효 레이어(피처 수 > 0인 벡터 또는 유효한 래스터)를 점검한다.
   /// layout_blank 등 더미 메모리 레이어 및 참조 지도는 명시적으로 배제한다.
   /// ka_hgis/auto_template 이고 ka_hgis/user_composed 가 아니면 조판으로 보지 않는다.
   static bool isComposedStudioSheet(QgsProject* project,
                                    const QString& layoutName = QStringLiteral("user_sheet"));
-  /// 도면만들기에서 지도를 올린 용지. 자동 5종 템플릿과 구분한다.
+  /// 도면만들기에서 지도를 올린 용지. 자동 4종 템플릿과 구분한다.
   static void markStudioSheetComposed(QgsLayout* layout);
   static QString exportLayoutPdf(QgsProject* project, const QString& layoutName,
                                  const QString& pdfPath, QString* errorOut = nullptr);

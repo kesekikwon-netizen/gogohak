@@ -15,7 +15,6 @@
 #include "KaAlignMapTool.h"
 #include "KaImageView.h"
 #include "KaDrawingStudio.h"
-#include "KaSectionDrawingStudio.h"
 #include "KaTerrain3dStudio.h"
 #include "KaTerrain3dLayoutStudio.h"
 #include "KaStartPage.h"
@@ -563,9 +562,6 @@ void MainWindow::buildMenus() {
   actPrint->setShortcut(QKeySequence::Print);
   btnPrint->setObjectName(QStringLiteral("btnRibbonPrint"));
   paintPrimary(actPrint, QStringLiteral("print"));
-  addIcon(QStringLiteral("out"), QStringLiteral("section"), QStringLiteral("단면도"),
-          QStringLiteral("단면 GeoTIFF로 표고·거리 눈금 도면을 만듭니다"),
-          &MainWindow::openSectionDesigner);
   auto [actMapGeoTiff, btnMapGeoTiff] = addIcon(
       QStringLiteral("out"), QStringLiteral("geotiff"), QStringLiteral("GeoTIFF"),
       QStringLiteral("현재 지도에 보이는 범위와 레이어를 지도 좌표계 그대로 GeoTIFF로 저장합니다"),
@@ -582,7 +578,7 @@ void MainWindow::buildMenus() {
   Q_UNUSED(btnExport);
   ribbon->applyTabOrder();
 
-  // 기록·자료 받기·배경 지도·정합은 지도에서 일한다. 도면·단면도 탭에서 누르면 먼저
+  // 기록·자료 받기·배경 지도·정합은 지도에서 일한다. 도면 탭에서 누르면 먼저
   // 지도 탭으로 넘어간다. 예전에는 보이지 않는 지도에 도구만 걸려 아무 일도 없어 보였다.
   for (const QString& id : mapOnlyRibbonGroups()) {
     QFrame* group = ribbon->group(id);

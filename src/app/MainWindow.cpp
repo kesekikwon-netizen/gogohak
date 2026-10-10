@@ -22,7 +22,6 @@
 #include "KaAlignMapTool.h"
 #include "KaImageView.h"
 #include "KaDrawingStudio.h"
-#include "KaSectionDrawingStudio.h"
 #include "KaTerrain3dStudio.h"
 #include "KaTerrain3dLayoutStudio.h"
 #include "KaStartPage.h"
@@ -379,7 +378,7 @@ QStringList MainWindow::mapOnlyRibbonGroups() {
           QStringLiteral("align")};
 }
 
-// 도면·단면도 같은 작업 탭에서 지도 전용 단추를 눌렀을 때만 지도 탭으로 넘긴다.
+// 도면 같은 작업 탭에서 지도 전용 단추를 눌렀을 때만 지도 탭으로 넘긴다.
 // 홈에서는 넘기지 않는다: 조사를 열기 전에 지도 화면을 여는 것은 사용자가 고른다.
 void MainWindow::showMapTabFromStudio() {
   if (!m_viewTabs || !m_mapPage) return;
@@ -1109,10 +1108,6 @@ void MainWindow::buildUi() {
       QTimer::singleShot(0, this, [this]() {
         if (!m_drawingStudio) return;
         m_drawingStudio->refreshMapFromProject();
-      });
-    if (m_sectionStudio && page == m_sectionStudio)
-      QTimer::singleShot(0, this, [this]() {
-        if (m_sectionStudio) m_sectionStudio->refreshLayers();
       });
     if (m_canvas) onCanvasScaleChanged(m_canvas->scale());
   });
@@ -2877,30 +2872,6 @@ void MainWindow::zoomToLocation(const LocationHit& hit) {
   }
 #else
   Q_UNUSED(hit);
-#endif
-}
-
-bool MainWindow::addSectionGeoTiffFromPath(const QString& path, const QString& crsAuthId) {
-#if KA_HGIS_HAS_QGIS
-  const QString title = QFileInfo(path).completeBaseName();
-  auto* rl = new QgsRasterLayer(path, title, QStringLiteral("gdal"));
-  if (!rl || !rl->isValid()) {
-    delete rl;
-    return false;
-  }
-  const QString crsLabel = crsAuthId.isEmpty()
-      ? QStringLiteral("EPSG:5187") : crsAuthId;
-  rl->setCustomProperty(QStringLiteral("ka_hgis/section_raster"), true);
-  rl->setCustomProperty(QStringLiteral("ka_hgis/section_crs_label"), crsLabel);
-  // 범례·캔버스에 넣지 않음. 단면도 탭 전용 (위성·지적과 섞지 않음).
-  QgsProject::instance()->addMapLayer(rl, false);
-  statusBar()->showMessage(
-      QStringLiteral("단면 GeoTIFF 추가: %1 · %2").arg(title, crsLabel), 8000);
-  return true;
-#else
-  Q_UNUSED(path);
-  Q_UNUSED(crsAuthId);
-  return false;
 #endif
 }
 

@@ -78,8 +78,7 @@ QStringList LayoutService::defaultLayoutNames() {
     QStringLiteral("survey_area_map"),
     QStringLiteral("site_location"),
     QStringLiteral("feature_plan"),
-    QStringLiteral("feature_detail"),
-    QStringLiteral("section")
+    QStringLiteral("feature_detail")
   };
 }
 
@@ -89,7 +88,6 @@ QString LayoutService::layoutId(DrawingKind kind) {
     case DrawingKind::SiteLocation: return QStringLiteral("site_location");
     case DrawingKind::FeaturePlan: return QStringLiteral("feature_plan");
     case DrawingKind::FeatureDetail: return QStringLiteral("feature_detail");
-    case DrawingKind::Section: return QStringLiteral("section");
   }
   return QStringLiteral("survey_area_map");
 }
@@ -98,7 +96,6 @@ LayoutService::DrawingKind LayoutService::kindFromLayoutId(const QString& layout
   if (layoutId == QLatin1String("site_location")) return DrawingKind::SiteLocation;
   if (layoutId == QLatin1String("feature_plan")) return DrawingKind::FeaturePlan;
   if (layoutId == QLatin1String("feature_detail")) return DrawingKind::FeatureDetail;
-  if (layoutId == QLatin1String("section")) return DrawingKind::Section;
   return DrawingKind::SurveyAreaMap;
 }
 
@@ -107,7 +104,6 @@ QString LayoutService::koreanTitle(const QString& name) {
   if (name == QLatin1String("site_location")) return QStringLiteral("유적위치도");
   if (name == QLatin1String("feature_plan")) return QStringLiteral("유구배치도");
   if (name == QLatin1String("feature_detail")) return QStringLiteral("개별유구실측도");
-  if (name == QLatin1String("section")) return QStringLiteral("층위도");
   return name;
 }
 
@@ -156,15 +152,6 @@ LayoutService::DrawingRecipe LayoutService::recipe(DrawingKind kind) {
       r.emptyHintKo = QStringLiteral("유구를 그린 뒤, 왼쪽에서 실측할 유구를 고르세요.");
       r.scaleChoices = {50.0, 100.0, 200.0};
       break;
-    case DrawingKind::Section:
-      r.purposeKo = QStringLiteral("단면·층위 기준선을 도면으로 출력합니다.");
-      r.defaultScale = 200.0;
-      r.gridIntervalM = 0.0;
-      r.includeBasemap = false;
-      r.layerKeys = {QStringLiteral("section_line"), QStringLiteral("survey_area")};
-      r.emptyHintKo = QStringLiteral("먼저 「그리기 → 단면」으로 단면선을 그리세요.");
-      r.scaleChoices = {100.0, 200.0, 500.0};
-      break;
   }
   return r;
 }
@@ -175,7 +162,6 @@ QList<LayoutService::DrawingRecipe> LayoutService::allRecipes() {
     recipe(DrawingKind::SiteLocation),
     recipe(DrawingKind::FeaturePlan),
     recipe(DrawingKind::FeatureDetail),
-    recipe(DrawingKind::Section),
   };
 }
 
@@ -308,18 +294,6 @@ static bool hasDrawableContent(const QList<QgsMapLayer*>& layers, const LayoutSe
     }
     return false;
   }
-  if (rec.kind == LayoutService::DrawingKind::Section) {
-    for (QgsMapLayer* ml : layers) {
-      auto* vl = qobject_cast<QgsVectorLayer*>(ml);
-      if (!vl || LayerOps::isReferenceLayer(vl) || LayerOps::isCadastralLayer(vl) ||
-          LayerOps::isBasemapLayer(vl))
-        continue;
-      const QString k = LayerOps::layerKeyOf(vl);
-      if (k == QLatin1String("section_line") && vl->featureCount() > 0)
-        return true;
-    }
-    return false;
-  }
   for (QgsMapLayer* ml : layers) {
     auto* vl = qobject_cast<QgsVectorLayer*>(ml);
     if (!vl || LayerOps::isReferenceLayer(vl) || LayerOps::isCadastralLayer(vl) ||
@@ -344,7 +318,6 @@ static QgsRectangle resolveExtent(QgsProject* project, const LayoutService::Draw
   auto* sa = LayerOps::findByLayerKey(project, QStringLiteral("survey_area"));
   auto* fp = LayerOps::findByLayerKey(project, QStringLiteral("feature_poly"));
   auto* fl = LayerOps::findByLayerKey(project, QStringLiteral("feature_line"));
-  auto* sl = LayerOps::findByLayerKey(project, QStringLiteral("section_line"));
 
   if (opt.extentMode == LayoutService::ExtentMode::SelectedFeature ||
       rec.kind == LayoutService::DrawingKind::FeatureDetail) {
@@ -352,15 +325,6 @@ static QgsRectangle resolveExtent(QgsProject* project, const LayoutService::Draw
     if (e.isEmpty()) e = featuresExtent(fl, opt.featureId);
     if (!e.isEmpty()) {
       e.scale(1.35);
-      return e;
-    }
-  }
-
-  if (rec.kind == LayoutService::DrawingKind::Section) {
-    QgsRectangle e = featuresExtent(sl);
-    if (e.isEmpty()) e = featuresExtent(sa);
-    if (!e.isEmpty()) {
-      e.scale(1.4);
       return e;
     }
   }
@@ -1281,7 +1245,7 @@ QString LayoutService::exportLayoutPdf(QgsProject* project, const QString& layou
     if (errorOut) *errorOut = QStringLiteral("프로젝트가 없습니다.");
     return {};
   }
-  // user_sheet는 도면만들기 용지. 없으면 5종 템플릿을 심지 않는다.
+  // user_sheet는 도면만들기 용지. 없으면 4종 템플릿을 심지 않는다.
   QgsMasterLayoutInterface* master = project->layoutManager()->layoutByName(layoutName);
   if (!master && layoutName != QLatin1String("user_sheet")) {
     ensureDefaultLayouts(project);

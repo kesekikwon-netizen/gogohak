@@ -135,10 +135,9 @@ QString build(const Inputs& in) {
   t += QStringLiteral("\nreference_data (도면에 그린 참조 지도):\n");
   t += in.referenceLines.isEmpty() ? QStringLiteral("- 없음\n") : in.referenceLines.join(QLatin1Char('\n')) + QLatin1Char('\n');
   t += QStringLiteral("\nSee MANIFEST.sha256 for file hashes.\n");
-  t += QStringLiteral("도면 PDF는 도면만들기 용지(user_sheet 및 section_sheet)를 넣습니다.\n");
+  t += QStringLiteral("도면 PDF는 도면만들기 용지(user_sheet)를 넣습니다.\n");
   t += in.hasSheetPdf ? QStringLiteral("- 조사도면.pdf (도면만들기 user_sheet)\n")
                       : QStringLiteral("조사도면.pdf 없음: 도면만들기에서 용지를 만든 뒤 다시 보내기 하세요.\n");
-  if (in.hasSectionPdf) t += QStringLiteral("- 단면도.pdf (단면도면만들기 section_sheet)\n");
   return t;
 }
 

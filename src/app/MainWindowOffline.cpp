@@ -13,7 +13,6 @@
 #include "KaAlignMapTool.h"
 #include "KaImageView.h"
 #include "KaDrawingStudio.h"
-#include "KaSectionDrawingStudio.h"
 #include "KaTerrain3dStudio.h"
 #include "KaTerrain3dLayoutStudio.h"
 #include "KaStartPage.h"

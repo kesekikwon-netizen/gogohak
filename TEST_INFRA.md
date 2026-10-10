@@ -52,8 +52,6 @@ tests/
 ├── test_workflow.cpp         # Field workflow, layer, schema (data/schemas) tests
 ├── test_save_open.cpp        # Window lifecycle, GPKG persistence, old-version compat sample
 ├── test_perf.cpp             # perf_engine budgets (render, open, layout, startup, PDF, save, submit)
-├── test_section_layout.cpp   # GeoTIFF section drawing layout tests
-├── test_section_studio.cpp   # Section studio interactive tool tests
 ├── test_dem_trench.cpp       # DEM trench generation & analysis tests
 ├── test_georef.cpp           # Map georeferencing engine tests
 ├── test_storage_*.cpp        # Save generations, recovery, hygiene

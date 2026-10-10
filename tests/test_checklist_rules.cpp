@@ -46,7 +46,7 @@ QJsonObject cleanState() {
                           "control_points_point_id_unique", "feature_poly_feature_no_unique",
                           "sheet_covers_targets", "sheet_has_elements", "HERITAGE_PLEDGE_SCOPE",
                           "layout_exists:site_location", "layout_exists:feature_plan",
-                          "layout_exists:feature_detail", "layout_exists:section"})
+                          "layout_exists:feature_detail"})
     st.insert(QString::fromLatin1(key), true);
   st.insert(QStringLiteral("has_abstract_marker"), false);
   return st;
@@ -64,7 +64,6 @@ const QVector<Violation>& violations() {
       {"REQ_DRAWING_SITE_LOCATION", "layout_exists:site_location", false},
       {"REQ_DRAWING_FEATURE_PLAN", "layout_exists:feature_plan", false},
       {"REQ_DRAWING_FEATURE_DETAIL", "layout_exists:feature_detail", false},
-      {"REQ_DRAWING_SECTION", "layout_exists:section", false},
       {"GEOMETRY_VALID", "geometries_valid", false},
       {"GEOMETRY_NOT_EMPTY", "geometries_nonempty", false},
       {"GEOMETRY_NONZERO_AREA", "geometries_nonzero_area", false},

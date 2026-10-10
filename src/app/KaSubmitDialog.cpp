@@ -31,7 +31,7 @@ KaSubmitDialog::KaSubmitDialog(QWidget* parent) : QDialog(parent) {
   auto* intro = new QLabel(
       QStringLiteral("제출 꾸러미 = EPSG:5179 SHP + 조사도면.pdf + MANIFEST.sha256 입니다. "
                      "검수 오류가 남아 있으면 한 번 묻고 만들며 README에 적습니다.\n"
-                     "필수 도면 5종은 조사구역도·유적위치도·유구배치도·개별유구실측도·층위도입니다. "
+                     "필수 도면 4종은 조사구역도·유적위치도·유구배치도·개별유구실측도입니다. "
                      "유적위치도·유구배치도·개별유구실측도는 「도면」에서 만든 용지로 확인합니다."),
       this);
   intro->setObjectName(QStringLiteral("submitIntro"));
@@ -109,7 +109,6 @@ KaSubmitDialog::KaSubmitDialog(QWidget* parent) : QDialog(parent) {
 QString KaSubmitDialog::actionLabel(const QString& action) {
   static const QHash<QString, QString> labels = {
       {QStringLiteral("open_layout"), QStringLiteral("도면 열기")},
-      {QStringLiteral("open_section"), QStringLiteral("단면도 열기")},
       {QStringLiteral("draw_survey_area"), QStringLiteral("조사구역 그리기")},
       {QStringLiteral("draw_feature"), QStringLiteral("유구 그리기")},
       {QStringLiteral("add_control_point"), QStringLiteral("기준점 찍기")},

@@ -5,7 +5,6 @@
 #include "LayerOps.h"
 #include "LayerFeatures.h"
 #include "LayoutService.h"
-#include "SectionLayoutService.h"
 #include <QJsonObject>
 #include <qgsproject.h>
 #include <qgsvectorlayer.h>
@@ -46,7 +45,6 @@ QJsonObject ProjectStateBuilder::empty() {
   st.insert(QStringLiteral("layout_exists:site_location"), false);
   st.insert(QStringLiteral("layout_exists:feature_plan"), false);
   st.insert(QStringLiteral("layout_exists:feature_detail"), false);
-  st.insert(QStringLiteral("layout_exists:section"), false);
   st.insert(QStringLiteral("layout_exists:survey_area_map"), false);
   return st;
 }
@@ -73,7 +71,6 @@ QJsonObject ProjectStateBuilder::fromProject(QgsProject* project) {
   const int saCount = total("survey_area");
   const int fpCount = total("feature_poly");
   const int flCount = total("feature_line");
-  const int slCount = total("section_line");
   st.insert(QStringLiteral("survey_area_count"), saCount);
   st.insert(QStringLiteral("feature_poly_count"), fpCount);
   st.insert(QStringLiteral("feature_line_count"), flCount);
@@ -115,16 +112,7 @@ QJsonObject ProjectStateBuilder::fromProject(QgsProject* project) {
   // 3. 조사구역도 판정(규칙은 layer_nonempty:survey_area). 참고용 상태로만 남긴다.
   st.insert(QStringLiteral("layout_exists:survey_area_map"),
             saCount > 0 && shows(QStringLiteral("survey_area_map"), extents.survey, 0.0));
-  // 4. 단면/층위도: section_sheet 조판 또는 (section_line 피처 > 0 및 section 조판).
-  // Section display rasters are layout-owned temp files; after a reopen the sheet's map
-  // is empty until they are derived again (same call as the package export, no-op when
-  // the sheet is complete). Without it the rule warned falsely after every reopen.
-  SectionLayoutService::restoreDisplayLayers(project);
-  const bool sectionPass =
-      LayoutService::isComposedStudioSheet(project, QStringLiteral("section_sheet")) ||
-      (slCount > 0 && C::isNamedLayoutComposed(project, QStringLiteral("section")));
-  st.insert(QStringLiteral("layout_exists:section"), sectionPass);
-  // 5. 개별유구실측도: 유구를 1:200보다 크게 보여 주는 조판 용지가 있어야 한다.
+  // 4. 개별유구실측도: 유구를 1:200보다 크게 보여 주는 조판 용지가 있어야 한다.
   st.insert(QStringLiteral("layout_exists:feature_detail"),
             hasFeatures && shows(QStringLiteral("feature_detail"), extents.features, kFeatureDetailMaxScale));
 

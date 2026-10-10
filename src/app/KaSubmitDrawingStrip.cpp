@@ -9,8 +9,7 @@ struct RequiredDrawing { const char* rule; const char* name; };
 constexpr RequiredDrawing kRequiredDrawings[] = {{"REQ_DRAWING_SURVEY_AREA", "조사구역도"},
                                                  {"REQ_DRAWING_SITE_LOCATION", "유적위치도"},
                                                  {"REQ_DRAWING_FEATURE_PLAN", "유구배치도"},
-                                                 {"REQ_DRAWING_FEATURE_DETAIL", "개별유구실측도"},
-                                                 {"REQ_DRAWING_SECTION", "층위도"}};
+                                                 {"REQ_DRAWING_FEATURE_DETAIL", "개별유구실측도"}};
 }  // namespace
 
 KaSubmitDrawingStrip::KaSubmitDrawingStrip(QWidget* parent) : QWidget(parent) {

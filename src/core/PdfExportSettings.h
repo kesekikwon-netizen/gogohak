@@ -5,8 +5,8 @@
 class QgsLayout;
 
 // One PDF recipe for every drawing sheet: the drawing studio 「PDF 저장」 and
-// print source, the submission package (조사도면.pdf) and the section sheet
-// (단면도.pdf). Every exporter takes its settings from here, so the PDF the
+// print source and the submission package (조사도면.pdf).
+// Every exporter takes its settings from here, so the PDF the
 // user checked on screen is the PDF that goes into the package.
 namespace KaPdfExport {
 

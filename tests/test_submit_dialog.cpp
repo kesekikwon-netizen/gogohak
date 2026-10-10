@@ -28,13 +28,12 @@ CheckResult result(const QString& id, const QString& severity, bool passed, cons
 class TestSubmitDialog : public QObject {
   Q_OBJECT
 private slots:
-  // 「조용한 도판」: five paper tiles for the required drawings, present or 「없음」, from the drawing rules.
+  // 「조용한 도판」: four paper tiles (층위도 left with the 단면도 feature, 2026-10-10) for the required drawings, present or 「없음」, from the drawing rules.
   void requiredDrawingsStripFollowsTheDrawingRules() {
     const QVector<CheckResult> results = {result(QStringLiteral("REQ_DRAWING_SURVEY_AREA"), QStringLiteral("error"), true),
                                           result(QStringLiteral("REQ_DRAWING_SITE_LOCATION"), QStringLiteral("error"), true),
                                           result(QStringLiteral("REQ_DRAWING_FEATURE_PLAN"), QStringLiteral("error"), true),
-                                          result(QStringLiteral("REQ_DRAWING_FEATURE_DETAIL"), QStringLiteral("warn"), false),
-                                          result(QStringLiteral("REQ_DRAWING_SECTION"), QStringLiteral("warn"), false)};
+                                          result(QStringLiteral("REQ_DRAWING_FEATURE_DETAIL"), QStringLiteral("warn"), false)};
     {
       KaSubmitDialog stock;
       stock.setResults(results, true);
@@ -46,7 +45,7 @@ private slots:
     dialog.setResults(results, true);
     auto* strip = dialog.findChild<QWidget*>(QStringLiteral("submitDrawingStrip"));
     QVERIFY(strip);
-    QCOMPARE(strip->property("missing").toStringList(), (QStringList{QStringLiteral("개별유구실측도"), QStringLiteral("층위도")}));
+    QCOMPARE(strip->property("missing").toStringList(), (QStringList{QStringLiteral("개별유구실측도")}));
     QCOMPARE(strip->property("present").toStringList(),
              (QStringList{QStringLiteral("조사구역도"), QStringLiteral("유적위치도"), QStringLiteral("유구배치도")}));
     dialog.setResults({}, false);  // no rule file: no drawing state to show
@@ -192,7 +191,8 @@ private slots:
   }
 
   void everyRuleActionHasALabel() {
-    for (const char* action : {"open_layout", "open_section", "draw_survey_area", "draw_feature", "add_control_point",
+    QVERIFY2(KaSubmitDialog::actionLabel(QStringLiteral("open_section")).isEmpty(), "단면도 is gone (2026-10-10)");
+    for (const char* action : {"open_layout", "draw_survey_area", "draw_feature", "add_control_point",
                                "edit_attributes", "vertex_edit", "select_tool", "set_work_crs"})
       QVERIFY2(!KaSubmitDialog::actionLabel(QString::fromLatin1(action)).isEmpty(), action);
   }

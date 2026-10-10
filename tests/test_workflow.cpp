@@ -58,7 +58,6 @@
 #include "core/KaSafeQgis.h"
 #include "core/SurveyStorage.h"
 #include "core/AdminBoundaryService.h"
-#include "core/SectionLayoutService.h"
 #include "app/KaCaptureMapTool.h"
 #include <QCryptographicHash>
 #include <QRegularExpression>
@@ -313,7 +312,6 @@ private slots:
   void bootNeverRestoresLastSurvey();
   void finishOpenedProject_doesNotBareRefreshWhileWms();
   void test_export_failure_aborts_and_reports_error();
-  void test_section_sheet_bundling();
   void test_chunked_sha256_manifest_integrity();
   void test_challenge_pdf_failure_readonly_and_locked();
   void test_challenge_section_sheet_bundling_variations();
@@ -7731,73 +7729,6 @@ void TestWorkflow::test_export_failure_aborts_and_reports_error() {
            "MANIFEST.sha256 must not be created if package export fails");
 }
 
-void TestWorkflow::test_section_sheet_bundling() {
-  QTemporaryDir tempDir;
-  QVERIFY(tempDir.isValid());
-  const QString pkgDir = tempDir.filePath(QStringLiteral("section_bundle_pkg"));
-
-  QgsProject proj;
-  proj.setCrs(QgsCoordinateReferenceSystem(QStringLiteral("EPSG:5186")));
-
-  // 1. Survey area
-  auto* sa = new QgsVectorLayer(QStringLiteral("Polygon?crs=EPSG:5186"),
-                                QStringLiteral("survey_area"), QStringLiteral("memory"));
-  QVERIFY(sa->isValid());
-  sa->setCustomProperty(QString::fromUtf8(LayerOps::kPropLayerKey), QStringLiteral("survey_area"));
-  proj.addMapLayer(sa);
-  QVERIFY(sa->startEditing());
-  QgsFeature sf(sa->fields());
-  QgsPolylineXY ring;
-  ring << QgsPointXY(200000, 450000) << QgsPointXY(200100, 450000)
-       << QgsPointXY(200100, 450100) << QgsPointXY(200000, 450100)
-       << QgsPointXY(200000, 450000);
-  sf.setGeometry(QgsGeometry::fromPolygonXY(QgsPolygonXY() << ring));
-  QVERIFY(sa->addFeature(sf));
-  QVERIFY(sa->commitChanges());
-
-  // 2. Composed user_sheet
-  QVERIFY2(addComposedUserSheet(&proj, sa), "composed user_sheet");
-  QVERIFY(LayoutService::isComposedStudioSheet(&proj));
-
-  // 3. Composed section_sheet via SectionLayoutService
-  SectionLayoutOptions secOpt;
-  secOpt.titleKo = QStringLiteral("트렌치 1호 토층 단면도");
-  secOpt.paper = SectionLayoutOptions::Paper::A4;
-  const auto secRes = SectionLayoutService::buildSectionLayout(&proj, {}, secOpt);
-  QVERIFY2(!secRes.layoutName.isEmpty(), qPrintable(secRes.errorKo));
-  QVERIFY(proj.layoutManager()->layoutByName(QStringLiteral("section_sheet")));
-
-  // 4. Export package
-  QString err;
-  const QString out = ExportService::exportSubmissionPackage(
-      &proj, pkgDir, QStringLiteral("UTF-8"), QStringLiteral("OK"), true, false, &err);
-  QVERIFY2(!out.isEmpty(), qPrintable(err));
-
-  // 5. Verify both 조사도면.pdf and 단면도.pdf exist
-  const QString userPdf = QDir(pkgDir).filePath(QStringLiteral("조사도면.pdf"));
-  QVERIFY2(QFile::exists(userPdf), "조사도면.pdf must exist");
-  QVERIFY(QFileInfo(userPdf).size() > 500);
-
-  const QString sectionPdf = QDir(pkgDir).filePath(QStringLiteral("단면도.pdf"));
-  QVERIFY2(QFile::exists(sectionPdf), "단면도.pdf must be bundled when section_sheet is present");
-  QVERIFY(QFileInfo(sectionPdf).size() > 500);
-
-  // 6. Verify MANIFEST.sha256 contains entries for both PDFs
-  const QString manifestPath = QDir(pkgDir).filePath(QStringLiteral("MANIFEST.sha256"));
-  QVERIFY(QFile::exists(manifestPath));
-  QFile mf(manifestPath);
-  QVERIFY(mf.open(QIODevice::ReadOnly | QIODevice::Text));
-  const QString manifestContent = QString::fromUtf8(mf.readAll());
-  mf.close();
-
-  QVERIFY2(manifestContent.contains(QStringLiteral("조사도면.pdf")),
-           "MANIFEST.sha256 must register 조사도면.pdf");
-  QVERIFY2(manifestContent.contains(QStringLiteral("단면도.pdf")),
-           "MANIFEST.sha256 must register 단면도.pdf");
-  QVERIFY2(manifestContent.contains(QStringLiteral("survey_area.shp")),
-           "MANIFEST.sha256 must register survey_area.shp");
-}
-
 void TestWorkflow::test_chunked_sha256_manifest_integrity() {
   QTemporaryDir tempDir;
   QVERIFY(tempDir.isValid());
@@ -7971,6 +7902,7 @@ void TestWorkflow::test_challenge_pdf_failure_readonly_and_locked() {
 
     QVERIFY2(res.isEmpty(), "exportSubmissionPackage must abort when PDF is locked");
     QVERIFY2(!err.isEmpty(), "Error output must report failure");
+    QVERIFY2(err.contains(QStringLiteral("비어 있지")), "Existing package files must be rejected before any writes");
 
     const QString manifestPath = QDir(outDir).filePath(QStringLiteral("MANIFEST.sha256"));
     QVERIFY2(!QFile::exists(manifestPath), "MANIFEST.sha256 must NOT be written when PDF is locked");
@@ -7981,71 +7913,10 @@ void TestWorkflow::test_challenge_pdf_failure_readonly_and_locked() {
     lockFile.close();
 #endif
   }
-
-  // Test C: user_sheet succeeds, but section_sheet (단면도.pdf) export fails (locked)
-  {
-    QTemporaryDir tempDir;
-    QVERIFY(tempDir.isValid());
-    const QString outDir = tempDir.filePath(QStringLiteral("sec_fail_locked"));
-    QDir().mkpath(outDir);
-
-    QgsProject proj;
-    proj.setCrs(QgsCoordinateReferenceSystem(QStringLiteral("EPSG:5186")));
-    auto* sa = new QgsVectorLayer(QStringLiteral("Polygon?crs=EPSG:5186"),
-                                  QStringLiteral("survey_area"), QStringLiteral("memory"));
-    sa->setCustomProperty(QString::fromUtf8(LayerOps::kPropLayerKey), QStringLiteral("survey_area"));
-    proj.addMapLayer(sa);
-    QVERIFY(sa->startEditing());
-    QgsFeature sf(sa->fields());
-    QgsPolylineXY ring;
-    ring << QgsPointXY(200000, 450000) << QgsPointXY(200100, 450000)
-         << QgsPointXY(200100, 450100) << QgsPointXY(200000, 450100)
-         << QgsPointXY(200000, 450000);
-    sf.setGeometry(QgsGeometry::fromPolygonXY(QgsPolygonXY() << ring));
-    QVERIFY(sa->addFeature(sf));
-    QVERIFY(sa->commitChanges());
-    QVERIFY2(addComposedUserSheet(&proj, sa), "composed user_sheet");
-
-    SectionLayoutOptions secOpt;
-    secOpt.titleKo = QStringLiteral("단면도");
-    secOpt.paper = SectionLayoutOptions::Paper::A4;
-    SectionLayoutService::buildSectionLayout(&proj, {}, secOpt);
-
-    const QString secPdfPath = QDir(outDir).filePath(QStringLiteral("단면도.pdf"));
-#ifdef _WIN32
-    HANDLE hSecLock = CreateFileW(reinterpret_cast<LPCWSTR>(secPdfPath.utf16()),
-                                  GENERIC_READ | GENERIC_WRITE,
-                                  FILE_SHARE_READ,
-                                  NULL,
-                                  CREATE_ALWAYS,
-                                  FILE_ATTRIBUTE_NORMAL,
-                                  NULL);
-    QVERIFY(hSecLock != INVALID_HANDLE_VALUE);
-#else
-    QFile secLockFile(secPdfPath);
-    QVERIFY(secLockFile.open(QIODevice::WriteOnly));
-#endif
-
-    QString err;
-    const QString res = ExportService::exportSubmissionPackage(
-        &proj, outDir, QStringLiteral("UTF-8"), QStringLiteral("OK"), true, false, &err);
-
-    QVERIFY2(res.isEmpty(), "exportSubmissionPackage must abort when section PDF export fails");
-    QVERIFY2(!err.isEmpty(), "Error output must report section failure");
-    QVERIFY2(err.contains(QStringLiteral("비어 있지")), "Existing package files must be rejected before any writes");
-
-    const QString manifestPath = QDir(outDir).filePath(QStringLiteral("MANIFEST.sha256"));
-    QVERIFY2(!QFile::exists(manifestPath), "MANIFEST.sha256 must NOT be written when section PDF export fails");
-
-#ifdef _WIN32
-    CloseHandle(hSecLock);
-#else
-    secLockFile.close();
-#endif
-  }
 }
 
 void TestWorkflow::test_challenge_section_sheet_bundling_variations() {
+  // 단면도 was removed (2026-10-10). An old survey may still carry a section_sheet; it never becomes 단면도.pdf.
   // Scenario A: Uncomposed section_sheet (with empty_hint item) should NOT be exported as 단면도.pdf
   {
     QTemporaryDir tempDir;
@@ -8095,7 +7966,7 @@ void TestWorkflow::test_challenge_section_sheet_bundling_variations() {
     QVERIFY(!manifestContent.contains(QStringLiteral("단면도.pdf")));
   }
 
-  // Scenario B: section_sheet composed, but user_sheet absent
+  // Scenario B: an old survey's composed-looking section_sheet and no user_sheet: SHP only
   {
     QTemporaryDir tempDir;
     QVERIFY(tempDir.isValid());
@@ -8117,19 +7988,23 @@ void TestWorkflow::test_challenge_section_sheet_bundling_variations() {
     QVERIFY(sa->addFeature(sf));
     QVERIFY(sa->commitChanges());
 
-    // Build composed section_sheet
-    SectionLayoutOptions secOpt;
-    secOpt.titleKo = QStringLiteral("단독 단면도");
-    secOpt.paper = SectionLayoutOptions::Paper::A4;
-    SectionLayoutService::buildSectionLayout(&proj, {}, secOpt);
+    // The layout an old 단면도 tab saved: section_sheet with its map item
+    auto* oldSheet = new QgsPrintLayout(&proj);
+    oldSheet->initializeDefaults();
+    oldSheet->setName(QStringLiteral("section_sheet"));
+    auto* oldMap = new QgsLayoutItemMap(oldSheet);
+    oldMap->setId(QStringLiteral("ka_section_map"));
+    oldMap->setLayers({sa});
+    oldSheet->addLayoutItem(oldMap);
+    proj.layoutManager()->addLayout(oldSheet);
 
     QString err;
     const QString res = ExportService::exportSubmissionPackage(
         &proj, pkgDir, QStringLiteral("UTF-8"), QStringLiteral("OK"), true, false, &err);
-    QVERIFY2(!res.isEmpty(), qPrintable(err));  // 2026-10-10: no user_sheet still makes a package (SHP, 단면도)
+    QVERIFY2(!res.isEmpty(), qPrintable(err));  // 2026-10-10: no user_sheet still makes a package (SHP)
     QVERIFY(QFile::exists(QDir(pkgDir).filePath(QStringLiteral("README_submit.txt"))));
     QVERIFY(QFile::exists(QDir(pkgDir).filePath(QStringLiteral("survey_area.shp"))));
-    QVERIFY(QFile::exists(QDir(pkgDir).filePath(QStringLiteral("단면도.pdf"))));
+    QVERIFY(!QFile::exists(QDir(pkgDir).filePath(QStringLiteral("단면도.pdf"))));
     QVERIFY(!QFile::exists(QDir(pkgDir).filePath(QStringLiteral("조사도면.pdf"))));
   }
 }

@@ -625,25 +625,10 @@ QFrame#studioBottomBar {
   background: @surface@;
 }
 QFrame#mapCard { background: @surface@; border-radius: @mapRadius@px; }
-/* ---- Studio inspectors: 도면 and 단면도 share cards and a pinned output bar ---- */
-QWidget#sectionPropertiesPanel, QWidget#sectionInspectorColumn, QWidget#drawingInspectorColumn {
+/* ---- Studio inspector: 도면 cards and a pinned output bar ---- */
+QWidget#drawingInspectorColumn {
   background: @desk@;
 }
-QFrame#sectionLayersPanel {
-  background: @desk@;
-  border: none;
-  border-right: 1px solid @border@;
-}
-QFrame#sectionLayersPanel QToolButton {
-  font-size: 12px;
-  padding: 4px 10px;
-  border: 1px solid @border@;
-  border-bottom: 2px solid @borderStrong@;
-  background: @surface@;
-  border-radius: 6px;
-  color: @inkMuted@;
-}
-QFrame#sectionLayersPanel QToolButton:enabled:hover { background: @hover@; color: @ink@; }
 QFrame#studioOutputBar {
   background: @surface@;
   border: none;
@@ -1229,7 +1214,6 @@ QFrame#layersCard QToolButton:enabled:focus,
 QFrame#filesCard QToolButton:enabled:focus,
 QFrame#filesCard QToolButton#btnBrowseUp:enabled:focus,
 QFrame#studioFilesPanel QToolButton:enabled:focus,
-QFrame#sectionLayersPanel QToolButton:enabled:focus,
 QFrame#studioOutputBar QToolButton:enabled:focus,
 QFrame#itemInspector QToolButton:enabled:focus,
 QToolButton.sampleTile:enabled:focus,

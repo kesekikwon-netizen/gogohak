@@ -21,7 +21,6 @@
 
 #include "KaDrawingStudio.h"
 #include "KaFeatureSelectTool.h"
-#include "KaSectionDrawingStudio.h"
 #include "KaTerrain3dLayoutStudio.h"
 #include "KaTerrain3dStudio.h"
 #include "core/Terrain3dLayoutService.h"
@@ -435,47 +434,6 @@ void MainWindow::refreshTerrain3dDrapeAndSheet() {
   Terrain3dLayoutService::replacePicture(QgsProject::instance(), png, &err);
   if (m_terrain3dLayoutStudio)
     m_terrain3dLayoutStudio->attachSheet();
-#endif
-}
-
-void MainWindow::openSectionDesigner() {
-#if KA_HGIS_HAS_QGIS
-  if (!m_viewTabs)
-    return;
-  if (m_sectionStudio && m_viewTabs->indexOf(m_sectionStudio) >= 0) {
-    m_viewTabs->setCurrentWidget(m_sectionStudio);
-    hideSubTools();
-    m_sectionStudio->refreshLayers();
-    return;
-  }
-  if (!m_sectionStudio) {
-    m_sectionStudio = new KaSectionDrawingStudio(QgsProject::instance(), this);
-    m_sectionStudio->setAttribute(Qt::WA_DeleteOnClose, false);
-    connect(m_sectionStudio, &KaSectionDrawingStudio::statusMessage, this, [this](const QString& text) {
-      if (!m_viewTabs || m_viewTabs->currentWidget() != m_sectionStudio) return;
-      statusBar()->showMessage(text);
-    });
-    connect(m_sectionStudio, &KaSectionDrawingStudio::geoTiffAddRequested, this,
-            [this](const QString& path) {
-              if (path.isEmpty()) return;
-              const QString crs = m_sectionStudio
-                  ? m_sectionStudio->selectedCrsAuthId()
-                  : QStringLiteral("EPSG:5187");
-              if (!addSectionGeoTiffFromPath(path, crs)) {
-                QMessageBox::warning(this, QStringLiteral("GeoTIFF 추가"),
-                                     QStringLiteral("단면 GeoTIFF를 열지 못했습니다.\n%1").arg(path));
-                return;
-              }
-            });
-  }
-  m_sectionStudio->setParent(m_viewTabs, Qt::Widget);
-  if (m_viewTabs->indexOf(m_sectionStudio) < 0)
-    m_viewTabs->addTab(m_sectionStudio, KaIcons::icon(QStringLiteral("section"), KaTheme::tokens().inkMuted),
-                       QStringLiteral("단면도"));
-  m_viewTabs->setCurrentWidget(m_sectionStudio);
-  hideSubTools();
-  m_sectionStudio->refreshLayers();
-  statusBar()->showMessage(QStringLiteral("용지 눈금이 준비되었습니다. GeoTIFF 추가로 단면을 맞추세요."), 6000);
 #endif
 }
 

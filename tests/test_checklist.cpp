@@ -138,7 +138,6 @@ void TestKaHgis::evaluatePassesHappyFixture() {
   st.insert(QStringLiteral("layout_exists:site_location"), true);
   st.insert(QStringLiteral("layout_exists:feature_plan"), true);
   st.insert(QStringLiteral("layout_exists:feature_detail"), true);
-  st.insert(QStringLiteral("layout_exists:section"), true);
   const auto r = e.evaluate(st);
   int errors = 0;
   for (const auto& x : r) if (!x.passed && x.severity == QLatin1String("error")) errors++;
@@ -181,7 +180,7 @@ void TestKaHgis::pdfViaLayout() {
   QgsProject proj;
   proj.setCrs(QgsCoordinateReferenceSystem(QStringLiteral("EPSG:5179")));
   LayoutService::ensureDefaultLayouts(&proj);
-  QCOMPARE(LayoutService::defaultLayoutNames().size(), 5);
+  QCOMPARE(LayoutService::defaultLayoutNames().size(), 4);  // no 층위도 (2026-10-10)
   const QString p = QDir::temp().filePath(QStringLiteral("ka_layout_test.pdf"));
   QFile::remove(p);
   QString err;
@@ -218,7 +217,7 @@ void TestKaHgis::fromProject_emptySeededSiteLocation_layoutExistsFalse() {
   QVERIFY(!st.value(QStringLiteral("layout_exists:feature_plan")).toBool());
   QVERIFY(!st.value(QStringLiteral("layout_exists:survey_area_map")).toBool());
   QVERIFY(!st.value(QStringLiteral("layout_exists:feature_detail")).toBool());
-  QVERIFY(!st.value(QStringLiteral("layout_exists:section")).toBool());
+  QVERIFY(!st.contains(QStringLiteral("layout_exists:section")));  // 층위도 left with 단면도 (2026-10-10)
   QVERIFY(!LayoutService::isComposedStudioSheet(&proj, QStringLiteral("site_location")));
   QVERIFY(!LayoutService::isComposedStudioSheet(&proj, QStringLiteral("feature_detail")));
 }
@@ -293,7 +292,7 @@ void TestKaHgis::fromProject_composedUserSheet_layoutExistsTrue() {
   QVERIFY(st.value(QStringLiteral("layout_exists:site_location")).toBool());
   QVERIFY(st.value(QStringLiteral("layout_exists:feature_plan")).toBool());
   QVERIFY(st.value(QStringLiteral("layout_exists:survey_area_map")).toBool());
-  QVERIFY(!st.value(QStringLiteral("layout_exists:section")).toBool());
+  QVERIFY(!st.contains(QStringLiteral("layout_exists:section")));  // 층위도 left with 단면도 (2026-10-10)
   // A 1:2000-ish site sheet is not an individual feature drawing.
   QVERIFY(!st.value(QStringLiteral("layout_exists:feature_detail")).toBool());
   QVERIFY(st.value(QStringLiteral("sheet_covers_targets")).toBool());

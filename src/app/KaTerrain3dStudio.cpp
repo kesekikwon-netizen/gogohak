@@ -350,8 +350,9 @@ QVector<Terrain3dService::DemCandidate> KaTerrain3dStudio::mapDemCandidates() co
     auto* ras = qobject_cast<QgsRasterLayer*>(l);
     if (!ras || !ras->isValid())
       continue;
-    if (ras->providerType() != QLatin1String("gdal"))
-      continue;
+    if (ras->providerType() != QLatin1String("gdal") ||
+        ras->customProperty(QStringLiteral("ka_hgis/section_raster")).toBool())
+      continue;  // a section photo left by the removed 단면도 tab is never a DEM
     Terrain3dService::DemCandidate c;
     c.name = ras->name();
     c.source = ras->source();

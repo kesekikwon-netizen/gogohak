@@ -67,7 +67,6 @@ class KaImageView;
 class KaAlignLinkOverlay;
 class KaDrawingStudio;
 class KaMapCornerBar;
-class KaSectionDrawingStudio;
 class KaTerrain3dStudio;
 class KaTerrain3dLayoutStudio;
 class KaStartPage;
@@ -269,7 +268,6 @@ private slots:
   // 어느 화면에서든 인쇄(Ctrl+P). 도면이 없으면 도면 화면부터 연다.
   void printDrawing();
   void placeTerrain3dOnSheet();
-  void openSectionDesigner();
   void openTerrain3dStudio();
   void openTerrain3dLayout();
   void applyTerrain3dSheetScale(int denominator);
@@ -302,7 +300,6 @@ private:
   void refreshAboveLabelsOverlay();
   void toggleAllLayersChecked();
   void refreshLayerCheckAllButton();
-  bool addSectionGeoTiffFromPath(const QString& path, const QString& crsAuthId);
   bool tryAddDroppedPaths(const QStringList& paths);
   QStringList selectedBrowserFiles() const;
   void loadSurveyLayers(const QString& gpkgOrStub);
@@ -537,7 +534,6 @@ private:
   QString m_subToolsMode;
   bool m_snapEnabled = true;
   KaDrawingStudio* m_drawingStudio = nullptr;
-  KaSectionDrawingStudio* m_sectionStudio = nullptr;
   KaTerrain3dStudio* m_terrain3dStudio = nullptr;
   KaTerrain3dLayoutStudio* m_terrain3dLayoutStudio = nullptr;
   QAction* m_actMapGeoTiff = nullptr;

@@ -984,7 +984,7 @@ private slots:
     QVERIFY2(clipped.isEmpty(), qPrintable(tag + QStringLiteral(": ") + clipped.join(QStringLiteral(" · "))));
   }
   // The same monitor rows for the dialogs opened from those: 검수·제출, 새 조사, 수치지형도 계정. Each fits under the
-  // screen height with its buttons inside. (단면도 is left as it is on this screen: user 2026-10-10.)
+  // screen height with its buttons inside. (The 단면도 tab was removed on 2026-10-10.)
   void monitorFitDialogs_data() { monitorFitHomeMapDrawing_data(); }
   void monitorFitDialogs() {
     QFETCH(QSize, size);
