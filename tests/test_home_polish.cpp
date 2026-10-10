@@ -8,6 +8,7 @@
 #include <QLabel>
 #include <QPushButton>
 #include <QRect>
+#include <QTableWidget>
 #include <QVBoxLayout>
 #include <QSettings>
 #include <QStandardPaths>
@@ -157,6 +158,31 @@ private slots:
     QVERIFY2(resume.right() <= block->width() - 24, "the button is inset 24 from the frame");
     const int below = block->height() - 1 - check.bottom();
     QVERIFY2(below <= 14, qPrintable(QStringLiteral("%1 px under the cells").arg(below)));
+  }
+
+  // 최근 조사 표 (보완 H4): the mouse over a row washes the whole row (every cell), not the one cell it is over.
+  void recentRowWashesWholeOnHover() {
+    for (const char* folder : {"n", "o"}) {
+      const QString path = touch(m_dir.filePath(QStringLiteral("%1/광령리.gpkg").arg(QLatin1String(folder))));
+      QSettings st = RecentSurveys::userSettings();
+      RecentSurveys::remember(st, path, QStringLiteral("광령리%1").arg(QLatin1String(folder)));
+    }
+    KaStartPage page;
+    page.resize(1600, 900);
+    page.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&page));
+    auto* table = page.findChild<QTableWidget*>(QStringLiteral("recentSurveyList"));
+    QVERIFY(table && table->rowCount() >= 2);
+    const int last = table->columnCount() - 1;
+    auto edgeOf = [&](int row, int column) {  // a pixel in a cell's left padding, clear of its text
+      const QRect cell = table->visualRect(table->model()->index(row, column));
+      return table->viewport()->grab().toImage().pixelColor(cell.left() + 3, cell.center().y());
+    };
+    QCOMPARE(edgeOf(0, last), edgeOf(1, last));  // nothing under the mouse: the rows look alike
+    const QRect first = table->visualRect(table->model()->index(0, 0));
+    QTest::mouseMove(table->viewport(), first.center());
+    QTRY_VERIFY2(edgeOf(0, last) != edgeOf(1, last), "the cells away from the mouse stay plain");
+    QCOMPARE(edgeOf(0, last), edgeOf(0, 0));  // one wash along the whole row
   }
 };
 

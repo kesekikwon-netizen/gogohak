@@ -8,6 +8,8 @@
 #include "core/SurveyFacts.h"
 
 #include <QAbstractItemView>
+#include <QEvent>
+#include <QMouseEvent>
 #include <QHBoxLayout>
 #include <QHeaderView>
 #include <QLabel>
@@ -98,6 +100,11 @@ KaHomeRecentCard::KaHomeRecentCard(QWidget* parent) : QFrame(parent) {
   auto* delegate = new KaHomeRowDelegate(m_table);
   for (int column : {SurveyColumn, StateColumn, DotsColumn})
     if (!m_plate || column != DotsColumn) m_table->setItemDelegateForColumn(column, delegate);
+  if (m_plate) {  // 새 모양: every cell goes through the delegate so a row washes as one (보완 H4)
+    delegate->setPlainFromThird(true);
+    m_table->setItemDelegate(delegate);
+    m_table->viewport()->installEventFilter(this);
+  }
   auto* columns = m_table->horizontalHeader();
   columns->setSectionResizeMode(SurveyColumn, QHeaderView::Stretch);
   if (m_plate) columns->setDefaultAlignment(Qt::AlignLeft | Qt::AlignVCenter);
@@ -227,4 +234,18 @@ void KaHomeRecentCard::showMenu(const QPoint& pos) {
   else if (chosen == openCopy) emit openRequested(snapshot);
   else if (chosen == openFolder) emit recoveryFolderRequested(snapshot);
   else if (chosen == dismiss) emit recoveryDismissed(path);
+}
+
+// The row under the mouse, for KaHomeRowDelegate (property kaHoverRow; -1 = none).
+bool KaHomeRecentCard::eventFilter(QObject* watched, QEvent* event) {
+  if (m_table && watched == m_table->viewport()) {
+    int row = m_table->property("kaHoverRow").isValid() ? m_table->property("kaHoverRow").toInt() : -1;
+    if (event->type() == QEvent::MouseMove) row = m_table->rowAt(static_cast<QMouseEvent*>(event)->position().toPoint().y());
+    else if (event->type() == QEvent::Leave) row = -1;
+    if (!m_table->property("kaHoverRow").isValid() || row != m_table->property("kaHoverRow").toInt()) {
+      m_table->setProperty("kaHoverRow", row);
+      m_table->viewport()->update();
+    }
+  }
+  return QFrame::eventFilter(watched, event);
 }

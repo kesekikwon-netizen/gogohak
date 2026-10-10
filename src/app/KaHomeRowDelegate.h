@@ -12,6 +12,8 @@ class QRectF;
 class KaHomeRowDelegate final : public QStyledItemDelegate {
 public:
   explicit KaHomeRowDelegate(QObject* parent = nullptr);
+  // 새 모양: the columns from the third on are plain text (조사구역 · 유구 · 검수 · 마지막 열림), no dots.
+  void setPlainFromThird(bool on) { m_plainFrom2 = on; }
 
   void paint(QPainter* painter, const QStyleOptionViewItem& option, const QModelIndex& index) const override;
   QSize sizeHint(const QStyleOptionViewItem& option, const QModelIndex& index) const override;
@@ -21,6 +23,7 @@ public:
   static void paintDot(QPainter& painter, const QRectF& box, int dot);
 
 private:
+  bool m_plainFrom2 = false;
   void paintSurvey(QPainter* painter, const QRect& rect, const QModelIndex& index, qreal dpr) const;
   void paintState(QPainter* painter, const QRect& rect, const QModelIndex& index) const;
   void paintDots(QPainter* painter, const QRect& rect, const QModelIndex& index) const;

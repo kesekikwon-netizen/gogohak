@@ -36,6 +36,9 @@ public:
   explicit KaHomeRecentCard(QWidget* parent = nullptr);
   void setItems(const QVector<RecentSurveys::Item>& items, QSettings& settings);
 
+protected:
+  bool eventFilter(QObject* watched, QEvent* event) override;
+
 signals:
   void openRequested(const QString& path);
   void forgetRequested(const QString& path);

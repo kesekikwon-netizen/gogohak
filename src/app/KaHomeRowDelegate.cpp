@@ -37,6 +37,15 @@ KaHomeRowDelegate::KaHomeRowDelegate(QObject* parent) : QStyledItemDelegate(pare
 void KaHomeRowDelegate::paint(QPainter* painter, const QStyleOptionViewItem& option,
                               const QModelIndex& index) const {
   QStyleOptionViewItem opt = option;
+  // 보완 H4: the mouse washes the whole row (the table tells which row), not the one cell under it.
+  if (const QWidget* view = opt.widget; view && view->property("kaHoverRow").isValid())
+    opt.state.setFlag(QStyle::State_MouseOver, index.row() == view->property("kaHoverRow").toInt());
+  const bool drawn = index.column() == KaHomeRecentCard::SurveyColumn || index.column() == KaHomeRecentCard::StateColumn ||
+                     (index.column() == KaHomeRecentCard::DotsColumn && !m_plainFrom2);
+  if (!drawn) {
+    QStyledItemDelegate::paint(painter, opt, index);  // the plain text cells, with the row's hover
+    return;
+  }
   initStyleOption(&opt, index);
   opt.text.clear();  // the model text feeds the filter and tooltips; the cell is drawn here
   opt.icon = QIcon();
