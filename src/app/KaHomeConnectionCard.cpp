@@ -67,6 +67,7 @@ KaHomeConnectionCard::KaHomeConnectionCard(QWidget* parent) : QFrame(parent) {
   m_internetButton = new QPushButton(QStringLiteral("인터넷 확인"), this);
   m_internetButton->setObjectName(QStringLiteral("startEnvInternet"));
   m_internetButton->setCursor(Qt::PointingHandCursor);
+  m_internetButton->setProperty("kaPlate", KaTheme::displayOptions().paperLook);  // 새 모양: a 24 px secondary button
   m_internetButton->setToolTip(QStringLiteral("VWorld 서버에 한 번 접속해 봅니다. 누를 때만 확인합니다."));
   connect(m_internetButton, &QPushButton::clicked, this, [this]() { checkInternet(); });
   head->addWidget(m_internet, 0, Qt::AlignVCenter);

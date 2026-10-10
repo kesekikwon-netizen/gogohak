@@ -119,6 +119,9 @@ private slots:
       QCOMPARE(rule->width(), 1);
       QCOMPARE(rule->height(), 32);
     }
+    auto* internet = card.findChild<QPushButton*>(QStringLiteral("startEnvInternet"));  // the strip's one bordered button: 24 px
+    QVERIFY(internet);
+    QCOMPARE(internet->height(), 24);
     const auto setups = card.findChildren<QPushButton*>(QStringLiteral("startConnectionSetup"));
     QCOMPARE(setups.size(), 3);
     for (QPushButton* setup : setups) {

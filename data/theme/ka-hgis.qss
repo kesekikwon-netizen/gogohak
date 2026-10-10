@@ -1402,6 +1402,7 @@ QFrame#startConnRow[kaPlate="true"] QPushButton#startConnectionSetup { min-heigh
 QFrame#startConnRow[kaPlate="true"] QPushButton#startConnectionSetup:enabled:hover { background: @hover@; border-color: transparent; }
 QFrame#startConnRow[kaPlate="true"] QPushButton#startConnectionSetup:enabled:focus { border-color: @focusRing@; }
 QFrame#startConnRule { background: @border@; border: none; }
+QPushButton#startEnvInternet[kaPlate="true"] { min-height: 22px; max-height: 22px; padding: 0 8px; font-size: 12px; font-weight: 400; }
 /* 홈 판 (2차 보드 판 2): the cards have no box in 새 모양 (stock: white, 1 px edge, 10 px corners). */
 QFrame#startRecentCard, QFrame#startGuideCard, QFrame#startGuideCard2, QFrame#startConnectionCard {
   background: @cardFace@; border: 1px solid @cardEdge@; border-radius: @mapRadius@px; }
