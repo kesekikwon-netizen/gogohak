@@ -2,6 +2,7 @@
 #include "KaCrashGuard.h"
 #include "KaIcons.h"
 #include "KaTheme.h"
+#include "KaUserError.h"
 #include "core/ChecklistEngine.h"
 #include "core/GeometryEditOps.h"  // [int W4] F083 merge conflict question
 #include "core/LayerOps.h"
@@ -89,7 +90,7 @@ void MainWindow::exportMapGeoTiff() {
   } else if (progress.wasCanceled()) {
     statusBar()->showMessage(QStringLiteral("GeoTIFF 저장을 취소했습니다."), 5000);
   } else {
-    QMessageBox::warning(this, QStringLiteral("GeoTIFF 저장 실패"), error);
+    KaUserError::warn(this, {QStringLiteral("GeoTIFF 저장 실패"), QStringLiteral("GeoTIFF를 저장하지 못했습니다"), error, {}});
   }
 #endif
 }
@@ -324,8 +325,8 @@ void MainWindow::placeTerrain3dOnSheet() {
   const QString png = terrain3dSheetPngPath();
   const QImage view = m_terrain3dStudio->renderView(1600, 1000);
   if (view.isNull() || !view.save(png)) {
-    QMessageBox::warning(this, QStringLiteral("입체지형 도면출력"),
-                         QStringLiteral("입체지형 그림을 만들지 못했습니다."));
+    KaUserError::warn(this, {QStringLiteral("입체지형 도면출력"), QStringLiteral("입체지형 그림을 만들지 못했습니다"),
+                             QStringLiteral("그림을 만들거나 파일로 쓰지 못했습니다."), {}});
     return;
   }
   Terrain3dLayoutService::SheetSpec spec;
@@ -344,8 +345,7 @@ void MainWindow::placeTerrain3dOnSheet() {
     m_terrain3dLayoutStudio->detachSheet();
   QString err;
   if (Terrain3dLayoutService::buildSheet(QgsProject::instance(), spec, &err).isEmpty()) {
-    QMessageBox::warning(this, QStringLiteral("입체지형 도면출력"),
-                         err.isEmpty() ? QStringLiteral("입체지형 도면을 만들지 못했습니다.") : err);
+    KaUserError::warn(this, {QStringLiteral("입체지형 도면출력"), QStringLiteral("입체지형 도면을 만들지 못했습니다"), err, {}});
     return;
   }
   openTerrain3dLayout();
@@ -455,12 +455,11 @@ void MainWindow::mergeFeaturePolygons() {
   // 예전에는 다른 레이어에서 고른 면을 조용히 버리고 첫 레이어 것만 묶은 뒤
   // "선택한 폴리곤 N개를 묶었습니다"라고만 알렸다. 무엇이 빠졌는지 밝힌다.
   if (!otherLayers.isEmpty()) {
-    QMessageBox::warning(
-        this, QStringLiteral("폴리곤 묶기"),
-        QStringLiteral("한 번에 한 레이어만 묶을 수 있습니다.\n"
-                       "「%1」의 면만 묶고 다음 레이어의 선택은 쓰지 않습니다: %2")
-            .arg(targetLayer ? targetLayer->name() : QStringLiteral("?"),
-                 QStringList(otherLayers.begin(), otherLayers.end()).join(QStringLiteral(", "))));
+    KaUserError::warn(this, {QStringLiteral("폴리곤 묶기"), QStringLiteral("한 번에 한 레이어의 면만 묶을 수 있습니다"),
+                             QStringLiteral("「%1」의 면만 묶고 다음 레이어의 선택은 쓰지 않습니다: %2")
+                                 .arg(targetLayer ? targetLayer->name() : QStringLiteral("?"),
+                                      QStringList(otherLayers.begin(), otherLayers.end()).join(QStringLiteral(", "))),
+                             {}});
   }
   // 아무것도 고르지 않고 누르면 예전에는 유구면 전체가 통째로 하나가 됐다.
   // 되돌리려면 다시 나누어야 해서 사고가 컸다. 이제는 멈추고 알려 준다.
@@ -489,7 +488,7 @@ void MainWindow::mergeFeaturePolygons() {
   QString err;
   const bool ok = LayerOps::mergePolygonFeatures(targetLayer, selectedIds, &err);
   if (!ok) {
-    QMessageBox::warning(this, QStringLiteral("폴리곤 묶기"), err);
+    KaUserError::warn(this, {QStringLiteral("폴리곤 묶기"), QStringLiteral("면을 묶지 못했습니다"), err, {}});
     return;
   }
   // The merge stays in the edit buffer (Ctrl+Z); the survey save writes it.

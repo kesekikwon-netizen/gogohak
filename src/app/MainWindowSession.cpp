@@ -434,13 +434,9 @@ bool MainWindow::openSurveyGpkg(const QString& gpkgPath, OpenSurveyMode mode) {
   });
   if (m_workspaceRestoreFailed) {
     m_workspaceRestoreFailed = false;
-    QMessageBox::warning(
-        this, QStringLiteral("조사 열기"),
-        QStringLiteral(
-            "조사 데이터(.gpkg)는 열었지만 저장된 작업공간을 읽지 못했습니다.\n\n"
-            "외부 파일과 일부 레이어 설정은 복원되지 않았을 수 있습니다. "
-            "원래 작업공간은 자동으로 덮어쓰지 않습니다.\n\n"
-            "「저장」을 누르면 현재 복원된 작업을 다른 이름의 조사 파일로 저장합니다."));
+    KaUserError::warn(this, {QStringLiteral("조사 열기"), QStringLiteral("저장된 작업공간을 읽지 못했습니다"),
+                             QStringLiteral("조사 데이터(.gpkg)는 열었습니다. 외부 파일과 일부 레이어 설정은 복원되지 않았을 수 있습니다."),
+                             QStringLiteral("원래 작업공간은 덮어쓰지 않습니다. 「저장」을 누르면 지금 복원된 작업을 다른 이름의 조사 파일로 저장합니다.")});
   }
 #endif
   return true;
@@ -569,12 +565,9 @@ void MainWindow::openRecentSurvey(const QString& path) {
   if (path.isEmpty() || !QFile::exists(path)) {
     // The entry stays listed (greyed on the home page): a USB or network drive may just be
     // unplugged. Removing it is the user's right-click choice.
-    QMessageBox::warning(
-        this, QStringLiteral("최근 조사"),
-        QStringLiteral("조사 파일을 찾을 수 없습니다.\n%1\n\nUSB·네트워크 드라이브라면 연결한 뒤 다시 "
-                       "누르세요. 목록에서 빼려면 홈의 최근 조사에서 오른쪽 클릭 → 「목록에서 제거」를 "
-                       "고르세요.")
-            .arg(QDir::toNativeSeparators(path)));
+    KaUserError::warn(this, {QStringLiteral("최근 조사"), QStringLiteral("조사 파일을 찾을 수 없습니다"), QDir::toNativeSeparators(path),
+                             QStringLiteral("USB·네트워크 드라이브라면 연결한 뒤 다시 누르세요. 목록에서 빼려면 홈의 최근 조사에서 "
+                                            "오른쪽 클릭 → 「목록에서 제거」를 고르세요.")});
     if (m_startPage) m_startPage->reload();
     return;
   }
@@ -617,7 +610,7 @@ void MainWindow::openRecentSurvey(const QString& path) {
   if (kaQgisProjectFileIsUnsafeToRead(path) ||
       !kaSafeReadQgisProject(QgsProject::instance(), path, nullptr, /*loadLayouts=*/true)) {
     kaMarkQgisProjectUnsafeToRead(path);
-    QMessageBox::warning(this, QStringLiteral("오류"), QStringLiteral("프로젝트를 열 수 없습니다."));
+    KaUserError::warn(this, {QStringLiteral("오류"), QStringLiteral("작업 파일(.qgz)을 열 수 없습니다"), QStringLiteral("이 파일은 안전하게 읽을 수 없습니다."), {}});
     return;
   }
   LayerOps::pruneDuplicateSatelliteLayers(QgsProject::instance());
@@ -1019,8 +1012,7 @@ void MainWindow::reportSaveFailure(const QString& title, const QString& reason,
   // After the save scope has unwound (wait cursor, frozen map, opening guard).
   QTimer::singleShot(0, this, [this, title, reason]() {
     if (m_closingWindow || !isVisible()) return;
-    QMessageBox::warning(this, title,
-                         QStringLiteral("%1\n\n지도 화면 위 알림 줄에 자세한 내용이 있습니다.").arg(reason));
+    KaUserError::warn(this, {title, title, reason, QStringLiteral("지도 화면 위 알림 줄에 자세한 내용이 있습니다.")});
   });
 #endif
 }
@@ -1676,7 +1668,7 @@ void MainWindow::openProject() {
   if (kaQgisProjectFileIsUnsafeToRead(path) ||
       !kaSafeReadQgisProject(QgsProject::instance(), path, nullptr, /*loadLayouts=*/true)) {
     kaMarkQgisProjectUnsafeToRead(path);
-    QMessageBox::warning(this, QStringLiteral("오류"), QStringLiteral("프로젝트를 열 수 없습니다."));
+    KaUserError::warn(this, {QStringLiteral("오류"), QStringLiteral("작업 파일(.qgz)을 열 수 없습니다"), QStringLiteral("이 파일은 안전하게 읽을 수 없습니다."), {}});
     return;
   }
   LayerOps::pruneDuplicateSatelliteLayers(QgsProject::instance());
@@ -1745,7 +1737,7 @@ void MainWindow::setWorkCrs(const QString& authId) {
   QString err;
   LayerOps::ensureOtfEnabled(QgsProject::instance(), m_canvas, authId);
   if (!LayerOps::setWorkCrs(QgsProject::instance(), m_canvas, authId, &err, false)) {
-    QMessageBox::warning(this, QStringLiteral("CRS"), err);
+    KaUserError::warn(this, {QStringLiteral("CRS"), QStringLiteral("작업 좌표계를 바꾸지 못했습니다"), err, {}});
     return;
   }
   LayerOps::applyKoreaMapLimits(QgsProject::instance(), m_canvas);
