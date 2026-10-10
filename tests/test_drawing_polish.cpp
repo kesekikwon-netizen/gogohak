@@ -4,9 +4,11 @@
 
 #include <QFrame>
 #include <QHBoxLayout>
+#include <QDoubleSpinBox>
 #include <QLabel>
 #include <QScrollArea>
 #include <QToolButton>
+#include <QWidget>
 #include <QVBoxLayout>
 
 #include <memory>
@@ -14,6 +16,7 @@
 #include <qgsapplication.h>
 
 #include "app/KaDrawingStudioPlate.h"
+#include "app/KaPaperDialog.h"
 #include "app/KaTheme.h"
 
 namespace {
@@ -115,6 +118,54 @@ private slots:
     paper(false);  // the stock look keeps its boxes
     QTRY_VERIFY(!files->property("kaPlate").toBool());
     QVERIFY(rimPixels(empty->grab().toImage()) > 0);
+  }
+
+  // 용지 설정 창 (보완 L5): a size that follows from the paper is a reading line (mono ink, dotted leader), entry fields
+  // only under 「직접 입력」; the stock look keeps its disabled fields.
+  void lockedPaperSizeIsAReadingLine() {
+    KaPaperDialog dialog(nullptr, 317.0, 220.0);
+    dialog.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&dialog));
+    auto button = [&dialog](const char* name) { return dialog.findChild<QToolButton*>(QString::fromLatin1(name)); };
+    auto spin = [&dialog](const char* name) { return dialog.findChild<QDoubleSpinBox*>(QString::fromLatin1(name)); };
+    auto value = [&dialog](const char* name) {
+      auto* row = dialog.findChild<QWidget*>(QString::fromLatin1(name));
+      return row ? row->findChild<QLabel*>(QStringLiteral("paperSpecValue")) : nullptr;
+    };
+    QVERIFY(button("paperA4") && button("paperA3") && button("paperCustom") && button("paperLandscape"));
+    QVERIFY(spin("paperWidth") && spin("paperHeight") && value("paperSpecWidth") && value("paperSpecHeight"));
+    QVERIFY2(!spin("paperWidth")->isVisible() && value("paperSpecWidth")->isVisible(), "A4: the size is read, not typed");
+    QCOMPARE(value("paperSpecWidth")->text(), QStringLiteral("210"));
+    QCOMPARE(value("paperSpecHeight")->text(), QStringLiteral("297"));
+    int ink = 0;  // the reading is in ink, not the disabled grey
+    const QImage reading = value("paperSpecWidth")->grab().toImage();
+    for (int y = 0; y < reading.height(); ++y)
+      for (int x = 0; x < reading.width(); ++x) ink += reading.pixelColor(x, y).lightness() < 100 && reading.pixelColor(x, y).alpha() > 200;
+    QVERIFY2(ink >= 8, qPrintable(QString::number(ink)));
+    QCOMPARE(dialog.widthMm(), 210.0);
+    if (const QString out = qEnvironmentVariable("KA_HGIS_QA_OUTPUT_DIR"); !out.isEmpty()) dialog.grab().save(out + QStringLiteral("/paper-dialog.png"));
+    button("paperLandscape")->click();  // A4 가로 is the field sheet
+    QCOMPARE(value("paperSpecWidth")->text(), QStringLiteral("317"));
+    QCOMPARE(value("paperSpecHeight")->text(), QStringLiteral("220"));
+    button("paperA3")->click();
+    QCOMPARE(dialog.widthMm(), 420.0);
+    QCOMPARE(dialog.heightMm(), 297.0);
+    button("paperCustom")->click();
+    QVERIFY2(spin("paperWidth")->isVisible() && spin("paperWidth")->isEnabled() && !value("paperSpecWidth")->isVisible(),
+             "직접 입력: the fields are typed into");
+    spin("paperWidth")->setValue(123.4);
+    QCOMPARE(dialog.widthMm(), 123.4);
+  }
+
+  void stockPaperDialogKeepsItsDisabledFields() {
+    paper(false);
+    KaPaperDialog dialog(nullptr, 317.0, 220.0);
+    dialog.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&dialog));
+    auto* width = dialog.findChild<QDoubleSpinBox*>(QStringLiteral("paperWidth"));
+    QVERIFY(width && width->isVisible() && !width->isEnabled());
+    QCOMPARE(dialog.widthMm(), 210.0);
+    QCOMPARE(dialog.heightMm(), 297.0);
   }
 };
 

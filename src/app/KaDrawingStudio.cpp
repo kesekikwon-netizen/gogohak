@@ -14,6 +14,7 @@
 #include "KaDrawingPdfProgress.h"
 #include "KaDrawingSheetSet.h"
 #include "KaDrawingTools.h"
+#include "KaPaperDialog.h"
 #include "KaTitleBlock.h"
 #include "core/LayoutService.h"
 #include "core/LayerOps.h"
@@ -359,121 +360,7 @@ void KaDrawingStudio::ensureLayoutGuiRegistered(QgsMapCanvas* mapCanvas) {
 }
 
 bool KaDrawingStudio::promptPaper(QWidget* parent, double* widthMm, double* heightMm) {
-  if (!widthMm || !heightMm) return false;
-  auto paperIcon = [](bool landscape) {
-    QPixmap pm(48, 48);
-    pm.fill(Qt::transparent);
-    QPainter p(&pm);
-    p.setRenderHint(QPainter::Antialiasing, true);
-    p.setPen(QPen(QColor(15, 23, 42), 1.6));
-    p.setBrush(QColor(255, 255, 255));
-    const qreal corner = KaTheme::depictedPaperRadius();
-    if (landscape)
-      p.drawRoundedRect(QRectF(5, 14, 38, 22), corner, corner);
-    else
-      p.drawRoundedRect(QRectF(13, 4, 22, 40), corner, corner);
-    return QIcon(pm);
-  };
-  QDialog dlg(parent);
-  dlg.setWindowTitle(QStringLiteral("용지 설정"));
-  dlg.setMinimumWidth(KaWindowSize::width(KaWindowSize::Small, 400));
-  auto* form = new QFormLayout(&dlg);
-  auto makeChoice = [&dlg](const QString& text, const QIcon& icon, bool checked) {
-    auto* b = new QToolButton(&dlg);
-    b->setText(text);
-    if (!icon.isNull()) b->setIcon(icon);
-    b->setIconSize(QSize(28, 28));
-    b->setToolButtonStyle(icon.isNull() ? Qt::ToolButtonTextOnly : Qt::ToolButtonTextUnderIcon);
-    b->setCheckable(true);
-    b->setChecked(checked);
-    b->setCursor(Qt::PointingHandCursor);
-    b->setMinimumSize(88, 56);
-    return b;
-  };
-  auto* paperRow = new QWidget(&dlg);
-  auto* paperLay = new QHBoxLayout(paperRow);
-  paperLay->setContentsMargins(0, 0, 0, 0);
-  auto* btnA4 = makeChoice(QStringLiteral("A4"), QIcon(), true);
-  auto* btnA3 = makeChoice(QStringLiteral("A3"), QIcon(), false);
-  auto* btnCustom = makeChoice(QStringLiteral("직접 입력"), QIcon(), false);
-  auto* paperGroup = new QButtonGroup(&dlg);
-  paperGroup->setExclusive(true);
-  paperGroup->addButton(btnA4, 0);
-  paperGroup->addButton(btnA3, 1);
-  paperGroup->addButton(btnCustom, 2);
-  paperLay->addWidget(btnA4);
-  paperLay->addWidget(btnA3);
-  paperLay->addWidget(btnCustom);
-  paperLay->addStretch(1);
-
-  auto* orientRow = new QWidget(&dlg);
-  auto* orientLay = new QHBoxLayout(orientRow);
-  orientLay->setContentsMargins(0, 0, 0, 0);
-  auto* btnPort = makeChoice(QStringLiteral("세로"), paperIcon(false), true);
-  auto* btnLand = makeChoice(QStringLiteral("가로"), paperIcon(true), false);
-  auto* orientGroup = new QButtonGroup(&dlg);
-  orientGroup->setExclusive(true);
-  orientGroup->addButton(btnPort, 0);
-  orientGroup->addButton(btnLand, 1);
-  orientLay->addWidget(btnPort);
-  orientLay->addWidget(btnLand);
-  orientLay->addStretch(1);
-
-  auto* w = new QDoubleSpinBox(&dlg);
-  w->setRange(50.0, 2000.0);
-  w->setDecimals(1);
-  w->setSuffix(QStringLiteral(" mm"));
-  w->setValue(210.0);
-  auto* h = new QDoubleSpinBox(&dlg);
-  h->setRange(50.0, 2000.0);
-  h->setDecimals(1);
-  h->setSuffix(QStringLiteral(" mm"));
-  h->setValue(297.0);
-  auto* tip = new QLabel(&dlg);
-  tip->setObjectName(QStringLiteral("paperScaleNote"));
-  tip->setWordWrap(true);
-  auto applyPreset = [paperGroup, btnLand, w, h, tip]() {
-    const int p = paperGroup->checkedId();
-    const bool land = btnLand->isChecked();
-    const bool custom = p == 2;
-    // The field sheet is larger than A4 on purpose. Say so where it is chosen:
-    // printed on one A4 sheet it shrinks and the written 1:N no longer holds on paper.
-    tip->setText(p == 0 && land
-                     ? QStringLiteral("A4 가로는 좌·우·위 1cm를 더 준 현장 용지(317×220mm)입니다. "
-                                      "A4 종이 한 장에 찍으면 약 90%로 줄어 종이 위 축척이 달라집니다. "
-                                      "축척대로 찍으려면 인쇄 창에서 A3 또는 여러 장 나눠 찍기를 고르세요.")
-                     : QStringLiteral("기본은 A4 세로입니다. A4 가로는 좌·우·위 1cm를 더 줍니다."));
-    w->setEnabled(custom);
-    h->setEnabled(custom);
-    if (custom) return;
-    double pw = (p == 1) ? 297.0 : 210.0;
-    double ph = (p == 1) ? 420.0 : 297.0;
-    if (land) std::swap(pw, ph);
-    if (p == 0 && land) {
-      pw = KaDrawingStudio::kFieldPaperWidthMm;
-      ph = KaDrawingStudio::kFieldPaperHeightMm;
-    }
-    w->setValue(pw);
-    h->setValue(ph);
-  };
-  QObject::connect(paperGroup, &QButtonGroup::idClicked, &dlg, [applyPreset](int) { applyPreset(); });
-  QObject::connect(orientGroup, &QButtonGroup::idClicked, &dlg, [applyPreset](int) { applyPreset(); });
-  applyPreset();
-  form->addRow(QStringLiteral("용지"), paperRow);
-  form->addRow(QStringLiteral("방향"), orientRow);
-  form->addRow(QStringLiteral("가로"), w);
-  form->addRow(QStringLiteral("세로"), h);
-  form->addRow(tip);
-  auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dlg);
-  buttons->button(QDialogButtonBox::Ok)->setText(QStringLiteral("용지 만들기"));
-  buttons->button(QDialogButtonBox::Cancel)->setText(QStringLiteral("취소"));
-  form->addRow(buttons);
-  connect(buttons, &QDialogButtonBox::accepted, &dlg, &QDialog::accept);
-  connect(buttons, &QDialogButtonBox::rejected, &dlg, &QDialog::reject);
-  if (dlg.exec() != QDialog::Accepted) return false;
-  *widthMm = w->value();
-  *heightMm = h->value();
-  return true;
+  return KaPaperDialog::prompt(parent, widthMm, heightMm, kFieldPaperWidthMm, kFieldPaperHeightMm);  // 보완 L5
 }
 
 KaDrawingStudio::KaDrawingStudio(QgsProject* project, QgsMapCanvas* mapCanvas,

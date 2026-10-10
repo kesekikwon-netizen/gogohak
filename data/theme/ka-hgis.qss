@@ -1381,6 +1381,9 @@ QToolButton#northSwatch:enabled:checked {
 QLabel#kaControlMeta { color: @inkMuted@; font-size: 12px; }
 QLabel#kaControlX, QLabel#kaControlY, QLabel#kaControlZ { font-family: @monoFont@; font-size: 13px; color: @ink@; }
 QFrame#kaLeader { border: none; border-bottom: 1px dotted @borderStrong@; background: transparent; }
+/* 용지 설정 (보완 L5): a size that follows from the paper is read, not typed: mono ink, unit grey. */
+QLabel#paperSpecValue { font-family: @monoFont@; font-size: 13px; color: @ink@; }
+QLabel#paperSpecUnit { color: @inkMuted@; font-size: 12px; }
 /* 「조용한 도판」 홈 (2차 보드 판 2): 「이어서 작업」 is a title block in an ink frame; 「새 조사」 is quiet
    while there is a survey to continue (one main button per view). These objects exist only in 새 모양. */
 QFrame#startTitleBlock { background: @surface@; border: 1px solid @ink@; border-radius: @homeRadius@px; }

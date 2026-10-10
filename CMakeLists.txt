@@ -463,6 +463,8 @@ add_executable(ka-hgis
   src/app/KaSketchMeasure.cpp
   src/app/KaAttributeMapTool.cpp
   src/app/KaDrawingStudio.cpp
+  src/app/KaPaperDialog.cpp
+  src/app/KaPaperDialog.h
   src/app/KaDrawingStudioSheets.cpp
   src/app/KaDrawingTools.cpp
   src/app/KaDrawingNorthArrow.cpp
@@ -2292,6 +2294,7 @@ if(KA_HGIS_BUILD_TESTS)
   # 세부 디자인 보완(도면 화면 항목들): test_map_polish.cpp is at the 300-line limit.
   add_executable(ka_drawing_polish_tests tests/test_drawing_polish.cpp
     src/app/KaDrawingStudioPlate.cpp src/app/KaDrawingStudioPlate.h
+    src/app/KaPaperDialog.cpp src/app/KaPaperDialog.h
     ${_ka_p1_chip_sources} ${_ka_p4_theme_sources})
   target_link_libraries(ka_drawing_polish_tests PRIVATE ${KA_TEST_LIBS})
   target_include_directories(ka_drawing_polish_tests PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_BINARY_DIR}/generated)
