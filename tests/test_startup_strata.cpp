@@ -93,7 +93,7 @@ private slots:
     };
     const QColor waiting = markerEdge("0");
     const QColor finished = markerEdge("1");
-    qunsetenv("KA_HGIS_REDUCED_MOTION");
+    qputenv("KA_HGIS_REDUCED_MOTION", "0");  // back to main()'s setting: later tests need the motion on a CI runner too
     QCOMPARE(waiting, KaSplashStrata::paper());
     QVERIFY2(finished.isValid() && finished.lightness() < 110, qPrintable(finished.name()));
   }
