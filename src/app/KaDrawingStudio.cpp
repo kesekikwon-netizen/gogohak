@@ -14,7 +14,6 @@
 #include "KaDrawingPdfProgress.h"
 #include "KaDrawingSheetSet.h"
 #include "KaDrawingTools.h"
-#include "core/LegendPlacement.h"
 #include "KaPaperDialog.h"
 #include "KaMapPagePlate.h"
 #include "KaUserError.h"
@@ -221,14 +220,6 @@ QRectF itemPaperRect(QgsLayoutItem* item) {
   if (box.width() >= 8.0 && box.height() >= 8.0)
     return box;
   return item->sceneBoundingRect();
-}
-
-// 범례 상자 전체를 용지 안에 둔다 (보완 L4): 용지 밖으로 걸친 만큼 안쪽으로 민다(크기는 그대로).
-void keepInsidePaper(QgsLayoutItem* item, double paperW, double paperH) {
-  if (!item) return;
-  const QRectF box = itemPaperRect(item);
-  const QRectF fitted = LegendPlacement::insidePage(QRectF(0.0, 0.0, paperW, paperH), box);
-  if (fitted.topLeft() != box.topLeft()) item->attemptSetSceneRect(fitted);
 }
 
 bool isSheetDecoration(const QgsLayoutItem* item) {
@@ -3298,11 +3289,14 @@ bool KaDrawingStudio::eventFilter(QObject* watched, QEvent* event) {
       if (pressUndoIndex >= 0) {
         auto* ly = layout();
         if (ly && ly->undoStack() && ly->undoStack()->stack() &&
-            ly->undoStack()->stack()->index() != pressUndoIndex)
+            ly->undoStack()->stack()->index() != pressUndoIndex) {
           markUserComposed();
+          // 범례를 놓은 자리가 이긴다: 용지 밖이어도 도면을 다시 이을 때(relinkDecorations) 기본 자리로 되돌리지 않는다.
+          if (auto* legend = findItemById(ly, kIdLegend))
+            legend->setCustomProperty(QStringLiteral("ka_hgis/legend_kept_on_page"), true);
+        }
       }
       if (property("ka_interacting").toBool()) return;
-      keepInsidePaper(findItemById(layout(), kIdLegend), m_paperW, m_paperH);  // 범례를 놓은 자리가 용지 밖이면 안쪽으로
       if (property("ka_visible_legend_pending").toBool()) {
         setProperty("ka_visible_legend_pending", false);
         if (auto* legend = dynamic_cast<QgsLayoutItemLegend*>(findItemById(layout(), kIdLegend))) {

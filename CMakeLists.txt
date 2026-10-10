@@ -151,7 +151,6 @@ add_library(ka_core STATIC
   src/core/LayerOps.cpp
   src/core/FeaturePick.cpp
   src/core/PolygonErase.cpp
-  src/core/LegendPlacement.cpp
   src/core/BasemapOps.cpp
   src/core/LabelOps.cpp
   src/core/LayerTreeLabelStack.cpp
@@ -266,7 +265,6 @@ add_library(ka_core STATIC
   src/core/GeometryEditOps.h
   src/core/FeaturePick.h
   src/core/PolygonErase.h
-  src/core/LegendPlacement.h
   src/core/KaPortableRuntime.h
   src/core/KaSessionLog.h
   src/core/LocationSearch.h
@@ -1355,10 +1353,6 @@ if(KA_HGIS_BUILD_TESTS)
   target_link_libraries(ka_survey_scope_clip_tests PRIVATE ka_core Qt6::Test)
   set_target_properties(ka_survey_scope_clip_tests PROPERTIES WIN32_EXECUTABLE FALSE)
   ka_add_qtest(survey_scope_clip ka_survey_scope_clip_tests)
-  add_executable(ka_legend_placement_tests tests/test_legend_placement.cpp)
-  target_link_libraries(ka_legend_placement_tests PRIVATE ka_core Qt6::Test)
-  set_target_properties(ka_legend_placement_tests PROPERTIES WIN32_EXECUTABLE FALSE)
-  ka_add_qtest(legend_placement ka_legend_placement_tests)
   # 세부 디자인 보완(창 항목 D3): 실패 알림이 한 틀이다(소스 글을 읽는 시험).
   add_executable(ka_alert_polish_tests tests/test_alert_polish.cpp)
   target_link_libraries(ka_alert_polish_tests PRIVATE Qt6::Test)
@@ -1785,6 +1779,7 @@ if(KA_HGIS_BUILD_TESTS)
     topographicDownloadKeepsMapVisibleAndUsesSurveyFolder)
   ka_add_qtest_filter(save_open_drawing ka_save_open_tests
     drawingStudio_decorationsMoveAndShrink
+    drawingStudio_legendStaysWhereTheUserPutsItOutsideThePaper
     drawingStudio_northArrowRendersOnOpen
     drawingStudio_fieldPageGrowsA4LandscapeByOneCentimetre
     drawingStudio_heritageRefreshRequestsCoalesceAndReuseOnRevisit

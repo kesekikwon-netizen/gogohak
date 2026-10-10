@@ -1784,6 +1784,74 @@ private slots:
     }
     QgsProject::instance()->setDirty(false);
   }
+  // 범례는 용지 밖에도 놓을 수 있고 놓은 자리가 그대로 남는다 (현장 요청 2026-10-11, 보완 L4를 되돌림): 마우스로 끌어 용지 오른쪽
+  // 밖으로 놓은 뒤에도, 도면을 다시 이어 붙이고 지도를 새로 고친 뒤에도 안쪽으로 밀려 오지 않는다.
+  void drawingStudio_legendStaysWhereTheUserPutsItOutsideThePaper() {
+    QgsProject project;
+    project.setCrs(QgsCoordinateReferenceSystem(QStringLiteral("EPSG:5187")));
+    QgsMapCanvas canvas;
+    canvas.setRenderFlag(false);
+    canvas.setDestinationCrs(project.crs());
+    canvas.setExtent(QgsRectangle(190000, 560000, 191000, 561000));
+    auto studioPtr = std::make_unique<KaDrawingStudio>(&project, &canvas, 420., 297.);
+    KaDrawingStudio& studio = *studioPtr;
+    studio.setAttribute(Qt::WA_DontShowOnScreen);
+    studio.show();
+    QCoreApplication::processEvents();
+    auto* view = studio.findChild<QgsLayoutView*>();
+    QVERIFY(view && view->currentLayout());
+    auto* ly = view->currentLayout();
+    QVERIFY(QMetaObject::invokeMethod(&studio, "beginPlaceLegend"));
+    auto* legend = dynamic_cast<QgsLayoutItemLegend*>(ly->itemById(QStringLiteral("ka_legend")));
+    QVERIFY(legend);
+    QVERIFY(QMetaObject::invokeMethod(&studio, "useSelectTool"));
+    auto* selectTool = studio.findChild<QgsLayoutViewToolSelect*>();
+    QVERIFY(selectTool);
+    // an A3 sheet (not the old A4 one, whose first opening lays everything out again): start at the right edge with the centre
+    // still on the paper, then drag the legend 30 mm further out
+    const QSizeF size = legend->rect().size();
+    legend->attemptSetSceneRect(QRectF(420. - size.width() / 2. - 6., 60., size.width(), size.height()));
+    view->zoomFull();
+    view->centerOn(legend);
+    ly->setSelectedItem(legend);
+    QCoreApplication::processEvents();
+    QTRY_VERIFY2(selectTool->mouseHandles() &&
+                     QLineF(selectTool->mouseHandles()->sceneBoundingRect().center(), legend->sceneBoundingRect().center()).length() < 0.5,
+                 "the selection handles did not settle on the legend");
+    QTest::qWait(120);
+    const QRectF before(legend->pos(), legend->rect().size());
+    const QPoint from = view->mapFromScene(legend->mapToScene(legend->rect().center()));
+    const double viewScale = std::max(1., view->transform().m11());
+    const QPoint to = from + QPoint(static_cast<int>(std::ceil(30. * viewScale)), 0);
+    QMouseEvent hover(QEvent::MouseMove, QPointF(from), view->viewport()->mapToGlobal(from), Qt::NoButton, Qt::NoButton, Qt::NoModifier);
+    QApplication::sendEvent(view->viewport(), &hover);
+    QTest::mousePress(view->viewport(), Qt::LeftButton, Qt::NoModifier, from);
+    QMouseEvent drag(QEvent::MouseMove, QPointF(to), view->viewport()->mapToGlobal(to), Qt::NoButton, Qt::LeftButton, Qt::NoModifier);
+    QApplication::sendEvent(view->viewport(), &drag);
+    QApplication::sendEvent(view->viewport(), &drag);
+    QTest::mouseRelease(view->viewport(), Qt::LeftButton, Qt::NoModifier, to);
+    QVERIFY2(legend->pos().x() > before.x() + 10., "the legend did not drag");
+    QTest::qWait(150);  // the settle step that runs after the release
+    const QRectF dropped(legend->pos(), legend->rect().size());
+    QVERIFY2(dropped.right() > 420. + 10. && !QRectF(0., 0., 420., 297.).contains(dropped.center()),
+             qPrintable(QStringLiteral("the legend was pushed back onto the paper: %1,%2").arg(dropped.x()).arg(dropped.y())));
+    // refreshing the map leaves the place alone, and so does opening the drawing again (the saved sheet's decorations are reconnected)
+    studio.refreshMapFromProject();
+    QTest::qWait(450);
+    QCOMPARE(QRectF(legend->pos(), legend->rect().size()), dropped);
+    studioPtr.reset();
+    KaDrawingStudio reopened(&project, &canvas, 420., 297.);
+    reopened.setAttribute(Qt::WA_DontShowOnScreen);
+    reopened.show();
+    QCoreApplication::processEvents();
+    QTest::qWait(450);
+    auto* again = reopened.findChild<QgsLayoutView*>();
+    QVERIFY(again && again->currentLayout());
+    auto* legendAgain = dynamic_cast<QgsLayoutItemLegend*>(again->currentLayout()->itemById(QStringLiteral("ka_legend")));
+    QVERIFY(legendAgain);
+    QCOMPARE(QRectF(legendAgain->pos(), legendAgain->rect().size()), dropped);
+  }
+
   void drawingStudio_decorationsMoveAndShrink() {
     QgsProject project;
     project.setCrs(QgsCoordinateReferenceSystem(QStringLiteral("EPSG:5187")));

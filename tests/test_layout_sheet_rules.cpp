@@ -249,29 +249,23 @@ private slots:
     QCOMPARE(numbers.entries().first().number, 1);
   }
 
-  // 범례 상자를 용지 안에 둔다 (보완 L4): after the legend has flowed to its content, the whole box lies on the paper; one that
-  // stuck out is pushed in by the way it stuck out, one that fits is left where it is.
-  void legendFlowKeepsTheWholeBoxOnThePaper() {
+  // 범례는 용지 밖에도 놓을 수 있다 (현장 요청 2026-10-11, 보완 L4를 되돌림): flowing the legend to its content never moves it, so a
+  // box that sticks out of the paper, or stands wholly beside it, stays exactly where the user put it.
+  void legendFlowLeavesAnOutsidePlaceWhereItIs() {
     QgsProject project;
     QgsPrintLayout layout(&project);
     layout.initializeDefaults();  // A4 landscape, 297 x 210 mm
-    const QRectF paper(0., 0., 297., 210.);
-    auto* sticking = new QgsLayoutItemLegend(&layout);
-    layout.addLayoutItem(sticking);
-    sticking->attemptMove(QgsLayoutPoint(280., 195.));
-    sticking->attemptResize(QgsLayoutSize(60., 40.));
-    LayoutService::flowSheetLegend(sticking);
-    const QRectF pushed(sticking->pos(), sticking->rect().size());
-    QVERIFY2(paper.contains(pushed), qPrintable(QStringLiteral("legend at %1,%2 size %3 x %4").arg(pushed.x()).arg(pushed.y()).arg(pushed.width()).arg(pushed.height())));
-    // the layout's own record of the position agrees with where the item stands, so a refresh or a save keeps it on the paper
-    QCOMPARE(sticking->positionWithUnits().x(), sticking->pos().x());
-    QCOMPARE(sticking->positionWithUnits().y(), sticking->pos().y());
-    auto* fitting = new QgsLayoutItemLegend(&layout);
-    layout.addLayoutItem(fitting);
-    fitting->attemptMove(QgsLayoutPoint(20., 20.));
-    fitting->attemptResize(QgsLayoutSize(60., 40.));
-    LayoutService::flowSheetLegend(fitting);
-    QCOMPARE(fitting->pos(), QPointF(20., 20.));
+    for (const QPointF& at : {QPointF(280., 195.), QPointF(320., 40.), QPointF(-90., -30.)}) {
+      auto* legend = new QgsLayoutItemLegend(&layout);
+      layout.addLayoutItem(legend);
+      legend->attemptMove(QgsLayoutPoint(at.x(), at.y()));
+      legend->attemptResize(QgsLayoutSize(60., 40.));
+      LayoutService::flowSheetLegend(legend);
+      QVERIFY2(legend->pos() == at, qPrintable(QStringLiteral("legend moved from %1,%2 to %3,%4").arg(at.x()).arg(at.y()).arg(legend->pos().x()).arg(legend->pos().y())));
+      // the layout's own record of the position agrees too, so a refresh or a save keeps the place
+      QCOMPARE(legend->positionWithUnits().x(), at.x());
+      QCOMPARE(legend->positionWithUnits().y(), at.y());
+    }
   }
 };
 

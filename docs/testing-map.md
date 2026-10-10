@@ -39,7 +39,7 @@ ctest --test-dir build -C Release -R '<아래 이름>' --output-on-failure
 | E | `inspector_polish` | 낮은 창(360·420·460·900 px)에서 오른쪽 판 스타일 탭이 스크롤되고 「배경 지도」 줄이 아래에 붙음 |
 | E | `browser_polish` | 파일함: 「SD 카드」 없음, 「상위」는 오른쪽 끝, 조용한 24 px 바로가기 |
 | E | `alert_polish` | 실패 알림 29곳이 한 틀(KaUserError)이다(소스 글을 읽어 남은 기본 경고창이 없음을 본다) |
-| E | `legend_placement` | 범례 상자 전체가 용지 안에 머문다(걸친 만큼 안쪽으로 민다) |
+| E | `layout_sheet_rules`·`save_open_drawing` | 범례는 용지 밖에도 놓을 수 있다: 내용에 맞춰 흘러도, 마우스로 놓은 뒤에도, 도면을 다시 열어도 놓은 자리 그대로 |
 | F 제출 | `checklist_engine` | 자기교차·빈 도형·0면적 차단 |
 | F | `export_survey_areas` | SHP+PDF 패키지 |
 | G 배포 | `theme_qss` 슬롯 `versionAndLaunchScripts_exist` | `VERSION`·바로가기·QGIS 핀 파일 |
