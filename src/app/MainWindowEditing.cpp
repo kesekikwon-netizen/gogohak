@@ -1124,6 +1124,9 @@ void MainWindow::startEditSurveyArea() {
   statusBar()->showMessage(
       QStringLiteral("조사구역 [%1] 그리기 시작 — 점을 찍고 Enter로 완성").arg(targetLayer->name()), 8000);
   beginEdit(targetLayer);
+  // 이어 그리는 조사구역(다시 연 조사 포함)의 기록을 오른쪽 속성에 보인다(2026-10-10). 개수 질의는 GPKG 에서 틀릴 수 있어 직접 읽는다.
+  if (QgsFeature first; m_featureCard && targetLayer->getFeatures(QgsFeatureRequest().setLimit(1)).nextFeature(first))
+    m_featureCard->setFeature(targetLayer, first.id());
 #else
   m_stubSurveyArea++;
   statusBar()->showMessage(QStringLiteral("스텁: 조사구역 폴리곤 %1개").arg(m_stubSurveyArea));

@@ -3049,6 +3049,12 @@ private slots:
     QVERIFY(window.openSurveyGpkg(path));
     const QList<QgsVectorLayer*> areas = LayerOps::surveyAreaLayers(QgsProject::instance());
     QVERIFY(!areas.isEmpty());
+    // 다시 연 조사의 조사구역도 오른쪽 속성에 기록이 나온다(2026-10-10 「속성정보를 찍어도 나오지않는다」).
+    auto* card = window.findChild<KaFeatureCard*>();
+    QVERIFY(card && QMetaObject::invokeMethod(&window, "startSelectTool", Qt::DirectConnection));
+    areas.first()->selectByIds({*areas.first()->allFeatureIds().constBegin()});
+    QVERIFY2(card->hasFeature() && card->layer() == areas.first(), "도형선택으로 고른 조사구역의 기록이 나와야 합니다.");
+    areas.first()->removeSelection();
     bool windowShown = false;
     QTimer::singleShot(300, &window, [&] {
       if (auto* dialog = qobject_cast<QDialog*>(QApplication::activeModalWidget())) windowShown = dialog->close();
@@ -3056,6 +3062,7 @@ private slots:
     QVERIFY(QMetaObject::invokeMethod(&window, "startEditSurveyArea", Qt::DirectConnection));
     QTest::qWait(400);
     QVERIFY2(!windowShown && areas.first()->isEditable(), "조사구역이 있으면 창 없이 이어 그려야 합니다.");
+    QVERIFY2(card->hasFeature() && card->layer() == areas.first(), "이어 그리는 조사구역의 기록이 오른쪽 속성에 나와야 합니다.");
   }
 
   void cadastralGroupContextMenuCanRemove() {
