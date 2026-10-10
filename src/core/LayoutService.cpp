@@ -5,6 +5,7 @@
 #include "DemColorRampLegend.h"
 #include "GeologyMapService.h"
 #include "LayerFeatures.h"
+#include "LegendPlacement.h"
 #include "LayerOps.h"
 #include "LayerLabelControls.h"
 #include "PdfExportSettings.h"
@@ -1519,6 +1520,11 @@ void LayoutService::flowSheetLegend(QgsLayoutItemLegend* legend) {
   const QPointF position = legend->pos();
   legend->attemptResize(QgsLayoutSize(width, measured.height() + .5, Qgis::LayoutUnit::Millimeters));
   legend->setPos(position);
+  // 보완 L4: 상자 전체가 용지 안에 머문다. 내용이 늘어 용지 밖으로 걸치면 걸친 만큼 안쪽으로 민다.
+  if (auto* page = legend->layout()->pageCollection() ? legend->layout()->pageCollection()->page(0) : nullptr) {
+    const QRectF fitted = LegendPlacement::insidePage(QRectF(page->pos(), page->rect().size()), QRectF(legend->pos(), legend->rect().size()));
+    if (fitted.topLeft() != legend->pos()) legend->setPos(fitted.topLeft());
+  }
   legend->update();
 }
 

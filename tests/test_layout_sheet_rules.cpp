@@ -248,6 +248,28 @@ private slots:
     QCOMPARE(numbers.entries().first().dataset, HeritageStyle::layerName(HeritageDataset::SurfaceSurveyArea));
     QCOMPARE(numbers.entries().first().number, 1);
   }
+
+  // 범례 상자를 용지 안에 둔다 (보완 L4): after the legend has flowed to its content, the whole box lies on the paper; one that
+  // stuck out is pushed in by the way it stuck out, one that fits is left where it is.
+  void legendFlowKeepsTheWholeBoxOnThePaper() {
+    QgsProject project;
+    QgsPrintLayout layout(&project);
+    layout.initializeDefaults();  // A4 landscape, 297 x 210 mm
+    const QRectF paper(0., 0., 297., 210.);
+    auto* sticking = new QgsLayoutItemLegend(&layout);
+    layout.addLayoutItem(sticking);
+    sticking->attemptMove(QgsLayoutPoint(280., 195.));
+    sticking->attemptResize(QgsLayoutSize(60., 40.));
+    LayoutService::flowSheetLegend(sticking);
+    const QRectF pushed(sticking->pos(), sticking->rect().size());
+    QVERIFY2(paper.contains(pushed), qPrintable(QStringLiteral("legend at %1,%2 size %3 x %4").arg(pushed.x()).arg(pushed.y()).arg(pushed.width()).arg(pushed.height())));
+    auto* fitting = new QgsLayoutItemLegend(&layout);
+    layout.addLayoutItem(fitting);
+    fitting->attemptMove(QgsLayoutPoint(20., 20.));
+    fitting->attemptResize(QgsLayoutSize(60., 40.));
+    LayoutService::flowSheetLegend(fitting);
+    QCOMPARE(fitting->pos(), QPointF(20., 20.));
+  }
 };
 
 int main(int argc, char** argv) {
