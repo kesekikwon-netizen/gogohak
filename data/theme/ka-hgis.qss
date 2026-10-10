@@ -762,11 +762,11 @@ QTabBar::tab:selected { color: @tabInk@; border-bottom: 2px solid @tabMark@; }
 QTabWidget#viewTabs > QTabBar { background: @desk@; }
 QTabWidget#viewTabs > QTabBar::tab {
   border: 1px solid transparent;
-  border-bottom: none;
-  border-top-left-radius: 8px;
-  border-top-right-radius: 8px;
+  border-bottom: @viewTabBase@;
+  border-top-left-radius: @viewTabRadius@px;
+  border-top-right-radius: @viewTabRadius@px;
 }
-QTabWidget#viewTabs > QTabBar::tab:selected { background: @surface@; border: 1px solid @border@; border-bottom: none; }
+QTabWidget#viewTabs > QTabBar::tab:selected { background: @viewTabFace@; border: 1px solid @viewTabEdge@; border-bottom: @viewTabMark@; }
 /* ---- Left Dock (레이어 위 / 파일함 아래 동시 노출) ---- */
 QSplitter#leftSplit,
 QSplitter#studioLeftSplit,

@@ -9,6 +9,7 @@
 #include <QSignalSpy>
 #include <QToolBar>
 #include <QTabBar>
+#include <QTabWidget>
 #include <QToolButton>
 #include <QWidget>
 
@@ -159,6 +160,29 @@ private slots:
       }
     }
     QCOMPARE(chosenButtons, 1);
+  }
+
+  // 홈 · 지도 · 도면 탭 (보완 M4): words and a 2 px ink underline for the current one, no box, no corner; the others are plain.
+  void viewTabsAreWordsWithAnUnderline() {
+    QTabWidget tabs;
+    tabs.setObjectName(QStringLiteral("viewTabs"));
+    tabs.setDocumentMode(true);
+    tabs.setTabsClosable(true);
+    tabs.addTab(new QWidget, QStringLiteral("홈"));
+    tabs.addTab(new QWidget, QStringLiteral("지도"));
+    for (int i = 0; i < 2; ++i) tabs.tabBar()->setTabButton(i, QTabBar::RightSide, nullptr);
+    tabs.resize(500, 200);
+    tabs.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&tabs));
+    QTabBar* bar = tabs.tabBar();
+    const QRect current = bar->tabRect(0), other = bar->tabRect(1);
+    const QImage image = bar->grab().toImage();
+    const QColor ground = image.pixelColor(image.width() - 3, current.center().y());  // bar past the tabs
+    QVERIFY2(image.pixelColor(current.center().x(), current.bottom()).lightness() < 80, "the current tab has an ink underline");
+    QVERIFY2(image.pixelColor(current.center().x(), current.bottom() - 1).lightness() < 80, "the underline is 2 px");
+    QVERIFY2(image.pixelColor(other.center().x(), other.bottom()).lightness() > 150, "the other tab has none");
+    QCOMPARE(image.pixelColor(current.left(), current.center().y()), ground);       // no side edge
+    QCOMPARE(image.pixelColor(current.left() + 3, current.center().y()), ground);   // no white face
   }
 };
 

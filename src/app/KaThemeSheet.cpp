@@ -127,6 +127,12 @@ QHash<QString, QString> replacementTable() {
   values.insert(QStringLiteral("menuItemMin"), paper ? QStringLiteral("20") : QStringLiteral("22"));
   values.insert(QStringLiteral("menuHover"), (paper ? c.desk : c.selected).name());
   values.insert(QStringLiteral("figureSize"), paper ? QStringLiteral("16") : QStringLiteral("13"));  // 수치 대장 (spec 20: 16 keeps 12,000,000.00 m² inside the 272 px panel)
+  // 홈 · 지도 · 도면 탭 (보완 M4): words with a 2 px ink underline in 새 모양 (stock: the white box tab).
+  values.insert(QStringLiteral("viewTabFace"), paper ? QStringLiteral("transparent") : c.surface.name());
+  values.insert(QStringLiteral("viewTabEdge"), paper ? QStringLiteral("transparent") : c.border.name());
+  values.insert(QStringLiteral("viewTabRadius"), paper ? QStringLiteral("0") : QStringLiteral("8"));
+  values.insert(QStringLiteral("viewTabBase"), paper ? QStringLiteral("2px solid transparent") : QStringLiteral("none"));
+  values.insert(QStringLiteral("viewTabMark"), paper ? QStringLiteral("2px solid ") + c.ink.name() : QStringLiteral("none"));
   // 그리기 줄에서 손에 든 도구 (보완 M3): the slate fill with ivory words, as the ribbon's 그리기 tile (stock: unchanged).
   values.insert(QStringLiteral("subCheckedFace"), paper ? c.tileOn.name() : none);
   values.insert(QStringLiteral("subCheckedEdge"), paper ? c.tileOn.name() : none);
