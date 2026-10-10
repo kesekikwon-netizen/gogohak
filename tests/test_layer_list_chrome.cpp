@@ -61,6 +61,21 @@ class TestLayerListChrome : public QObject {
     if (!out.isEmpty()) QVERIFY(v.host.grab().save(QDir(out).filePath(QStringLiteral("layer-list-sections.png"))));
   }
 
+  // 보완 M2: the layers keep their order, so 「지적도」 can come back after another section; the caption is
+  // written the first time and the later band is the rule alone.
+  void sections_repeatedCaptionIsWrittenOnce() {
+    Tree t;
+    vector(t.project, t.project.layerTreeRoot(), QStringLiteral("사용자 SHP"));
+    QgsRasterLayer* picture = basemap(t.project, t.project.layerTreeRoot(), QStringLiteral("VWorld 지적"));
+    View v(t);
+    const QModelIndex first = v.index(t.node(t.cadastral));
+    const QModelIndex again = v.index(t.node(picture));
+    QVERIFY(v.sections()->hasBand(first) && v.sections()->hasBand(again));
+    QVERIFY(v.sections()->showsTitle(first));
+    QVERIFY(!v.sections()->showsTitle(again));
+    QVERIFY(v.sections()->showsTitle(v.row(0)));  // the first band of the list always says its section
+  }
+
   void sections_noBandInsideGroups() {
     Tree t;
     View v(t);

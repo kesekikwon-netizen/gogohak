@@ -35,6 +35,9 @@ class KaLayerSectionDelegate : public QStyledItemDelegate {
   // True for a top-level row that starts a section: row 0, or a section change.
   bool hasBand(const QModelIndex& index) const;
   int bandHeight(const QModelIndex& index) const { return hasBand(index) ? bandPx() : 0; }
+  // False for a band whose caption an earlier band already shows: the layers keep their order, so a section can
+  // come back, and then the band is the rule alone (보완 M2).
+  bool showsTitle(const QModelIndex& index) const;
   // kBandHeight, grown with 큰 글자 like the caption in it (16 px, 18 px with large text).
   static int bandPx();
   QAbstractItemDelegate* inner() const { return m_inner.data(); }

@@ -62,6 +62,15 @@ bool KaLayerSectionDelegate::hasBand(const QModelIndex& index) const {
   return sectionOf(m_view->index2node(first.sibling(first.row() - 1, 0))) != section;
 }
 
+bool KaLayerSectionDelegate::showsTitle(const QModelIndex& index) const {
+  if (!hasBand(index)) return false;
+  const QModelIndex first = index.siblingAtColumn(0);
+  const Section section = sectionOf(m_view->index2node(first));
+  for (int row = 0; row < first.row(); ++row)
+    if (sectionOf(m_view->index2node(first.sibling(row, 0))) == section) return false;
+  return true;
+}
+
 QStyleOptionViewItem KaLayerSectionDelegate::below(const QStyleOptionViewItem& option,
                                                    const QModelIndex& index) const {
   QStyleOptionViewItem moved(option);
@@ -88,8 +97,9 @@ void KaLayerSectionDelegate::paintBand(QPainter* painter, const QStyleOptionView
   font.setBold(true);
   painter->setFont(font);
   painter->setPen(option.palette.color(QPalette::PlaceholderText));
-  painter->drawText(band.adjusted(kTextLeft, 1, -4, 0), Qt::AlignLeft | Qt::AlignVCenter | Qt::TextSingleLine,
-                    sectionTitle(sectionOf(m_view->index2node(index))));
+  if (showsTitle(index))  // a section that comes back later is the rule alone (보완 M2)
+    painter->drawText(band.adjusted(kTextLeft, 1, -4, 0), Qt::AlignLeft | Qt::AlignVCenter | Qt::TextSingleLine,
+                      sectionTitle(sectionOf(m_view->index2node(index))));
   painter->restore();
 }
 
