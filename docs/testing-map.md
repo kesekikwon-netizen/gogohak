@@ -31,6 +31,15 @@ ctest --test-dir build -C Release -R '<아래 이름>' --output-on-failure
 | E | `above_labels_200` | 200% 라벨 |
 | E | `ribbon_overflow` · `ribbon_pixels` | 리본은 접지 않고 창 너비에 맞는 가장 큰 크기(타일 56~20)로 모든 칩을 보인다, 글자·타일이 잘리지 않는다 |
 | E | `toolbar_fit` | 그리기 보조 줄은 » 없이 글자를 숨긴 뒤 아이콘을 20에서 16으로 줄인다 |
+| E | `home_polish` | 세부 디자인 보완(2026-10-11) 홈: 제출 준비 한 줄·칩 숫자 모노, 연결 상태 「설정」·「인터넷 확인」, 표제란 3행, 최근 조사 줄 hover, 폴더 칸·줄 경로 |
+| E | `map_polish` | 같은 보완 지도 화면: 오른쪽 판 탭·빈 문장, 되돌리기 한 덮개, 상태줄 「→ 제출 5179」·32 px, 그리기 줄(고른 도구 먹 채움·토글 귀리색·묶음 선), 탭 밑줄 |
+| E | `drawing_polish` | 같은 보완 도면 화면: 오른쪽 판 캡션 + 이음선, 왼쪽 머리줄·빈 문장, 용지 설정 창의 읽는 줄 |
+| E | `page_polish` | 같은 보완 판 틀: 홈·지도의 바깥 틀 없음, 7 px 분할선 가운데 1 px 선, 지도가 판 사이를 채움 |
+| E | `window_polish` | 같은 보완 창: 단추·입력칸 32 px, 검수 항목 삼선표 |
+| E | `inspector_polish` | 낮은 창(360·420·460·900 px)에서 오른쪽 판 스타일 탭이 스크롤되고 「배경 지도」 줄이 아래에 붙음 |
+| E | `browser_polish` | 파일함: 「SD 카드」 없음, 「상위」는 오른쪽 끝, 조용한 24 px 바로가기 |
+| E | `alert_polish` | 실패 알림 29곳이 한 틀(KaUserError)이다(소스 글을 읽어 남은 기본 경고창이 없음을 본다) |
+| E | `legend_placement` | 범례 상자 전체가 용지 안에 머문다(걸친 만큼 안쪽으로 민다) |
 | F 제출 | `checklist_engine` | 자기교차·빈 도형·0면적 차단 |
 | F | `export_survey_areas` | SHP+PDF 패키지 |
 | G 배포 | `theme_qss` 슬롯 `versionAndLaunchScripts_exist` | `VERSION`·바로가기·QGIS 핀 파일 |
