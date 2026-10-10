@@ -1,4 +1,5 @@
 #include "ExportService.h"
+#include "LayerFeatures.h"
 #include "LayerOps.h"
 #include "LayoutService.h"
 #include "SectionLayoutService.h"
@@ -14,8 +15,6 @@
 #include <QTextStream>
 #include <memory>
 #include <qgscoordinatetransform.h>
-#include <qgsfeatureiterator.h>
-#include <qgsfeaturerequest.h>
 #include <qgslayoutmanager.h>
 #include <qgsprintlayout.h>
 #include <qgsproject.h>
@@ -159,7 +158,8 @@ QString ExportService::exportSubmissionPackage(QgsProject* project, const QStrin
       // 같은 키의 레이어를 모두 모아 하나의 SHP 로 쓴다. 하나만 내보내면 구역이 빠진다.
       QList<QgsVectorLayer*> sources;
       for (QgsVectorLayer* vl : LayerOps::domainLayersForKey(project, n)) {
-        if (vl->featureCount() <= 0) continue;
+        // 개수가 0이어도 읽어 본다. GPKG 개수 질의가 실패하면 조사구역이 빠졌다(ERROR_REGRESSION).
+        if (!LayerFeatures::any(vl)) continue;
         // 좌표계가 없으면 5179로 바꿀 수 없다. 그대로 쓰고 README에 5179라고 적지 않는다.
         if (!vl->crs().isValid())
           return fail(QStringLiteral("「%1」(%2) 레이어에 좌표계가 없어 EPSG:5179로 바꿀 수 없습니다. "
@@ -191,13 +191,7 @@ QString ExportService::exportSubmissionPackage(QgsProject* project, const QStrin
         return fail(QStringLiteral("%1.shp를 쓰지 못했습니다. 저장 위치의 쓰기 권한과 남은 공간을 확인하세요.%2")
                         .arg(n, errMsg.isEmpty() ? QString() : QStringLiteral("\n") + errMsg));
       // 다시 열어 좌표계와 도형 수가 맞는지 확인한다. 조용히 틀린 파일을 내지 않는다.
-      long long expected = static_cast<long long>(out->featureCount());
-      if (expected < 0) {
-        expected = 0;
-        QgsFeatureIterator it = out->getFeatures(QgsFeatureRequest().setNoAttributes().setFlags(Qgis::FeatureRequestFlag::NoGeometry));
-        QgsFeature counted;
-        while (it.nextFeature(counted)) ++expected;
-      }
+      const long long expected = LayerFeatures::count(out);
       if (!SubmitShp::verifyWritten(shp, expected, &layerError)) return fail(layerError);
       readme.layerLines << QStringLiteral("%1.shp features=%2 crs=EPSG:5179 verified").arg(n).arg(expected);
     }

@@ -115,6 +115,39 @@ private slots:
     QVERIFY(LayoutService::isComposedStudioSheet(&project));
   }
 
+  // The same failed or stale count must not drop saved shapes from the package: CI (Korean TEMP,
+  // 2026-10-03~10) reported success without survey_area.shp. feature_poly keeps its field names,
+  // so its SHP is checked against the layer itself rather than a renamed copy.
+  void packageKeepsShapesTheLayerCountMissed() {
+    QTemporaryDir temp;
+    QString error;
+    const QString gpkg = SurveyProjectFactory::createNewSurvey(temp.path(), QStringLiteral("count"), &error);
+    QVERIFY2(!gpkg.isEmpty(), qPrintable(error));
+    QgsProject project;
+    project.setCrs(QgsCoordinateReferenceSystem(QStringLiteral("EPSG:5187")));
+    for (const QString& key : {QStringLiteral("survey_area"), QStringLiteral("feature_poly")}) {
+      const QString uri = gpkg + QStringLiteral("|layername=") + key;
+      auto* shown = new QgsVectorLayer(uri, key, QStringLiteral("ogr"));
+      QVERIFY(shown->isValid());
+      project.addMapLayer(shown);
+      QCOMPARE(shown->featureCount(), 0LL);  // counted while empty
+      {
+        QgsVectorLayer writer(uri, QStringLiteral("writer"), QStringLiteral("ogr"));
+        addSquare(&writer, 200000, 450000);
+      }
+      QCOMPARE(shown->featureCount(), 0LL);  // still the stale count
+    }
+    const QString out = temp.filePath(QStringLiteral("pkg"));
+    QVERIFY2(!ExportService::exportSubmissionPackage(&project, out, QStringLiteral("UTF-8"), QStringLiteral("OK"),
+                                                     true, false, &error).isEmpty(),
+             qPrintable(error));
+    const QString readme = readAll(QDir(out).filePath(QStringLiteral("README_submit.txt")));
+    for (const QString& key : {QStringLiteral("survey_area"), QStringLiteral("feature_poly")}) {
+      QVERIFY2(QFileInfo::exists(QDir(out).filePath(key + QStringLiteral(".shp"))), qPrintable(key));
+      QVERIFY2(readme.contains(key + QStringLiteral(".shp features=1 ")), qPrintable(readme));
+    }
+  }
+
   // Deleting one of two survey areas without saving leaves the other on the sheet
   // (QgsVectorLayer::hasFeatures() only answers "maybe" for an edited layer with deletions).
   void sheetSeesSurveyAreaWithAnUnsavedDeletion() {
