@@ -1523,7 +1523,8 @@ void LayoutService::flowSheetLegend(QgsLayoutItemLegend* legend) {
   // 보완 L4: 상자 전체가 용지 안에 머문다. 내용이 늘어 용지 밖으로 걸치면 걸친 만큼 안쪽으로 민다.
   if (auto* page = legend->layout()->pageCollection() ? legend->layout()->pageCollection()->page(0) : nullptr) {
     const QRectF fitted = LegendPlacement::insidePage(QRectF(page->pos(), page->rect().size()), QRectF(legend->pos(), legend->rect().size()));
-    if (fitted.topLeft() != legend->pos()) legend->setPos(fitted.topLeft());
+    // attemptSetSceneRect keeps the layout's own position record in step (a bare setPos would be undone by a refresh or a reopen).
+    if (fitted.topLeft() != legend->pos()) legend->attemptSetSceneRect(QRectF(fitted.topLeft(), legend->rect().size()));
   }
   legend->update();
 }

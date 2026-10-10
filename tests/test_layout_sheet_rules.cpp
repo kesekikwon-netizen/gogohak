@@ -263,6 +263,9 @@ private slots:
     LayoutService::flowSheetLegend(sticking);
     const QRectF pushed(sticking->pos(), sticking->rect().size());
     QVERIFY2(paper.contains(pushed), qPrintable(QStringLiteral("legend at %1,%2 size %3 x %4").arg(pushed.x()).arg(pushed.y()).arg(pushed.width()).arg(pushed.height())));
+    // the layout's own record of the position agrees with where the item stands, so a refresh or a save keeps it on the paper
+    QCOMPARE(sticking->positionWithUnits().x(), sticking->pos().x());
+    QCOMPARE(sticking->positionWithUnits().y(), sticking->pos().y());
     auto* fitting = new QgsLayoutItemLegend(&layout);
     layout.addLayoutItem(fitting);
     fitting->attemptMove(QgsLayoutPoint(20., 20.));
