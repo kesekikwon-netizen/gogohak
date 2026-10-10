@@ -207,6 +207,45 @@ private slots:
     QVERIFY(st.value(QStringLiteral("layout_exists:site_location")).toBool());
   }
 
+  // The attribute checks read every saved feature even when QGIS's count failed or went stale (same
+  // cause as CI 2026-10-03): a feature without kind/period, origin or section id must reach the summary.
+  void staleCountStillChecksTheAttributes_data() {
+    QTest::addColumn<QString>("table");
+    QTest::addColumn<QString>("wkt");
+    QTest::addColumn<QString>("check");
+    QTest::newRow("feature_poly") << QStringLiteral("feature_poly") << kSquare << QStringLiteral("has_kind_period");
+    QTest::newRow("control_points") << QStringLiteral("control_points") << QStringLiteral("POINT(200010 450010)")
+                                    << QStringLiteral("has_origin");
+    QTest::newRow("section_line") << QStringLiteral("section_line")
+                                  << QStringLiteral("LINESTRING(200010 450010,200020 450020)")
+                                  << QStringLiteral("required_fields_filled");
+  }
+
+  void staleCountStillChecksTheAttributes() {
+    QFETCH(QString, table);
+    QFETCH(QString, wkt);
+    QFETCH(QString, check);
+    QTemporaryDir temp;
+    QString error;
+    const QString gpkg = SurveyProjectFactory::createNewSurvey(temp.path(), QStringLiteral("count"), &error);
+    QVERIFY2(!gpkg.isEmpty(), qPrintable(error));
+    const QString uri = gpkg + QStringLiteral("|layername=") + table;
+    QgsProject project;
+    project.setCrs(QgsCoordinateReferenceSystem(QStringLiteral("EPSG:5187")));
+    auto* shown = new QgsVectorLayer(uri, table, QStringLiteral("ogr"));
+    QVERIFY(shown->isValid());
+    project.addMapLayer(shown);
+    QCOMPARE(shown->featureCount(), 0LL);  // counted while empty
+    {
+      QgsVectorLayer writer(uri, QStringLiteral("writer"), QStringLiteral("ogr"));
+      addFeature(&writer, wkt);
+    }
+    QVERIFY2(shown->featureCount() == 0, "the probe needs a count that missed the saved feature");
+    const QJsonObject st = ProjectStateBuilder::fromProject(&project);
+    QVERIFY2(!st.value(check).toBool(), qPrintable(check));
+    QCOMPARE(offenderLabels(st, check).size(), 1);
+  }
+
   void sheetOfAnotherPlaceDoesNotPass() {
     QgsProject project;
     project.setCrs(QgsCoordinateReferenceSystem(QStringLiteral("EPSG:5187")));

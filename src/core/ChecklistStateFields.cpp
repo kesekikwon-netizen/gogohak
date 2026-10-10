@@ -31,11 +31,12 @@ constexpr Required kRequired[] = {{"survey_area", "survey_name"},
                                   {"feature_line", "kind"}};
 }  // namespace
 
+// The loops read every feature rather than trusting featureCount(): QGIS can fail its GeoPackage
+// count or leave it stale, and the checks would then pass silently (docs/ERROR_REGRESSION.md).
 void scanFields(QgsProject* project, QJsonObject& st, Offenders& off) {
   // Every feature needs kind and period; one good feature must not hide the others.
   bool kindPeriod = true;
   for (QgsVectorLayer* layer : LayerOps::domainLayersForKey(project, QStringLiteral("feature_poly"))) {
-    if (layer->featureCount() <= 0) continue;
     QgsFeatureIterator it = layer->getFeatures();
     QgsFeature f;
     while (it.nextFeature(f)) {
@@ -53,7 +54,6 @@ void scanFields(QgsProject* project, QJsonObject& st, Offenders& off) {
   bool uniqueIds = true;
   QHash<QString, int> seenIds;
   for (QgsVectorLayer* layer : LayerOps::domainLayersForKey(project, QStringLiteral("control_points"))) {
-    if (layer->featureCount() <= 0) continue;
     QgsFeatureIterator it = layer->getFeatures();
     QgsFeature f;
     while (it.nextFeature(f)) {
@@ -92,7 +92,7 @@ void scanFields(QgsProject* project, QJsonObject& st, Offenders& off) {
   for (const Required& r : kRequired) {
     const QString field = QString::fromLatin1(r.field);
     for (QgsVectorLayer* layer : LayerOps::domainLayersForKey(project, QString::fromLatin1(r.key))) {
-      if (layer->featureCount() <= 0 || !hasField(layer, field)) continue;
+      if (!hasField(layer, field)) continue;
       QgsFeatureIterator it = layer->getFeatures();
       QgsFeature f;
       bool layerMissing = false;
