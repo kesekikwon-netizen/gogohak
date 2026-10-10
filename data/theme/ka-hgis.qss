@@ -281,6 +281,13 @@ QToolBar#subToolbar QToolButton:enabled:checked {
   border: @subCheckedEdgeWidth@px solid @subCheckedEdge@;
   border-bottom: @subUnderline@;
 }
+/* 켜짐 토글(「연속 그리기」, kaToggle): oat with a grey ring, not the slate of a tool in hand (보완 M3). */
+QToolBar#subToolbar QToolButton[kaToggle="true"]:enabled:checked {
+  background: @subToggleFace@;
+  color: @subToggleInk@;
+  border: @subCheckedEdgeWidth@px solid @subToggleEdge@;
+  border-bottom: @subToggleUnderline@;
+}
 QToolBar#mainToolbar {
   spacing: @buttonSpacing@px;
   padding: 4px 8px;

@@ -7,7 +7,9 @@
 #include <QLabel>
 #include <QMainWindow>
 #include <QSignalSpy>
+#include <QCheckBox>
 #include <QToolBar>
+#include <QWidgetAction>
 #include <QTabBar>
 #include <QTabWidget>
 #include <QToolButton>
@@ -16,6 +18,7 @@
 #include <qgsapplication.h>
 
 #include "app/KaDrawGuideBand.h"
+#include "app/KaDrawRowRules.h"
 #include "app/KaFeatureCard.h"
 #include "app/KaIcons.h"
 #include "app/KaInspectorPanel.h"
@@ -143,6 +146,10 @@ private slots:
       if (QLatin1String(id) == QLatin1String("draw_area")) chosen = action;
     }
     chosen->setChecked(true);
+    QAction* toggle = sub->addAction(QStringLiteral("연속 그리기"));  // a switch, not a tool in hand
+    toggle->setCheckable(true);
+    toggle->setChecked(true);
+    sub->widgetForAction(toggle)->setProperty("kaToggle", true);
     window.addToolBar(sub);
     window.setCentralWidget(new QWidget(&window));
     window.resize(900, 200);
@@ -152,7 +159,10 @@ private slots:
     for (QToolButton* button : sub->findChildren<QToolButton*>()) {
       if (!button->defaultAction()) continue;
       const QColor face = button->grab().toImage().pixelColor(3, button->height() / 2);
-      if (button->defaultAction() == chosen) {
+      if (button->defaultAction() == toggle) {  // 켜짐 토글: the oat "on", not the slate "in hand"
+        QVERIFY2(qAbs(face.red() - 0xE3) < 8 && qAbs(face.green() - 0xDA) < 8 && qAbs(face.blue() - 0xCC) < 8,
+                 qPrintable(QStringLiteral("toggle face %1").arg(face.name())));
+      } else if (button->defaultAction() == chosen) {
         ++chosenButtons;
         QVERIFY2(face.lightness() < 70, qPrintable(QStringLiteral("chosen face %1").arg(face.name())));
       } else {
@@ -183,6 +193,43 @@ private slots:
     QVERIFY2(image.pixelColor(other.center().x(), other.bottom()).lightness() > 150, "the other tab has none");
     QCOMPARE(image.pixelColor(current.left(), current.center().y()), ground);       // no side edge
     QCOMPARE(image.pixelColor(current.left() + 3, current.center().y()), ground);   // no white face
+  }
+
+  // 그리기 줄 (보완 M3): a rule between the clusters (도형선택 | 자석 … | 그리는 도구 | 완료 · 연속 그리기), none at the ends
+  // and none doubled; the stock look draws none.
+  void drawRowHasRulesBetweenClusters() {
+    const auto build = [](QToolBar& bar) {
+      const auto tool = [&bar](const char* name, const char* property, const char* value) {
+        QAction* action = bar.addAction(QString::fromUtf8(name));
+        action->setProperty(property, QString::fromLatin1(value));
+        return action;
+      };
+      tool("도형선택", "kaSubTool", "select");
+      auto* snap = new QWidgetAction(&bar);  // 자석 · 공유 경계 · 허용치 · 대상
+      snap->setDefaultWidget(new QCheckBox(QStringLiteral("자석")));
+      bar.addAction(snap);
+      tool("쉽게그리기", "kaSubTool", "easy");
+      tool("조사구역 그리기", "kaSubTool", "area");
+      tool("유물위치표시", "kaSubTool", "artifact");
+      tool("완료", "kaSketch", "finish");
+      tool("연속 그리기", "kaSketch", "continuous");
+    };
+    const auto shape = [](const QToolBar& bar) {
+      QString out;
+      for (QAction* action : bar.actions()) out += action->isSeparator() ? QLatin1Char('|') : QLatin1Char('.');
+      return out;
+    };
+    QToolBar plate;
+    build(plate);
+    KaDrawRowRules::apply(&plate);
+    QCOMPARE(shape(plate), QStringLiteral(".|.|...|.."));
+    KaDrawRowRules::apply(&plate);  // asking twice never doubles a rule
+    QCOMPARE(shape(plate), QStringLiteral(".|.|...|.."));
+    paper(false);
+    QToolBar stock;
+    build(stock);
+    KaDrawRowRules::apply(&stock);
+    QCOMPARE(shape(stock), QStringLiteral("......."));
   }
 };
 

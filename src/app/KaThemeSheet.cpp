@@ -138,6 +138,12 @@ QHash<QString, QString> replacementTable() {
   values.insert(QStringLiteral("subCheckedEdge"), paper ? c.tileOn.name() : none);
   values.insert(QStringLiteral("subCheckedEdgeWidth"), paper ? QStringLiteral("1") : QStringLiteral("2"));
   values.insert(QStringLiteral("subCheckedInk"), (paper ? c.glyphOn : c.ribbonActiveInk).name());
+  // 켜짐 토글(연속 그리기)은 손에 든 도구가 아니라 귀리색 「켜짐」이다 (stock: the same as the chosen tool).
+  values.insert(QStringLiteral("subToggleFace"), paper ? c.tileShown.name() : none);
+  values.insert(QStringLiteral("subToggleEdge"), paper ? c.tileShownBorder.name() : none);
+  values.insert(QStringLiteral("subToggleInk"), (paper ? c.ink : c.ribbonActiveInk).name());
+  values.insert(QStringLiteral("subToggleUnderline"),
+                paper ? QStringLiteral("1px solid ") + c.tileShownBorder.name() : QStringLiteral("2px solid ") + c.ribbonActiveInk.name());
   values.insert(QStringLiteral("subUnderline"),
                 paper ? QStringLiteral("1px solid ") + c.tileOn.name() : QStringLiteral("2px solid ") + c.ribbonActiveInk.name());
   return values;

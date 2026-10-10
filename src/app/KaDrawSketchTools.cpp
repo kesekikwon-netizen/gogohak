@@ -5,6 +5,7 @@
 #include "KaAlignMapTool.h"
 #include "KaAttributeMapTool.h"
 #include "KaCaptureMapTool.h"
+#include "KaDrawRowRules.h"
 #include "KaDrawGuideBand.h"
 #include "KaFeatureSelectTool.h"
 #include "KaIcons.h"
@@ -51,6 +52,7 @@ void MainWindow::addDrawSketchButtons() {
   auto* continuousAct = m_subToolbar->addAction(QStringLiteral("연속 그리기"));
   continuousAct->setProperty("kaSketch", QStringLiteral("continuous"));
   continuousAct->setCheckable(true);
+  if (QWidget* toggle = m_subToolbar->widgetForAction(continuousAct)) toggle->setProperty("kaToggle", true);  // oat when on, not slate
   continuousAct->setToolTip(QStringLiteral(
       "켜면 도형을 마칠 때마다 이름·번호 창을 띄우지 않고 바로 다음 도형을 그립니다.\n"
       "이름·번호는 나중에 도형을 우클릭해 「이 도형 기록 입력」으로 넣습니다.\n"
@@ -61,6 +63,7 @@ void MainWindow::addDrawSketchButtons() {
                                 : QStringLiteral("도형을 마칠 때마다 이름·번호 창을 띄웁니다(Esc로 건너뜀)."),
                              5000);
   });
+  KaDrawRowRules::apply(m_subToolbar);  // 새 모양: a rule between the clusters of the drawing row
   syncDrawSketchButtons();
 #endif
 }
