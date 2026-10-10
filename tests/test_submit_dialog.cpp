@@ -92,7 +92,7 @@ private slots:
       auto* label = dialog.findChild<QLabel*>(QString::fromLatin1(name));
       return label ? label->text() : QStringLiteral("(없음)");
     };
-    QCOMPARE(text("submitHeadline"), QStringLiteral("오류 1건이 남아 있습니다"));
+    QCOMPARE(text("submitHeadline"), QStringLiteral("오류 1건을 확인하세요"));
     QVERIFY(text("submitSubline").startsWith(QStringLiteral("발굴 위치도면 유의사항 기반 검수 v1")));
     QCOMPARE(text("submitCountError"), QStringLiteral("1"));  // mono figures; 「건」 is its own faint label
     QCOMPARE(text("submitCountWarn"), QStringLiteral("2"));
@@ -109,7 +109,7 @@ private slots:
     QVERIFY(QTest::qWaitForWindowExposed(&dialog));
     auto* fix = dialog.findChild<QPushButton*>(QStringLiteral("btnAction_SPEC"));
     QVERIFY2(fix->width() <= fix->sizeHint().width() + 4, qPrintable(QString::number(fix->width())));  // compact, at the right
-    QVERIFY(text("submitSubline").endsWith(QStringLiteral("고치거나, 그대로 제출 꾸러미를 만들 수 있습니다.")));
+    QVERIFY(text("submitSubline").endsWith(QStringLiteral("고치지 않아도 꾸러미는 만들 수 있고, README_submit.txt에 적힙니다.")));
     dialog.setResults({result(QStringLiteral("W1"), QStringLiteral("warn"), false)}, true);
     QCOMPARE(text("submitHeadline"), QStringLiteral("오류가 없습니다"));
     QVERIFY(text("submitSubline").endsWith(QStringLiteral("주의 항목은 확인한 뒤 진행할 수 있습니다.")));
@@ -120,6 +120,19 @@ private slots:
     dialog.setResults({}, false);
     QCOMPARE(text("submitHeadline"), QStringLiteral("검수 규칙 파일을 찾지 못했습니다"));
     QVERIFY(!text("submitSubline").contains(QStringLiteral("진행")));  // never 「go ahead」 while blocked
+  }
+
+  // 검수·제출 (보완 D2): the three count cells are 96 px wide at least, so 「오류 / 5 건」 never breaks onto two lines.
+  void paperCountCellsAre96Wide() {
+    qApp->setProperty("kaPaperLook", true);
+    KaSubmitDialog dialog;
+    qApp->setProperty("kaPaperLook", QVariant());
+    dialog.setResults({result(QStringLiteral("SPEC"), QStringLiteral("error"), false)}, true);
+    dialog.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&dialog));
+    const auto cells = dialog.findChildren<QWidget*>(QStringLiteral("submitCountCell"));
+    QCOMPARE(cells.size(), 3);
+    for (QWidget* cell : cells) QVERIFY2(cell->width() >= 96, qPrintable(QString::number(cell->width())));
   }
 
   // 2026-10-10 사용자 결정 「검수와 상관없이 5179는 내보내기」: 오류는 알려 주고 README에 적되 꾸러미는 막지 않는다.

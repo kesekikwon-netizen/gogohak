@@ -9,10 +9,12 @@
 #include <QLineEdit>
 #include <QPushButton>
 #include <QSpinBox>
+#include <QTreeWidget>
 #include <QVBoxLayout>
 
 #include <qgsapplication.h>
 
+#include "app/KaSubmitDialog.h"
 #include "app/KaTheme.h"
 
 namespace {
@@ -63,6 +65,27 @@ private slots:
     QVERIFY2(home->height() >= 40, qPrintable(heights()));  // the home's button is not changed by D1
     paper(false);  // the stock look keeps its taller controls
     QTRY_VERIFY2(push->height() > 40 && line->height() > 36, qPrintable(heights()));
+  }
+
+  // 검수·제출 (보완 D2): the item list is a three-rule table: an ink rule above and below, no box and no side edge.
+  void reviewListIsAThreeRuleTable() {
+    KaSubmitDialog dialog;
+    CheckResult blocking;
+    blocking.id = QStringLiteral("SPEC");
+    blocking.severity = QStringLiteral("error");
+    blocking.passed = false;
+    blocking.messageKo = QStringLiteral("종류·시대가 빈 유구가 있습니다.");
+    blocking.fixKo = QStringLiteral("종류와 시대를 넣으세요.");
+    dialog.setResults({blocking}, true);
+    dialog.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&dialog));
+    auto* tree = dialog.findChild<QTreeWidget*>(QStringLiteral("submitReviewTree"));
+    QVERIFY(tree);
+    const QImage face = tree->grab().toImage();
+    QVERIFY2(face.pixelColor(face.width() / 2, 0).lightness() < 90, "an ink rule above the table");
+    QVERIFY2(face.pixelColor(face.width() / 2, face.height() - 1).lightness() < 90, "and one below");
+    const QColor side = face.pixelColor(0, face.height() / 2);
+    QVERIFY2(side.alpha() == 0 || side.lightness() > 200, qPrintable(QStringLiteral("a box edge at the side: %1").arg(side.name())));
   }
 };
 

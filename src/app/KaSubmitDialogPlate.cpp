@@ -38,7 +38,10 @@ QWidget* KaSubmitDialog::buildPlateHead() {
       rule->setFixedWidth(1);
       cells->addWidget(rule);
     }
-    auto* cell = new QVBoxLayout;
+    auto* cellBox = new QWidget(counts);  // 96 px at least, so 「오류 / 5 건」 stays one block (보완 D2)
+    cellBox->setObjectName(QStringLiteral("submitCountCell"));
+    cellBox->setMinimumWidth(96);
+    auto* cell = new QVBoxLayout(cellBox);
     cell->setContentsMargins(12, 6, 24, 6);
     auto* caption = new QLabel(QString::fromUtf8(cellNames[i][0]), counts);
     caption->setObjectName(QStringLiteral("submitCountCaption"));
@@ -53,7 +56,7 @@ QWidget* KaSubmitDialog::buildPlateHead() {
     figure->addStretch(1);
     cell->addWidget(caption);
     cell->addLayout(figure);
-    cells->addLayout(cell);
+    cells->addWidget(cellBox);
   }
   row->addWidget(counts, 0, Qt::AlignTop);
   return head;
@@ -70,13 +73,13 @@ QWidget* KaSubmitDialog::buildPlateFoot() {
 void KaSubmitDialog::showPlateResult(int errors, int warns, int passed) {
   const bool noRules = !m_rulesLoaded || m_results.isEmpty();
   m_headline->setText(noRules      ? QStringLiteral("검수 규칙 파일을 찾지 못했습니다")
-                      : errors > 0 ? QStringLiteral("오류 %1건이 남아 있습니다").arg(errors)
+                      : errors > 0 ? QStringLiteral("오류 %1건을 확인하세요").arg(errors)
                       : warns > 0  ? QStringLiteral("오류가 없습니다")
                                    : QStringLiteral("오류와 주의 항목이 없습니다"));
   // What to do next follows the headline: nothing to add with a missing rule file (the reason below says where
   // it was looked for) or when everything passed.
   const QString next = noRules      ? QString()
-                       : errors > 0 ? QStringLiteral("「위치 보기」나 옆 단추로 고치거나, 그대로 제출 꾸러미를 만들 수 있습니다.")
+                       : errors > 0 ? QStringLiteral("고치지 않아도 꾸러미는 만들 수 있고, README_submit.txt에 적힙니다.")
                        : warns > 0  ? QStringLiteral("주의 항목은 확인한 뒤 진행할 수 있습니다.")
                                     : QString();
   QStringList parts{noRules ? QString() : m_rulesTitle, next};

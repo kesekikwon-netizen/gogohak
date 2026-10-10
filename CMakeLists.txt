@@ -2318,6 +2318,8 @@ if(KA_HGIS_BUILD_TESTS)
     ENVIRONMENT "GDAL_DATA=${OSGEO4W_ROOT}/apps/gdal-dev/share/gdal;PATH=${_ka_path_esc};QGIS_PREFIX_PATH=${QGIS_PREFIX_PATH};QT_QPA_PLATFORM=offscreen" TIMEOUT 90)
   # 세부 디자인 보완(창 항목: D1 단추·입력칸 높이).
   add_executable(ka_window_polish_tests tests/test_window_polish.cpp
+    src/app/KaSubmitDialog.cpp src/app/KaSubmitDialog.h src/app/KaSubmitDialogPlate.cpp
+    src/app/KaSubmitDrawingStrip.cpp src/app/KaSubmitDrawingStrip.h
     ${_ka_p1_chip_sources} ${_ka_p4_theme_sources})
   target_link_libraries(ka_window_polish_tests PRIVATE ${KA_TEST_LIBS})
   target_include_directories(ka_window_polish_tests PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_BINARY_DIR}/generated)
