@@ -7,6 +7,7 @@
 #include <QFrame>
 #include <QLabel>
 #include <QPushButton>
+#include <QRect>
 #include <QVBoxLayout>
 #include <QSettings>
 #include <QStandardPaths>
@@ -124,6 +125,38 @@ private slots:
       QVERIFY2(face.pixelColor(0, face.height() / 2).alpha() == 0, "an edge or a fill is drawn at the left");
       QVERIFY2(face.pixelColor(face.width() / 2, 0).alpha() == 0, "an edge or a fill is drawn at the top");
     }
+  }
+
+  // 「이어서 작업」 표제란 (보완 H2): one frame of three rows (caption · name beside the button · cells). The caption row
+  // runs over the button column with 「저장됨」 at its right end, the button sits in the second row, and nothing hangs
+  // under the cells (the empty recovery-note row used to leave a band, so the bottom rules were 13 px apart).
+  void titleBlockIsThreeRowsInOneFrame() {
+    const QString path = touch(m_dir.filePath(QStringLiteral("m/광령리1.gpkg")));
+    {
+      QSettings st = RecentSurveys::userSettings();
+      RecentSurveys::remember(st, path, QStringLiteral("광령리1"));
+      SurveyFacts::rememberCounts(st, path, 1, 6, QStringLiteral("EPSG:5186"));
+      SurveyFacts::rememberCheck(st, path, 1, 3);
+    }
+    KaStartPage page;
+    page.resize(1600, 900);
+    page.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&page));
+    auto* block = page.findChild<QFrame*>(QStringLiteral("startTitleBlock"));
+    QVERIFY(block);
+    auto part = [&](const char* name) {
+      auto* widget = block->findChild<QWidget*>(QString::fromLatin1(name));
+      return widget ? QRect(widget->mapTo(block, QPoint()), widget->size()) : QRect();
+    };
+    const QRect tag = part("startTitleTag"), state = part("startTitleState"), name = part("startTitleName");
+    const QRect resume = part("startContinueBtn"), folder = part("startCellFolder"), check = part("startCellCheck");
+    QVERIFY(!tag.isNull() && !state.isNull() && !name.isNull() && !resume.isNull() && !folder.isNull() && !check.isNull());
+    QVERIFY2(tag.bottom() < name.top() && state.bottom() < name.top(), "the caption row is above the name");
+    QVERIFY2(state.right() >= block->width() - 40, qPrintable(QStringLiteral("state right %1 of %2").arg(state.right()).arg(block->width())));
+    QVERIFY2(resume.top() > tag.bottom() && resume.bottom() < folder.top(), "the button sits in the second row");
+    QVERIFY2(resume.right() <= block->width() - 24, "the button is inset 24 from the frame");
+    const int below = block->height() - 1 - check.bottom();
+    QVERIFY2(below <= 14, qPrintable(QStringLiteral("%1 px under the cells").arg(below)));
   }
 };
 
