@@ -1379,7 +1379,11 @@ QFrame#startSubmitReady[kaPlate="true"] { background: transparent; border: none;
 QFrame#startConnRow[kaPlate="true"] { background: transparent; border-radius: 0; }
 QLabel#startConnState[kaPlate="true"] { color: @inkMuted@; font-weight: 400; }
 QLabel#startConnState[kaPlate="true"][ready="false"] { color: @ink@; }
-QFrame#startConnRow[kaPlate="true"] QPushButton#startConnectionSetup { min-height: 24px; font-weight: 400; padding: 0 10px; }
+QFrame#startConnRow[kaPlate="true"] QPushButton#startConnectionSetup { min-height: 22px; max-height: 22px; font-weight: 400; padding: 0 10px;
+  border: 1px solid transparent; background: transparent; }  /* the edge stays so the focus ring (border-color) still shows */
+QFrame#startConnRow[kaPlate="true"] QPushButton#startConnectionSetup:enabled:hover { background: @hover@; border-color: transparent; }
+QFrame#startConnRow[kaPlate="true"] QPushButton#startConnectionSetup:enabled:focus { border-color: @focusRing@; }
+QFrame#startConnRule { background: @border@; border: none; }
 /* 홈 판 (2차 보드 판 2): the cards have no box in 새 모양 (stock: white, 1 px edge, 10 px corners). */
 QFrame#startRecentCard, QFrame#startGuideCard, QFrame#startGuideCard2, QFrame#startConnectionCard {
   background: @cardFace@; border: 1px solid @cardEdge@; border-radius: @mapRadius@px; }

@@ -6,6 +6,8 @@
 #include <QFileInfo>
 #include <QFrame>
 #include <QLabel>
+#include <QPushButton>
+#include <QVBoxLayout>
 #include <QSettings>
 #include <QStandardPaths>
 #include <QTemporaryDir>
@@ -13,6 +15,7 @@
 #include <qgsapplication.h>
 
 #include "app/KaChip.h"
+#include "app/KaHomeConnectionCard.h"
 #include "app/KaStartPage.h"
 #include "app/KaTheme.h"
 #include "core/RecentSurveys.h"
@@ -84,6 +87,43 @@ private slots:
     QCOMPARE(runs[3], qMakePair(QStringLiteral("3"), true));
     QVERIFY(KaChip::figureRuns(QString()).isEmpty());
     QCOMPARE(KaChip::figureRuns(QStringLiteral("다음")).size(), 1);
+  }
+
+  // 연결 상태 (보완 H6): 「설정」 is a quiet 24 px word button (no edge, no fill at rest) and a 1 x 32 rule stands
+  // between the cells of the strip.
+  void connectionSetupIsQuietWithRulesBetween() {
+    QWidget host;
+    auto* column = new QVBoxLayout(&host);
+    KaHomeConnectionCard card;
+    card.placeIn(column, true);
+    KaHomeStatus::Inputs inputs;
+    for (auto source : {AccountStatus::Source::VworldKey, AccountStatus::Source::TopographicAccount,
+                        AccountStatus::Source::HeritageAccount}) {
+      AccountStatus::Entry entry;
+      entry.source = source;
+      entry.ready = true;
+      inputs.accounts << entry;
+    }
+    inputs.crsDatabase = true;
+    card.setInputs(inputs);
+    host.resize(1400, 120);
+    host.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&host));
+    const auto rules = card.findChildren<QFrame*>(QStringLiteral("startConnRule"));
+    QCOMPARE(rules.size(), 2);  // between three cells
+    for (QFrame* rule : rules) {
+      QTRY_VERIFY(rule->isVisible());
+      QCOMPARE(rule->width(), 1);
+      QCOMPARE(rule->height(), 32);
+    }
+    const auto setups = card.findChildren<QPushButton*>(QStringLiteral("startConnectionSetup"));
+    QCOMPARE(setups.size(), 3);
+    for (QPushButton* setup : setups) {
+      QCOMPARE(setup->height(), 24);
+      const QImage face = setup->grab().toImage();
+      QVERIFY2(face.pixelColor(0, face.height() / 2).alpha() == 0, "an edge or a fill is drawn at the left");
+      QVERIFY2(face.pixelColor(face.width() / 2, 0).alpha() == 0, "an edge or a fill is drawn at the top");
+    }
   }
 };
 

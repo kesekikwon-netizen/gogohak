@@ -91,6 +91,7 @@ void KaHomeConnectionCard::placeIn(QBoxLayout* layout, bool strip) {
   else
     layout->insertWidget(1, this);
   m_rows->setDirection(strip ? QBoxLayout::LeftToRight : QBoxLayout::TopToBottom);
+  for (QFrame* rule : findChildren<QFrame*>(QStringLiteral("startConnRule"))) rule->setVisible(strip);
   m_lock->setVisible(strip);  // the column is too narrow for the note beside the internet check
   m_privacy->setVisible(strip);
 }
@@ -161,6 +162,13 @@ void KaHomeConnectionCard::setInputs(const KaHomeStatus::Inputs& inputs) {
     const AccountStatus::Source source = entry.source;
     connect(setup, &QPushButton::clicked, this, [this, source]() { emit configureRequested(source); });
     line->addWidget(setup, 0, Qt::AlignVCenter);
+    if (plate && m_rows->count() > 0) {  // 1 x 32 rule between the cells of the strip
+      auto* rule = new QFrame(this);
+      rule->setObjectName(QStringLiteral("startConnRule"));
+      rule->setFixedSize(1, 32);
+      rule->setVisible(m_rows->direction() == QBoxLayout::LeftToRight);
+      m_rows->addWidget(rule, 0, Qt::AlignVCenter);
+    }
     m_rows->addWidget(row, 1);
   }
   // proj.db and the survey folder speak only when something is wrong.
