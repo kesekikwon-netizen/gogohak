@@ -34,6 +34,7 @@
 #include "KaCanvasGridOverlay.h"
 #include "KaTrenchMoveTool.h"
 #include "KaFeatureSelectTool.h"
+#include "KaParcelCopyKeys.h"
 #include "KaShellFocus.h"
 #include "KaShellGridControls.h"
 #include "KaGridOriginButton.h"
@@ -499,6 +500,10 @@ void MainWindow::buildUi() {
           [this](const QString& title, const QString& message, Qgis::MessageLevel) {
     statusBar()->showMessage(title + QStringLiteral(": ") + message, 8000);
   });
+  // 도형선택에서 Ctrl+C · Ctrl+V 로 지적 필지를 같은 자리에 복사한다. 결과는 상태 줄에 알린다.
+  auto* parcelKeys = new KaParcelCopyKeys(m_canvas);
+  connect(parcelKeys, &KaParcelCopyKeys::statusMessage, this,
+          [this](const QString& text) { statusBar()->showMessage(text, 6000); });
   m_canvas->setObjectName(QStringLiteral("mapCanvas"));
   LayerOps::applyWheelZoomFactor(m_canvas);
   KaTheme::excludeMapSurface(m_canvas);

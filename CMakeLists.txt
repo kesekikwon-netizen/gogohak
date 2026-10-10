@@ -112,6 +112,7 @@ add_library(ka_core STATIC
   src/core/KaGitHash.h
   src/core/LayerLabelControls.cpp
   src/core/CadastralImport.cpp
+  src/core/ParcelClipboard.cpp
   src/core/CadastralPortal.cpp
   data/topographic/topographic.qrc
   src/core/TopographicArchive.cpp
@@ -501,6 +502,7 @@ add_executable(ka-hgis
   src/app/KaVertexEditTool.cpp
   src/app/KaFeatureSelectTool.cpp
   src/app/KaFeatureSelectPick.cpp
+  src/app/KaParcelCopyKeys.cpp
   src/app/KaTrenchDialog.cpp
   src/app/KaTrenchDialogPlan.cpp
   src/app/KaDemClassDialog.cpp
@@ -749,6 +751,25 @@ if(KA_HGIS_BUILD_TESTS)
   target_link_directories(ka_editing_tools_tests PRIVATE ${KA_LIBDIRS})
   target_compile_definitions(ka_editing_tools_tests PRIVATE ${KA_TEST_DEFS})
   ka_add_qtest(editing_tools ka_editing_tools_tests)
+  add_executable(ka_parcel_copy_tests tests/test_parcel_copy.cpp tests/parcel_copy_fixture.h)
+  target_link_libraries(ka_parcel_copy_tests PRIVATE ${KA_TEST_LIBS})
+  target_include_directories(ka_parcel_copy_tests PRIVATE ${KA_INCLUDES})
+  target_link_directories(ka_parcel_copy_tests PRIVATE ${KA_LIBDIRS})
+  target_compile_definitions(ka_parcel_copy_tests PRIVATE ${KA_TEST_DEFS})
+  ka_add_qtest(parcel_copy ka_parcel_copy_tests)
+  add_executable(ka_parcel_copy_keys_tests tests/test_parcel_copy_keys.cpp tests/parcel_copy_fixture.h
+    src/app/KaCaptureMapTool.cpp src/app/KaCaptureMapTool.h src/app/KaSketchMeasure.cpp src/app/KaSketchMeasure.h
+    src/app/KaFeatureSelectTool.cpp src/app/KaFeatureSelectPick.cpp src/app/KaFeatureSelectTool.h
+    src/app/KaVertexEditTool.cpp src/app/KaVertexEditTool.h
+    src/app/KaAttributeMapTool.cpp src/app/KaAttributeMapTool.h
+    src/app/KaEditTolerance.h
+    src/app/KaCrashGuard.cpp src/app/KaCrashGuard.h
+    src/app/KaParcelCopyKeys.cpp src/app/KaParcelCopyKeys.h)
+  target_link_libraries(ka_parcel_copy_keys_tests PRIVATE ${KA_TEST_LIBS})
+  target_include_directories(ka_parcel_copy_keys_tests PRIVATE ${KA_INCLUDES})
+  target_link_directories(ka_parcel_copy_keys_tests PRIVATE ${KA_LIBDIRS})
+  target_compile_definitions(ka_parcel_copy_keys_tests PRIVATE ${KA_TEST_DEFS})
+  ka_add_qtest(parcel_copy_keys ka_parcel_copy_keys_tests)
 
   # 도형선택 cases that used to pick nothing (unsaved shape, lifted layer, inner piece) and key A.
   add_executable(ka_inner_piece_tests tests/test_inner_piece.cpp

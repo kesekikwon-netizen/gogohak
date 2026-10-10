@@ -19,11 +19,14 @@ ctest --test-dir build -C Release -R '<아래 이름>' --output-on-failure
 | B | `topographic_source_crs` | 수치지형 원본 CRS |
 | C 편집 | `workflow_engine` | undoStack, 스냅, 위상 편집 |
 | C | `save_open_edit` | 정점 Undo·메뉴 (ctrlZ 슬롯 실패 이력) |
+| C | `parcel_copy` | 받은 지적도 필지 Ctrl+C·V: 같은 자리, 여러 조각, 원본 줄을 지워도 복사본이 남음, 저장 뒤 다시 열어도 남음 |
+| C | `parcel_copy_keys` | 도형선택에서만 Ctrl+C·V, 누르고 있어도 한 번만 붙음 |
 | D 성능·안정 | `perf_engine` | 15만 필지·열기·조판 상한 |
 | D | `parallel_render` | 병렬 렌더 재현, 제품은 꺼 둠 |
 | D | `cadastral` | 지적 준비 cheap key · P3-4 절대 HTTP 마감 |
 | D | [network-download-timeout-checklist.md](network-download-timeout-checklist.md) | 내려받기 취소·시간 제한·재시도·오프라인 문구 |
 | E UX | `layer_information` | 작은 창 목록 ≥5행 |
+| E UX | `layer_list_chrome` | 「지적도」 머리글: 받은 지적도·VWorld 지적은 지적도 구역, 「주변·참조」와 나뉨 |
 | E | `theme_qss` | Tab/Enter 새 조사→저장 |
 | E | `above_labels_200` | 200% 라벨 |
 | E | `ribbon_overflow` · `ribbon_pixels` | 리본은 접지 않고 창 너비에 맞는 가장 큰 크기(타일 56~20)로 모든 칩을 보인다, 글자·타일이 잘리지 않는다 |

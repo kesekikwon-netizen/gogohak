@@ -6,7 +6,7 @@
 class QgsLayerTreeNode;
 class QgsLayerTreeView;
 
-// Section headers of the layer list (「조사 데이터」「주변·참조」「배경 지도」) drawn as a
+// Section headers of the layer list (「조사 데이터」「지적도」「주변·참조」「배경 지도」) drawn as a
 // 16 px band above the first top-level row of each section. The QgsLayerTree itself
 // is untouched: no group is created and no node moves; the band is a painted row
 // prefix only, so a user drag that mixes sections simply gets a band per change.
@@ -18,7 +18,7 @@ class QgsLayerTreeView;
 class KaLayerSectionDelegate : public QStyledItemDelegate {
   Q_OBJECT
  public:
-  enum class Section { None, Survey, Nearby, Basemap };
+  enum class Section { None, Survey, Cadastral, Nearby, Basemap };
   static constexpr int kBandHeight = 16;
   // 「조용한 도판」: a survey layer row's shape count, painted in mono after the name (the model fills it).
   static constexpr int kCountRole = Qt::UserRole + 0x4b4c;
@@ -26,8 +26,8 @@ class KaLayerSectionDelegate : public QStyledItemDelegate {
   KaLayerSectionDelegate(QAbstractItemDelegate* inner, QgsLayerTreeView* view);
 
   // A group row is its own header (None). Survey data: a layer_key or the survey role.
-  // Basemap: live tiles. Everything else (cadastral, reference, unmarked user files)
-  // is 「주변·참조」.
+  // Cadastral: the received map, the VWorld cadastral picture and parcels copied from them.
+  // Basemap: live tiles. Everything else (reference, unmarked user files) is 「주변·참조」.
   static Section sectionOf(QgsLayerTreeNode* node);
   static QString sectionTitle(Section section);
 

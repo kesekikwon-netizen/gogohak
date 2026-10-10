@@ -29,6 +29,10 @@ KaLayerSectionDelegate::Section KaLayerSectionDelegate::sectionOf(QgsLayerTreeNo
   if (!layer) return Section::Nearby;
   if (!LayerOps::layerKeyOf(layer).isEmpty() || LayerRole::resolve(layer) == LayerRole::Kind::Survey)
     return Section::Survey;
+  // 받은 지적도, 바탕 지적 그림(VWorld)과 거기서 복사한 필지는 「지적도」 구역이다.
+  // 지적 그림도 wms 라서 배경 지도 검사보다 먼저 본다.
+  if (LayerOps::isCadastralLayer(layer) || LayerOps::isVworldCadastralPicture(layer))
+    return Section::Cadastral;
   if (LayerOps::isBasemapLayer(layer)) return Section::Basemap;
   return Section::Nearby;
 }
@@ -36,6 +40,7 @@ KaLayerSectionDelegate::Section KaLayerSectionDelegate::sectionOf(QgsLayerTreeNo
 QString KaLayerSectionDelegate::sectionTitle(Section section) {
   switch (section) {
     case Section::Survey: return QStringLiteral("조사 데이터");
+    case Section::Cadastral: return QStringLiteral("지적도");
     case Section::Nearby: return QStringLiteral("주변·참조");
     case Section::Basemap: return QStringLiteral("배경 지도");
     case Section::None: break;

@@ -51,11 +51,12 @@ class TestLayerListChrome : public QObject {
     View v(t);
     QCOMPARE(v.bandRows(), (QList<int>{0, 2, 3}));
     QCOMPARE(KaLayerSectionDelegate::sectionOf(t.node(t.area)), Section::Survey);
-    QCOMPARE(KaLayerSectionDelegate::sectionOf(t.node(t.cadastral)), Section::Nearby);
+    QCOMPARE(KaLayerSectionDelegate::sectionOf(t.node(t.cadastral)), Section::Cadastral);
     QCOMPARE(KaLayerSectionDelegate::sectionOf(t.node(t.satellite)), Section::Basemap);
     QCOMPARE(KaLayerSectionDelegate::sectionTitle(Section::Survey), QStringLiteral("조사 데이터"));
     QCOMPARE(KaLayerSectionDelegate::sectionTitle(Section::Nearby), QStringLiteral("주변·참조"));
     QCOMPARE(KaLayerSectionDelegate::sectionTitle(Section::Basemap), QStringLiteral("배경 지도"));
+    QCOMPARE(KaLayerSectionDelegate::sectionTitle(Section::Cadastral), QStringLiteral("지적도"));
     const QString out = qEnvironmentVariable("KA_HGIS_QA_OUTPUT_DIR");
     if (!out.isEmpty()) QVERIFY(v.host.grab().save(QDir(out).filePath(QStringLiteral("layer-list-sections.png"))));
   }
@@ -89,6 +90,13 @@ class TestLayerListChrome : public QObject {
     QgsVectorLayer* user = vector(t.project, t.project.layerTreeRoot(), QStringLiteral("사용자 SHP"));
     QVERIFY(LayerOps::layerKeyOf(user).isEmpty());
     QCOMPARE(KaLayerSectionDelegate::sectionOf(t.node(user)), Section::Nearby);
+  }
+
+  void sections_vworldCadastralPictureJoinsCadastral() {
+    Tree t;
+    QgsRasterLayer* picture = basemap(t.project, t.project.layerTreeRoot(), QStringLiteral("VWorld 지적"));
+    QCOMPARE(KaLayerSectionDelegate::sectionOf(t.node(picture)), Section::Cadastral);
+    QCOMPARE(KaLayerSectionDelegate::sectionOf(t.node(t.satellite)), Section::Basemap);
   }
 
   void delegate_addsBandHeightOnlyOnBandRows() {
