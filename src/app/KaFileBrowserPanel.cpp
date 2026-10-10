@@ -1,7 +1,9 @@
 #include "KaFileBrowserPanel.h"
 #include "KaFileRowDelegate.h"
 
+#include <QApplication>
 #include <QDir>
+#include <QEvent>
 #include <QDrag>
 #include <QFileDialog>
 #include <QFileInfo>
@@ -15,17 +17,10 @@
 #include <QResizeEvent>
 #include <QShowEvent>
 #include <QStandardPaths>
-#include <QStorageInfo>
+#include <QStyle>
 #include <QToolButton>
 #include <QUrl>
 #include <QVBoxLayout>
-
-#ifdef Q_OS_WIN
-#ifndef NOMINMAX
-#define NOMINMAX
-#endif
-#include <windows.h>
-#endif
 
 KaFileListView::KaFileListView(QWidget* parent) : QListWidget(parent) {
   setDragEnabled(true);
@@ -75,27 +70,6 @@ QString KaFileBrowserPanel::resolvedDesktopPath() {
   return cached;
 }
 
-QString KaFileBrowserPanel::findRemovableSdPath() {
-#ifdef Q_OS_WIN
-  for (wchar_t letter = L'D'; letter <= L'Z'; ++letter) {
-    wchar_t root[] = {letter, L':', L'\\', L'\0'};
-    if (GetDriveTypeW(root) == DRIVE_REMOVABLE)
-      return QString::fromWCharArray(root);
-  }
-#endif
-  const auto vols = QStorageInfo::mountedVolumes();
-  for (const QStorageInfo& vol : vols) {
-    if (!vol.isValid() || !vol.isReady()) continue;
-    const QString root = QDir::fromNativeSeparators(vol.rootPath());
-    if (root.compare(QStringLiteral("C:/"), Qt::CaseInsensitive) == 0) continue;
-    const QString name = vol.name();
-    if (name.contains(QStringLiteral("SD"), Qt::CaseInsensitive) ||
-        name.contains(QStringLiteral("카드"), Qt::CaseInsensitive))
-      return vol.rootPath();
-  }
-  return {};
-}
-
 KaFileBrowserPanel::KaFileBrowserPanel(QWidget* parent) : QFrame(parent) {
   setObjectName(QStringLiteral("filesCard"));
   auto* filesLay = new QVBoxLayout(this);
@@ -111,6 +85,7 @@ KaFileBrowserPanel::KaFileBrowserPanel(QWidget* parent) : QFrame(parent) {
     b->setText(text);
     b->setObjectName(objName);
     b->setToolTip(tip);
+    b->setProperty("kaPlate", qApp && qApp->property("kaPaperLook").toBool());  // 새 모양: quiet 24 px words (보완 M8)
     return b;
   };
 
@@ -137,19 +112,9 @@ KaFileBrowserPanel::KaFileBrowserPanel(QWidget* parent) : QFrame(parent) {
     goTo(d);
   });
 
-  m_btnPick = makeBtn(QStringLiteral("폴더 지정"), QStringLiteral("btnBrowseFolder"),
-                      QStringLiteral("조사 자료 폴더를 지정하여 엽니다"));
+  m_btnPick = makeBtn(QStringLiteral("폴더 직접 찾기"), QStringLiteral("btnBrowseFolder"),
+                      QStringLiteral("조사 자료 폴더를 직접 찾아 엽니다. 카메라·GPS 메모리카드(SD)도 여기서 엽니다"));
   connect(m_btnPick, &QToolButton::clicked, this, &KaFileBrowserPanel::pickFolder);
-
-  m_btnSd = makeBtn(QStringLiteral("SD 카드"), QStringLiteral("btnBrowseSd"),
-                    QStringLiteral("SD 카드·이동식 디스크를 찾아 엽니다"));
-  connect(m_btnSd, &QToolButton::clicked, this, [this]() {
-    const QString sd = findRemovableSdPath();
-    if (sd.isEmpty())
-      emit statusMessage(QStringLiteral("연결된 SD카드를 찾지 못했습니다."));
-    else
-      goTo(sd);
-  });
 
   m_btnUp = makeBtn(QStringLiteral("상위"), QStringLiteral("btnBrowseUp"),
                     QStringLiteral("상위 폴더로 한 단계 이동합니다"));
@@ -256,17 +221,15 @@ void KaFileBrowserPanel::updateButtonLayout(int width) {
   clearLayout(m_pathBar2);
 
   if (!m_isTwoRows) {
-    // 1 row: [내 PC] [바탕화면] [문서] [내려받기] [폴더 지정] [상위]
+    // 1 row: [내 PC] [바탕화면] [문서] [내려받기] [폴더 직접 찾기] ... [상위]
     m_pathBar1->addWidget(m_btnPc);
     m_pathBar1->addWidget(m_btnDesk);
     m_pathBar1->addWidget(m_btnDocs);
     m_pathBar1->addWidget(m_btnDown);
-    m_pathBar1->addWidget(m_btnSd);
     m_pathBar1->addWidget(m_btnPick);
-    m_pathBar1->addWidget(m_btnUp);
     m_pathBar1->addStretch(1);
+    m_pathBar1->addWidget(m_btnUp);
     m_btnDown->setVisible(true);
-    m_btnSd->setVisible(true);
     m_btnPick->setVisible(true);
     m_btnUp->setVisible(true);
   } else {
@@ -276,12 +239,11 @@ void KaFileBrowserPanel::updateButtonLayout(int width) {
     m_pathBar1->addWidget(m_btnDesk);
     m_pathBar1->addWidget(m_btnDocs);
     m_pathBar1->addStretch(1);
-    // Row 2: [내려받기] [SD 카드] [폴더 지정] [상위]
+    // Row 2: [내려받기] [폴더 직접 찾기] ... [상위]
     m_pathBar2->addWidget(m_btnDown);
-    m_pathBar2->addWidget(m_btnSd);
     m_pathBar2->addWidget(m_btnPick);
-    m_pathBar2->addWidget(m_btnUp);
     m_pathBar2->addStretch(1);
+    m_pathBar2->addWidget(m_btnUp);
   }
   fitShortcutFonts(width);
 }
@@ -380,4 +342,17 @@ void KaFileBrowserPanel::goTo(const QString& path) {
     ++n;
   }
   emit statusMessage(QStringLiteral("경로: %1").arg(QDir::toNativeSeparators(m_path)));
+}
+
+// 새 모양을 켜고 끄면 바로가기 단추도 조용한 글자 ↔ 예전 단추로 따라 바뀐다.
+void KaFileBrowserPanel::changeEvent(QEvent* event) {
+  QFrame::changeEvent(event);
+  if (event->type() != QEvent::StyleChange) return;
+  const bool plate = qApp && qApp->property("kaPaperLook").toBool();
+  for (QToolButton* b : {m_btnPc, m_btnDesk, m_btnDocs, m_btnDown, m_btnPick, m_btnUp}) {
+    if (!b || b->property("kaPlate").toBool() == plate) continue;
+    b->setProperty("kaPlate", plate);
+    b->style()->unpolish(b);
+    b->style()->polish(b);
+  }
 }

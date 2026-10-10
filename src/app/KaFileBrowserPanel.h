@@ -45,11 +45,11 @@ signals:
 public:
   // 바탕화면은 OneDrive로 옮겨 가 있는 현장 PC가 많아 후보를 차례로 찾는다.
   static QString resolvedDesktopPath();
-  static QString findRemovableSdPath();
 
 protected:
   void resizeEvent(QResizeEvent* event) override;
   void showEvent(QShowEvent* event) override;
+  void changeEvent(QEvent* event) override;
 
 private:
   void updateButtonLayout(int width);
@@ -62,7 +62,6 @@ private:
   class QToolButton* m_btnDocs = nullptr;
   class QToolButton* m_btnDown = nullptr;
   class QToolButton* m_btnPick = nullptr;
-  class QToolButton* m_btnSd = nullptr;
   class QToolButton* m_btnUp = nullptr;
   class QHBoxLayout* m_pathBar1 = nullptr;
   class QHBoxLayout* m_pathBar2 = nullptr;

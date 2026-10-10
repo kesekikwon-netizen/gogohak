@@ -1177,6 +1177,19 @@ QFrame#filesCard QToolButton#btnBrowseUp:disabled {
   border-color: @border@;
 }
 
+/* ---- 파일함 바로가기 (보완 M8): in 새 모양 quiet 24 px words; 「상위」 alone is oat. ---- */
+QFrame#filesCard QToolButton[kaPlate="true"], QFrame#studioFilesPanel QToolButton[kaPlate="true"] {
+  background: transparent; border: 1px solid transparent; border-radius: 8px; padding: 0 8px;
+  min-height: 22px; max-height: 22px; font-weight: 400; color: @ink@; }
+QFrame#filesCard QToolButton[kaPlate="true"]:enabled:hover, QFrame#studioFilesPanel QToolButton[kaPlate="true"]:enabled:hover {
+  background: @hover@; border: 1px solid transparent; }
+QFrame#filesCard QToolButton[kaPlate="true"]:enabled:pressed, QFrame#studioFilesPanel QToolButton[kaPlate="true"]:enabled:pressed {
+  background: @pressed@; border: 1px solid transparent; }
+QFrame#filesCard QToolButton[kaPlate="true"]:enabled:focus, QFrame#studioFilesPanel QToolButton[kaPlate="true"]:enabled:focus {
+  border: 1px solid @focusRing@; }
+QFrame#filesCard QToolButton#btnBrowseUp[kaPlate="true"], QFrame#studioFilesPanel QToolButton#btnBrowseUp[kaPlate="true"] {
+  background: @sheetOnFace@; border: 1px solid @sheetOnEdge@; color: @sheetOnInk@;
+  padding: 0 8px; min-height: 22px; max-height: 22px; font-weight: 400; border-radius: 8px; }
 /* ---- Download windows (수치지형·주변유적·지적도): KaDownloadUi sets the
    kaDownloadWindow property and these object names. Flat header in the
    startup-notice blue; the compact size and 상세 보기 fold are set in C++. ---- */
