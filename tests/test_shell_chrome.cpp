@@ -225,8 +225,9 @@ class TestShellChrome : public QObject {
     QCOMPARE(title->text(), QStringLiteral("그리기 · 유구 면"));
     QCOMPARE(hint->text(), QStringLiteral("— 클릭으로 점을 찍고 우클릭으로 마칩니다 (Esc 취소)"));
     QVERIFY(!glyph->pixmap().isNull() && !glyph->isHidden());
-    QCOMPARE(band.undoButton()->x(), band.pill()->x() + band.pill()->width() + 8);
-    QCOMPARE(band.redoButton()->x(), band.undoButton()->x() + 36 + 8);
+    const auto inBand = [&band](QWidget* w) { return w->mapTo(&band, QPoint()).x(); };  // the buttons sit in the undo/redo cover
+    QCOMPARE(inBand(band.undoButton()), band.pill()->x() + band.pill()->width() + 8);
+    QCOMPARE(inBand(band.redoButton()), inBand(band.undoButton()) + 36 + 8);
     QCOMPARE(rail.pos(), QPoint(10, 10 + 56));
     QVERIFY2(!band.geometry().intersects(rail.geometry()), "the card sits below the band");
     QVERIFY(rail.isVisible() && band.isVisible());

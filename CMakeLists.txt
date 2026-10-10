@@ -2218,21 +2218,6 @@ if(KA_HGIS_BUILD_TESTS)
   ka_add_qtest(feature_card_plate ka_feature_card_plate_tests)
   set_tests_properties(feature_card_plate PROPERTIES
     ENVIRONMENT "GDAL_DATA=${OSGEO4W_ROOT}/apps/gdal-dev/share/gdal;PATH=${_ka_path_esc};QGIS_PREFIX_PATH=${QGIS_PREFIX_PATH};QT_QPA_PLATFORM=offscreen" TIMEOUT 90)
-  # 세부 디자인 보완(지도 화면 항목들): the plate test files are at the 300-line limit, so these live together.
-  add_executable(ka_map_polish_tests tests/test_map_polish.cpp
-    src/app/KaInspectorPanel.cpp src/app/KaInspectorPanel.h
-    src/app/KaInspectorStyle.cpp src/app/KaInspectorStyle.h
-    src/app/KaBasemapQuickCard.cpp src/app/KaBasemapQuickCard.h
-    src/app/KaFeatureCard.cpp src/app/KaFeatureCard.h src/app/KaFeatureCardEdit.cpp ${_ka_p4_card_sources}
-    src/app/KaFeatureFormDialog.cpp src/app/KaFeatureFormDialog.h
-    ${_ka_p1_chip_sources} ${_ka_p4_theme_sources})
-  target_link_libraries(ka_map_polish_tests PRIVATE ${KA_TEST_LIBS})
-  target_include_directories(ka_map_polish_tests PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_BINARY_DIR}/generated)
-  target_compile_definitions(ka_map_polish_tests PRIVATE ${KA_TEST_DEFS})
-  set_target_properties(ka_map_polish_tests PROPERTIES WIN32_EXECUTABLE FALSE)
-  ka_add_qtest(map_polish ka_map_polish_tests)
-  set_tests_properties(map_polish PROPERTIES
-    ENVIRONMENT "GDAL_DATA=${OSGEO4W_ROOT}/apps/gdal-dev/share/gdal;PATH=${_ka_path_esc};QGIS_PREFIX_PATH=${QGIS_PREFIX_PATH};QT_QPA_PLATFORM=offscreen" TIMEOUT 90)
   # The 스타일 tab alone: both check boxes, point layers, a change made elsewhere.
   add_executable(ka_inspector_style_tests tests/test_inspector_style.cpp
     src/app/KaInspectorStyle.cpp src/app/KaInspectorStyle.h src/app/KaSymbolSwatch.cpp src/app/KaSymbolSwatch.h ${_ka_p4_theme_sources})
@@ -2284,6 +2269,22 @@ if(KA_HGIS_BUILD_TESTS)
   target_link_directories(ka_map_plate_tests PRIVATE ${KA_LIBDIRS})
   target_compile_definitions(ka_map_plate_tests PRIVATE ${KA_TEST_DEFS})
   ka_add_qtest(map_plate ka_map_plate_tests)
+  # 세부 디자인 보완(지도 화면 항목들): the plate test files are at the 300-line limit, so these live together.
+  add_executable(ka_map_polish_tests tests/test_map_polish.cpp
+    src/app/KaInspectorPanel.cpp src/app/KaInspectorPanel.h
+    src/app/KaInspectorStyle.cpp src/app/KaInspectorStyle.h
+    src/app/KaBasemapQuickCard.cpp src/app/KaBasemapQuickCard.h
+    src/app/KaFeatureCard.cpp src/app/KaFeatureCard.h src/app/KaFeatureCardEdit.cpp ${_ka_p4_card_sources}
+    src/app/KaFeatureFormDialog.cpp src/app/KaFeatureFormDialog.h
+    ${_ka_p5_app_sources}
+    ${_ka_p1_chip_sources} ${_ka_p4_theme_sources})
+  target_link_libraries(ka_map_polish_tests PRIVATE ${KA_TEST_LIBS})
+  target_include_directories(ka_map_polish_tests PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_BINARY_DIR}/generated)
+  target_compile_definitions(ka_map_polish_tests PRIVATE ${KA_TEST_DEFS})
+  set_target_properties(ka_map_polish_tests PROPERTIES WIN32_EXECUTABLE FALSE)
+  ka_add_qtest(map_polish ka_map_polish_tests)
+  set_tests_properties(map_polish PROPERTIES
+    ENVIRONMENT "GDAL_DATA=${OSGEO4W_ROOT}/apps/gdal-dev/share/gdal;PATH=${_ka_path_esc};QGIS_PREFIX_PATH=${QGIS_PREFIX_PATH};QT_QPA_PLATFORM=offscreen" TIMEOUT 90)
   set_tests_properties(map_plate PROPERTIES ENVIRONMENT
     "GDAL_DATA=${OSGEO4W_ROOT}/apps/gdal-dev/share/gdal;PATH=${_ka_path_esc};QGIS_PREFIX_PATH=${QGIS_PREFIX_PATH};QT_QPA_PLATFORM=offscreen" TIMEOUT 90)
   # 「조용한 도판」 windows (board 5): message boxes with a serif question and no icon disc (no QGIS).

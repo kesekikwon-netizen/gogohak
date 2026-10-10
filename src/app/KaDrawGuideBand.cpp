@@ -10,6 +10,7 @@
 #include <QHideEvent>
 #include <QLabel>
 #include <QShowEvent>
+#include <QStyle>
 #include <QToolButton>
 
 namespace {
@@ -51,10 +52,22 @@ KaDrawGuideBand::KaDrawGuideBand(QWidget* host) : QWidget(host), m_host(host) {
   pillRow->addWidget(m_measure);
   row->addWidget(m_pill);
 
+  // 되돌리기 · 다시 실행: two round buttons in the stock look; in 새 모양 one cover with a rule between (보완 M6).
+  m_pair = new QFrame(this);
+  m_pair->setObjectName(QStringLiteral("drawGuideUndoPair"));
+  m_pair->setAttribute(Qt::WA_StyledBackground, true);
+  m_pairRow = new QHBoxLayout(m_pair);
+  m_pairRow->setContentsMargins(0, 0, 0, 0);
   m_undo = makeRoundButton(QStringLiteral("drawGuideUndo"), QStringLiteral("undo"), QStringLiteral("되돌리기 (Ctrl+Z)"));
   m_redo = makeRoundButton(QStringLiteral("drawGuideRedo"), QStringLiteral("redo"), QStringLiteral("다시 실행 (Ctrl+Y)"));
-  row->addWidget(m_undo);
-  row->addWidget(m_redo);
+  m_divider = new QFrame(m_pair);
+  m_divider->setObjectName(QStringLiteral("drawGuideDivider"));
+  m_divider->setFixedWidth(1);
+  m_pairRow->addWidget(m_undo);
+  m_pairRow->addWidget(m_divider);
+  m_pairRow->addWidget(m_redo);
+  row->addWidget(m_pair);
+  applyLook();
 
   setTool(QString(), QString(), QString());
   if (m_host) {
@@ -64,7 +77,7 @@ KaDrawGuideBand::KaDrawGuideBand(QWidget* host) : QWidget(host), m_host(host) {
 }
 
 QToolButton* KaDrawGuideBand::makeRoundButton(const QString& objectName, const QString& iconId, const QString& tip) {
-  auto* button = new QToolButton(this);
+  auto* button = new QToolButton(m_pair);
   button->setObjectName(objectName);
   button->setFixedSize(kHeight, kHeight);
   button->setIconSize(QSize(kButtonIconPx, kButtonIconPx));
@@ -75,6 +88,25 @@ QToolButton* KaDrawGuideBand::makeRoundButton(const QString& objectName, const Q
   button->setToolTip(tip);
   button->setEnabled(false);  // until the window hands over its action
   return button;
+}
+
+void KaDrawGuideBand::applyLook() {
+  m_plate = KaTheme::displayOptions().paperLook;
+  m_pair->setProperty("kaPlate", m_plate);
+  m_pairRow->setSpacing(m_plate ? 0 : kButtonGap);
+  m_divider->setVisible(m_plate);
+  // The cover is 73 x 36 with its 1 px edge (QSS): two 35 x 34 halves and the 1 px rule inside.
+  const QSize half = m_plate ? QSize(kHeight - 1, kHeight - 2) : QSize(kHeight, kHeight);
+  m_undo->setFixedSize(half);
+  m_redo->setFixedSize(half);
+  m_pair->style()->unpolish(m_pair);
+  m_pair->style()->polish(m_pair);
+  if (m_host) relayout();
+}
+
+void KaDrawGuideBand::changeEvent(QEvent* event) {
+  QWidget::changeEvent(event);
+  if (event->type() == QEvent::StyleChange && m_pair && m_plate != KaTheme::displayOptions().paperLook) applyLook();
 }
 
 void KaDrawGuideBand::bindAction(QToolButton* button, QAction* action, const QString& iconId) {

@@ -1332,6 +1332,14 @@ QWidget#drawGuideBand QToolButton:enabled:hover { background: @hover@; border-co
 QWidget#drawGuideBand QToolButton:enabled:pressed { background: @pressed@; }
 QWidget#drawGuideBand QToolButton:enabled:focus { border-color: @focusRing@; }
 QWidget#drawGuideBand QToolButton:disabled { background: @disabledSurface@; border-color: @border@; }
+/* 되돌리기 · 다시 실행 (보완 M6): in 새 모양 one 8 px cover with a rule between the two glyphs. */
+QFrame#drawGuideUndoPair[kaPlate="true"] { background: @surface@; border: 1px solid @borderStrong@; border-radius: 8px; }
+QFrame#drawGuideDivider { background: @border@; border: none; }
+QWidget#drawGuideBand QFrame#drawGuideUndoPair[kaPlate="true"] QToolButton { border: 1px solid transparent; border-radius: 0; background: transparent; }
+QWidget#drawGuideBand QFrame#drawGuideUndoPair[kaPlate="true"] QToolButton:enabled:hover { background: @hover@; border-color: transparent; }
+QWidget#drawGuideBand QFrame#drawGuideUndoPair[kaPlate="true"] QToolButton:enabled:pressed { background: @pressed@; }
+QWidget#drawGuideBand QFrame#drawGuideUndoPair[kaPlate="true"] QToolButton:enabled:focus { border-color: @focusRing@; }
+QWidget#drawGuideBand QFrame#drawGuideUndoPair[kaPlate="true"] QToolButton:disabled { background: transparent; border-color: transparent; }
 QStatusBar#kaStatusBar QLabel[kaChip="true"] { margin: 0 4px; }
 /* ---- [새 모양] names and headings (append-only). The stock look resolves these to what the rules above
    already say (body stack at 700, the Segoe UI wordmark at 600, 15 and 20 px), so nothing moves there;

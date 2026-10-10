@@ -6,6 +6,7 @@
 
 class QAction;
 class QFrame;
+class QHBoxLayout;
 class QHideEvent;
 class QLabel;
 class QShowEvent;
@@ -54,9 +55,11 @@ class KaDrawGuideBand : public QWidget {
   bool eventFilter(QObject* watched, QEvent* event) override;
   void showEvent(QShowEvent* event) override;
   void hideEvent(QHideEvent* event) override;
+  void changeEvent(QEvent* event) override;
 
  private:
   void relayout();
+  void applyLook();
   void emitInsetIfChanged();
   QToolButton* makeRoundButton(const QString& objectName, const QString& iconId, const QString& tip);
   static void bindAction(QToolButton* button, QAction* action, const QString& iconId);
@@ -67,10 +70,14 @@ class KaDrawGuideBand : public QWidget {
   QLabel* m_title = nullptr;
   QLabel* m_hint = nullptr;
   QLabel* m_measure = nullptr;
+  QFrame* m_pair = nullptr;  // 새 모양: the one cover around the two buttons
+  QHBoxLayout* m_pairRow = nullptr;
+  QFrame* m_divider = nullptr;
   QToolButton* m_undo = nullptr;
   QToolButton* m_redo = nullptr;
   QString m_iconId;
   QString m_titleText;
   QString m_hintText;
   int m_lastInset = 0;
+  bool m_plate = false;
 };
