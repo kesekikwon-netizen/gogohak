@@ -66,4 +66,5 @@ private:
   class QHBoxLayout* m_pathBar1 = nullptr;
   class QHBoxLayout* m_pathBar2 = nullptr;
   bool m_isTwoRows = false;
+  bool m_rowsForPlate = false;  // the look the rows were laid out for
 };

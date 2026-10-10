@@ -64,6 +64,7 @@ bool KaLayerSectionDelegate::hasBand(const QModelIndex& index) const {
 
 bool KaLayerSectionDelegate::showsTitle(const QModelIndex& index) const {
   if (!hasBand(index)) return false;
+  if (!KaTheme::displayOptions().paperLook) return true;  // 새 모양 only: the stock look writes every band's caption
   const QModelIndex first = index.siblingAtColumn(0);
   const Section section = sectionOf(m_view->index2node(first));
   for (int row = 0; row < first.row(); ++row)

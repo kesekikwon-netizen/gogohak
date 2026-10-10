@@ -43,6 +43,8 @@ private slots:
       QVERIFY2(shortcut->geometry().right() < up->geometry().left(), name);  // 상위 stands last, on the right
     }
     QVERIFY2(up->geometry().right() >= panel.width() - 24, "상위 is at the right end of its row, not next to 폴더 직접 찾기");
+    paper(false);  // the stock look keeps 상위 right behind the last shortcut, as before the SD button went
+    QTRY_VERIFY2(up->x() - button("btnBrowseFolder")->geometry().right() < 24, qPrintable(QString::number(up->x())));
   }
 
   // 파일함 (보완 M8): the shortcuts are quiet 24 px words; the place you are at (상위) alone is oat.

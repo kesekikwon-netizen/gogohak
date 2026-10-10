@@ -64,6 +64,10 @@ class TestLayerListChrome : public QObject {
   // 보완 M2: the layers keep their order, so 「지적도」 can come back after another section; the caption is
   // written the first time and the later band is the rule alone.
   void sections_repeatedCaptionIsWrittenOnce() {
+    KaTheme::DisplayOptions plate;
+    plate.paperLook = true;
+    KaTheme::setDisplayOptions(qApp, plate);  // 새 모양 only: the stock look writes every band's caption as before
+    const auto restore = qScopeGuard([] { KaTheme::setDisplayOptions(qApp, KaTheme::DisplayOptions()); });
     Tree t;
     vector(t.project, t.project.layerTreeRoot(), QStringLiteral("사용자 SHP"));
     QgsRasterLayer* picture = basemap(t.project, t.project.layerTreeRoot(), QStringLiteral("VWorld 지적"));
@@ -74,6 +78,8 @@ class TestLayerListChrome : public QObject {
     QVERIFY(v.sections()->showsTitle(first));
     QVERIFY(!v.sections()->showsTitle(again));
     QVERIFY(v.sections()->showsTitle(v.row(0)));  // the first band of the list always says its section
+    KaTheme::setDisplayOptions(qApp, KaTheme::DisplayOptions());
+    QVERIFY2(v.sections()->showsTitle(again), "the stock look keeps the caption on a section that comes back");
   }
 
   void sections_noBandInsideGroups() {

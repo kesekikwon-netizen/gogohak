@@ -205,11 +205,13 @@ void KaFileBrowserPanel::fitShortcutFonts(int width) {
 void KaFileBrowserPanel::updateButtonLayout(int width) {
   if (!m_pathBar1 || !m_pathBar2 || !m_btnPc) return;
   const bool wantTwoRows = (width > 0 && width < 420);
-  if (wantTwoRows == m_isTwoRows && m_pathBar1->count() > 0) {
+  const bool plate = qApp && qApp->property("kaPaperLook").toBool();  // 새 모양: 상위 stands alone at the right end
+  if (wantTwoRows == m_isTwoRows && plate == m_rowsForPlate && m_pathBar1->count() > 0) {
     fitShortcutFonts(width);
     return;
   }
   m_isTwoRows = wantTwoRows;
+  m_rowsForPlate = plate;
 
   // Clear existing items from layouts
   auto clearLayout = [](QHBoxLayout* lay) {
@@ -227,8 +229,9 @@ void KaFileBrowserPanel::updateButtonLayout(int width) {
     m_pathBar1->addWidget(m_btnDocs);
     m_pathBar1->addWidget(m_btnDown);
     m_pathBar1->addWidget(m_btnPick);
-    m_pathBar1->addStretch(1);
+    if (plate) m_pathBar1->addStretch(1);
     m_pathBar1->addWidget(m_btnUp);
+    if (!plate) m_pathBar1->addStretch(1);
     m_btnDown->setVisible(true);
     m_btnPick->setVisible(true);
     m_btnUp->setVisible(true);
@@ -242,8 +245,9 @@ void KaFileBrowserPanel::updateButtonLayout(int width) {
     // Row 2: [내려받기] [폴더 직접 찾기] ... [상위]
     m_pathBar2->addWidget(m_btnDown);
     m_pathBar2->addWidget(m_btnPick);
-    m_pathBar2->addStretch(1);
+    if (plate) m_pathBar2->addStretch(1);
     m_pathBar2->addWidget(m_btnUp);
+    if (!plate) m_pathBar2->addStretch(1);
   }
   fitShortcutFonts(width);
 }
@@ -355,4 +359,5 @@ void KaFileBrowserPanel::changeEvent(QEvent* event) {
     b->style()->unpolish(b);
     b->style()->polish(b);
   }
+  updateButtonLayout(width());  // 상위 moves with the look
 }
