@@ -98,6 +98,7 @@ QHash<QString, QString> replacementTable() {
   values.insert(QStringLiteral("cardFace"), paper ? QStringLiteral("transparent") : c.surface.name());
   values.insert(QStringLiteral("cardEdge"), paper ? QStringLiteral("transparent") : c.border.name());
   values.insert(QStringLiteral("heroNameSize"), paper ? QStringLiteral("34") : QStringLiteral("40"));
+  values.insert(QStringLiteral("statusHeight"), paper ? QStringLiteral("31") : QStringLiteral("34"));  // 상태줄 (보완 M7): 31 + its 1 px top rule = 32
   // 오른쪽 판의 빈 상태 문장 (보완 M5): words only in 새 모양 (stock: a dashed box).
   values.insert(QStringLiteral("emptyEdge"), paper ? QStringLiteral("transparent") : c.border.name());
   values.insert(QStringLiteral("emptyPad"), paper ? QStringLiteral("16px 0") : QStringLiteral("16px 12px"));

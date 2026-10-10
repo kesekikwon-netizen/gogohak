@@ -5,6 +5,8 @@
 #include <QAction>
 #include <QFrame>
 #include <QLabel>
+#include <QMainWindow>
+#include <QSignalSpy>
 #include <QTabBar>
 #include <QToolButton>
 #include <QWidget>
@@ -14,6 +16,7 @@
 #include "app/KaDrawGuideBand.h"
 #include "app/KaFeatureCard.h"
 #include "app/KaInspectorPanel.h"
+#include "app/KaStatusBar.h"
 #include "app/KaTheme.h"
 #include "core/FeaturePresets.h"
 
@@ -92,6 +95,32 @@ private slots:
     QTRY_COMPARE(first->size(), QSize(36, 36));
     QTRY_COMPARE(second->x() - first->geometry().right() - 1, 8);
     QVERIFY(!rule->isVisible());
+  }
+
+  // 상태줄 (보완 M7): 「→ 제출 5179」 is quiet words (no edge, no fill, the pointing hand, underlined under the mouse) that
+  // still open 검수·제출 on a click, and the bar is 32 px high.
+  void submitCrsIsQuietWordsAndTheBarIs32() {
+    QMainWindow window;
+    auto* bar = new KaStatusBar(&window);
+    window.setStatusBar(bar);
+    window.resize(1200, 300);
+    window.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&window));
+    auto* chip = bar->findChild<QLabel*>(QStringLiteral("uploadCrsChip"));
+    QVERIFY(chip && chip->isVisible());
+    QCOMPARE(chip->text(), QStringLiteral("→ 제출 5179"));
+    const int rim = rimPixels(chip->grab().toImage());
+    QVERIFY2(rim == 0, qPrintable(QStringLiteral("%1 inked pixels on the chip's rim").arg(rim)));
+    QCOMPARE(chip->cursor().shape(), Qt::PointingHandCursor);
+    QVERIFY(!chip->font().underline());
+    QTest::mouseMove(chip, QPoint(chip->width() / 2, chip->height() / 2));
+    QTRY_VERIFY2(chip->font().underline(), "the words are underlined under the mouse");
+    QTest::mouseMove(&window, QPoint(5, 5));
+    QTRY_VERIFY(!chip->font().underline());
+    QSignalSpy clicked(bar, &KaStatusBar::submitClicked);
+    QTest::mouseClick(chip, Qt::LeftButton);
+    QCOMPARE(clicked.count(), 1);
+    QTRY_COMPARE(bar->height(), 32);
   }
 };
 

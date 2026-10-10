@@ -5,6 +5,7 @@
 
 #include <QComboBox>
 #include <QEvent>
+#include <QStyle>
 #include <QFrame>
 #include <QLabel>
 #include <QLineEdit>
@@ -192,6 +193,12 @@ void KaStatusBar::refreshCrsText() {
   m_crsButton->setAccessibleName(named ? QStringLiteral("작업 %1 · %2").arg(work, origin) : QString());
   m_crsButton->setToolTip(
       QStringLiteral("지금 그리는 좌표계는 %1입니다. 눌러서 바꿀 수 있습니다.").arg(m_workCrs));
+  const bool plate = KaTheme::displayOptions().paperLook;
+  if (m_uploadChip->property("kaPlate").toBool() != plate) {  // 새 모양: quiet words, not a pill (보완 M7)
+    m_uploadChip->setProperty("kaPlate", plate);
+    m_uploadChip->style()->unpolish(m_uploadChip);
+    m_uploadChip->style()->polish(m_uploadChip);
+  }
   m_uploadChip->setText(QStringLiteral("→ 제출 %1").arg(upload));
   m_uploadChip->setToolTip(
       QStringLiteral("제출용 파일은 작업 좌표계와 상관없이 항상 %1로 변환되어 나갑니다. 누르면 「검수·제출」을 엽니다.")
@@ -199,6 +206,11 @@ void KaStatusBar::refreshCrsText() {
 }
 
 bool KaStatusBar::eventFilter(QObject* watched, QEvent* event) {
+  if (watched == m_uploadChip && (event->type() == QEvent::Enter || event->type() == QEvent::Leave)) {
+    QFont font = m_uploadChip->font();  // the words are underlined under the mouse, like a link
+    font.setUnderline(event->type() == QEvent::Enter && m_uploadChip->property("kaPlate").toBool());
+    m_uploadChip->setFont(font);
+  }
   if (watched == m_uploadChip && event->type() == QEvent::MouseButtonRelease) {
     // Like a button: a release after dragging off the words does nothing.
     const auto* mouse = static_cast<QMouseEvent*>(event);

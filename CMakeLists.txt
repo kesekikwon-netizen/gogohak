@@ -2276,6 +2276,7 @@ if(KA_HGIS_BUILD_TESTS)
     src/app/KaBasemapQuickCard.cpp src/app/KaBasemapQuickCard.h
     src/app/KaFeatureCard.cpp src/app/KaFeatureCard.h src/app/KaFeatureCardEdit.cpp ${_ka_p4_card_sources}
     src/app/KaFeatureFormDialog.cpp src/app/KaFeatureFormDialog.h
+    src/app/KaStatusBar.cpp src/app/KaStatusBar.h
     ${_ka_p5_app_sources}
     ${_ka_p1_chip_sources} ${_ka_p4_theme_sources})
   target_link_libraries(ka_map_polish_tests PRIVATE ${KA_TEST_LIBS})

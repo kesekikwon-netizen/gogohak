@@ -970,7 +970,7 @@ QStatusBar QLabel { color: @inkMuted@; }
 QStatusBar#kaStatusBar {
   background: @chrome@;
   color: @inkMuted@;
-  min-height: 34px;
+  min-height: @statusHeight@px;
   padding: 0 6px;
 }
 QStatusBar::item { border: none; }
@@ -1000,6 +1000,9 @@ QToolButton#crsButton, QLabel#uploadCrsChip, QToolButton#renderToggle {
 QToolButton#crsButton { color: @accentDeep@; font-weight: 700; }
 QToolButton#crsButton:enabled:hover { background: @hover@; border-color: @accent@; }
 QLabel#uploadCrsChip { color: @inkMuted@; }
+/* 「→ 제출 5179」 (보완 M7): in 새 모양 quiet mono words that open 검수·제출, underlined under the mouse (code). */
+QLabel#uploadCrsChip[kaPlate="true"] { background: transparent; border: 1px solid transparent; border-radius: 0; padding: 3px 4px;
+  font-family: @monoFont@; }
 QToolButton#renderToggle:enabled:checked {
   background: transparent;
   color: @inkMuted@;
