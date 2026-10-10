@@ -633,6 +633,10 @@ QFrame#studioBottomBar {
 }
 QFrame#mapCard { background: @surface@; border-radius: @mapRadius@px; }
 /* ---- Studio inspector: 도면 cards and a pinned output bar ---- */
+/* 도면 오른쪽 판 (보완 L1): in 새 모양 the cards are captions with a hairline, no box. */
+QFrame#itemInspector[kaPlate="true"] { background: transparent; border: none; border-radius: 0; }
+QFrame#itemInspector[kaPlate="true"] QLabel#cardCaption { font-size: 11px; font-weight: 400; padding: 0; }
+QFrame#studioCaptionRule { background: @border@; border: none; }
 QWidget#drawingInspectorColumn {
   background: @desk@;
 }
@@ -733,8 +737,8 @@ QLabel#emptyState {
   font-weight: 400;
   padding: 24px 16px;
   min-height: 88px;
-  background: @surface@;
-  border: 1px dashed @border@;
+  background: @emptyFace@;
+  border: 1px dashed @emptyEdge@;
   border-radius: 8px;
 }
 /* The same card for a failed or offline state: setProperty("tone", ...). */

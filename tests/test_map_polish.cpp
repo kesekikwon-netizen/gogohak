@@ -6,6 +6,7 @@
 #include <QFrame>
 #include <QLabel>
 #include <QMainWindow>
+#include <QVBoxLayout>
 #include <QSignalSpy>
 #include <QCheckBox>
 #include <QToolBar>

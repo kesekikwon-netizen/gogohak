@@ -4,6 +4,9 @@
 #include <QEvent>
 #include <QHBoxLayout>
 #include <QBoxLayout>
+#include <QFrame>
+#include <QLabel>
+#include <QStyle>
 #include <QLayout>
 #include <QScrollArea>
 #include <QSpacerItem>
@@ -24,6 +27,42 @@ public:
     return false;
   }
 };
+// Keeps a header button's kaPlate mark in step with the look (KaTheme sends StyleChange to every widget on a switch).
+class QuietFollower final : public QObject {
+public:
+  using QObject::QObject;
+  bool eventFilter(QObject* watched, QEvent* event) override {
+    auto* button = event->type() == QEvent::StyleChange ? qobject_cast<QToolButton*>(watched) : nullptr;
+    if (button && button->property("kaPlate").toBool() != paperLook()) {
+      button->setProperty("kaPlate", paperLook());
+      button->style()->unpolish(button);
+      button->style()->polish(button);
+    }
+    return false;
+  }
+};
+
+// 보완 L1: in 새 모양 the three cards of the right panel (도면 항목 · 방위 · 도면 정보) are no boxes (kaPlate, QSS); the
+// caption runs on into a hairline to the edge.
+void captionLeaders(QWidget* content) {
+  for (QFrame* card : content->findChildren<QFrame*>(QStringLiteral("itemInspector"))) {
+    card->setProperty("kaPlate", true);
+    auto* column = qobject_cast<QVBoxLayout*>(card->layout());
+    auto* caption = card->findChild<QLabel*>(QStringLiteral("cardCaption"));
+    if (!column || !caption || column->indexOf(caption) != 0) continue;
+    column->setContentsMargins(0, 4, 0, 0);
+    column->removeWidget(caption);
+    auto* head = new QHBoxLayout;
+    head->setContentsMargins(0, 0, 0, 0);
+    head->setSpacing(8);
+    head->addWidget(caption);
+    auto* rule = new QFrame(card);
+    rule->setObjectName(QStringLiteral("studioCaptionRule"));
+    rule->setFixedHeight(1);
+    head->addWidget(rule, 1, Qt::AlignVCenter);
+    column->insertLayout(0, head);
+  }
+}
 }  // namespace
 
 namespace KaDrawingStudioPlate {
@@ -31,6 +70,7 @@ namespace KaDrawingStudioPlate {
 QWidget* inspectorColumn(QScrollArea* scroll) {
   if (!qApp || !qApp->property("kaPaperLook").toBool()) return scroll;
   QWidget* content = scroll->widget();
+  if (content) captionLeaders(content);
   if (content) joinScaleTable(content);  // the panel is built: share the scale presets' edges
   if (content) wordTiles(content);
   auto* pdf = content ? content->findChild<QToolButton*>(QStringLiteral("btnPrimary")) : nullptr;
@@ -151,6 +191,12 @@ void fitToHeight(QScrollArea* inspector, int studioHeight) {
   fit(side->layout());
   for (QWidget* card : side->findChildren<QWidget*>(QString(), Qt::FindDirectChildrenOnly))
     if (card->layout()) fit(card->layout());
+}
+
+QToolButton* quiet(QToolButton* button) {
+  button->setProperty("kaPlate", paperLook());
+  button->installEventFilter(new QuietFollower(button));
+  return button;
 }
 
 void setWord(QToolButton* button) {

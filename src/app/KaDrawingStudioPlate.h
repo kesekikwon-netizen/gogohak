@@ -15,6 +15,9 @@ QWidget* inspectorColumn(QScrollArea* scroll);
 QWidget* bottomStrip(QWidget* strip);
 // 「세트」 on the layer-set button, 「세트 ▾」 in 새 모양 (the board's list mark); follows a switch of the look.
 void setWord(QToolButton* button);
+// The layer panel's header buttons (파일함 · 전체 끄기 · 세트) are the map screen's quiet words in 새 모양: marks the button
+// kaPlate (QSS: QFrame#layersCard QToolButton[kaPlate]) and follows a switch of the look. Returns the button.
+QToolButton* quiet(QToolButton* button);
 // The scale presets: 3 a row with the stock gap; in 새 모양 7 a row with none (the board's joined table).
 int chipsPerRow();
 int chipGap(int stockGap);

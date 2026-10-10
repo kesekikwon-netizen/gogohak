@@ -784,14 +784,14 @@ void KaDrawingStudio::buildUi() {
   filesToggle->setText(QStringLiteral("파일함"));
   filesToggle->setCheckable(true);
   filesToggle->setChecked(true);
-  capRow->addWidget(filesToggle);
+  capRow->addWidget(KaDrawingStudioPlate::quiet(filesToggle));  // 새 모양: the map screen's quiet header words
   m_layerCheckAllBtn = new QToolButton(layerBox);
   m_layerCheckAllBtn->setObjectName(QStringLiteral("layoutLayerCheckAllBtn"));
   m_layerCheckAllBtn->setFocusPolicy(Qt::NoFocus);
   m_layerCheckAllBtn->setToolTip(QStringLiteral(
       "레이어 체크를 한 번에 모두 끄거나 켭니다. 하나라도 켜져 있으면 전부 끕니다."));
   connect(m_layerCheckAllBtn, &QToolButton::clicked, this, &KaDrawingStudio::toggleAllLayersChecked);
-  capRow->addWidget(m_layerCheckAllBtn);
+  capRow->addWidget(KaDrawingStudioPlate::quiet(m_layerCheckAllBtn));
   // Named layer sets (map themes). Applied only when the user picks one here.
   auto* layerSetBtn = new QToolButton(layerBox);
   layerSetBtn->setObjectName(QStringLiteral("layoutLayerSetBtn"));
@@ -806,7 +806,7 @@ void KaDrawingStudio::buildUi() {
     KaDrawingLayerSets::fillMenu(layerSetMenu, m_project, m_layerModel, this,
                                  [this](const QString& text) { showStatus(text); });
   });
-  capRow->addWidget(layerSetBtn);
+  capRow->addWidget(KaDrawingStudioPlate::quiet(layerSetBtn));
   auto* informationModel = new KaLayerInformationModel(m_project, true, this);
   m_layerModel = informationModel;
   m_layerModel->setFlag(QgsLayerTreeModel::AllowNodeChangeVisibility, true);
