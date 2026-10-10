@@ -150,7 +150,7 @@ void MainWindow::runChecklist() {
   if (!m_checklist) return;
   if (!ensureChecklistRules()) {
     m_lastChecklistErrors = 1;
-    statusBar()->showMessage(QStringLiteral("검수 규칙 파일을 찾지 못했습니다. 제출 꾸러미를 만들 수 없습니다."), 8000);
+    statusBar()->showMessage(QStringLiteral("검수 규칙 파일을 찾지 못해 검수하지 못했습니다. 제출 꾸러미는 한 번 묻고 만들 수 있습니다."), 8000);
     return;
   }
   const QVector<CheckResult> results = evaluateChecklist();
@@ -171,7 +171,7 @@ void MainWindow::exportPdf() {
 }
 
 // Kept for the layer menu and the work dock: same flow as the 「검수·제출」 package button.
-// The checklist runs first; with an error or no rule file the review list opens instead.
+// The checklist runs first; with an error or no rule file it asks once and writes it to the README.
 void MainWindow::exportShpPackage() { makeSubmitPackage(); }
 
 void MainWindow::exportReportLayout() {

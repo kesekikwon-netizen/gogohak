@@ -576,7 +576,7 @@ void MainWindow::buildMenus() {
   btnMapGeoTiff->setObjectName(QStringLiteral("btnMapGeoTiff"));
   auto [actExport, btnExport] = addIcon(
       QStringLiteral("out"), QStringLiteral("export_convert"), QStringLiteral("검수·제출"),
-      QStringLiteral("도면을 검수하고 제출 꾸러미(EPSG:5179 SHP·조사도면.pdf·MANIFEST)를 만듭니다. 오류가 있으면 막고 고칠 곳을 보여 줍니다. 레이어 하나만 바꾸는 「레이어 5179 변환」도 여기 있습니다 (Ctrl+E)."),
+      QStringLiteral("도면을 검수하고 제출 꾸러미(EPSG:5179 SHP·조사도면.pdf·MANIFEST)를 만듭니다. 오류는 고칠 곳을 보여 주고, 남은 채로 만들면 한 번 묻고 README에 적습니다. 레이어 하나만 바꾸는 「레이어 5179 변환」도 여기 있습니다 (Ctrl+E)."),
       &MainWindow::openSubmitReview);
   actExport->setShortcut(QKeySequence(QStringLiteral("Ctrl+E")));
   Q_UNUSED(btnExport);

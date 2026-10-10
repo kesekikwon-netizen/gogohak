@@ -436,7 +436,7 @@ void TestE2EOpaque::testT2_ZeroFeatureLayers_ExportGraceful() {
       &proj, outDir, QStringLiteral("UTF-8"),
       QStringLiteral("Empty project warning"), false, false, &err);
   QVERIFY(res.isEmpty());
-  QVERIFY2(err.contains(QStringLiteral("도면만들기")), qPrintable(err));
+  QVERIFY2(err.contains(QStringLiteral("내보낼 조사 도형이 없습니다")), qPrintable(err));  // no SHP and no sheet: no empty package
   QVERIFY(!QFile::exists(QDir(outDir).filePath(QStringLiteral("README_submit.txt"))));
 }
 

@@ -62,20 +62,21 @@ QWidget* KaSubmitDialog::buildPlateHead() {
 QWidget* KaSubmitDialog::buildPlateFoot() {
   auto* line = new QLabel(QStringLiteral("EPSG:5179 SHP · 조사도면.pdf · MANIFEST.sha256"), this);
   line->setObjectName(QStringLiteral("submitPackageLine"));
-  line->setToolTip(QStringLiteral("제출 꾸러미에 들어가는 것입니다. 오류가 한 건이라도 있으면 만들 수 없습니다."));
+  line->setToolTip(QStringLiteral("제출 꾸러미에 들어가는 것입니다. 검수 오류가 남아 있어도 만들 수 있고, "
+                                  "도면 용지가 없으면 조사도면.pdf만 빠집니다."));
   return line;
 }
 
 void KaSubmitDialog::showPlateResult(int errors, int warns, int passed) {
   const bool noRules = !m_rulesLoaded || m_results.isEmpty();
   m_headline->setText(noRules      ? QStringLiteral("검수 규칙 파일을 찾지 못했습니다")
-                      : errors > 0 ? QStringLiteral("오류 %1건을 고쳐야 제출할 수 있습니다").arg(errors)
+                      : errors > 0 ? QStringLiteral("오류 %1건이 남아 있습니다").arg(errors)
                       : warns > 0  ? QStringLiteral("오류가 없습니다")
                                    : QStringLiteral("오류와 주의 항목이 없습니다"));
-  // What to do next follows the headline: nothing to add while blocked by a missing rule file (the reason below
-  // says where it was looked for) or when everything passed.
+  // What to do next follows the headline: nothing to add with a missing rule file (the reason below says where
+  // it was looked for) or when everything passed.
   const QString next = noRules      ? QString()
-                       : errors > 0 ? QStringLiteral("「위치 보기」나 옆 단추로 고칠 곳을 여세요.")
+                       : errors > 0 ? QStringLiteral("「위치 보기」나 옆 단추로 고치거나, 그대로 제출 꾸러미를 만들 수 있습니다.")
                        : warns > 0  ? QStringLiteral("주의 항목은 확인한 뒤 진행할 수 있습니다.")
                                     : QString();
   QStringList parts{noRules ? QString() : m_rulesTitle, next};

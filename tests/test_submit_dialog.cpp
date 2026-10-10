@@ -93,7 +93,7 @@ private slots:
       auto* label = dialog.findChild<QLabel*>(QString::fromLatin1(name));
       return label ? label->text() : QStringLiteral("(없음)");
     };
-    QCOMPARE(text("submitHeadline"), QStringLiteral("오류 1건을 고쳐야 제출할 수 있습니다"));
+    QCOMPARE(text("submitHeadline"), QStringLiteral("오류 1건이 남아 있습니다"));
     QVERIFY(text("submitSubline").startsWith(QStringLiteral("발굴 위치도면 유의사항 기반 검수 v1")));
     QCOMPARE(text("submitCountError"), QStringLiteral("1"));  // mono figures; 「건」 is its own faint label
     QCOMPARE(text("submitCountWarn"), QStringLiteral("2"));
@@ -110,7 +110,7 @@ private slots:
     QVERIFY(QTest::qWaitForWindowExposed(&dialog));
     auto* fix = dialog.findChild<QPushButton*>(QStringLiteral("btnAction_SPEC"));
     QVERIFY2(fix->width() <= fix->sizeHint().width() + 4, qPrintable(QString::number(fix->width())));  // compact, at the right
-    QVERIFY(text("submitSubline").endsWith(QStringLiteral("「위치 보기」나 옆 단추로 고칠 곳을 여세요.")));
+    QVERIFY(text("submitSubline").endsWith(QStringLiteral("고치거나, 그대로 제출 꾸러미를 만들 수 있습니다.")));
     dialog.setResults({result(QStringLiteral("W1"), QStringLiteral("warn"), false)}, true);
     QCOMPARE(text("submitHeadline"), QStringLiteral("오류가 없습니다"));
     QVERIFY(text("submitSubline").endsWith(QStringLiteral("주의 항목은 확인한 뒤 진행할 수 있습니다.")));
@@ -123,34 +123,32 @@ private slots:
     QVERIFY(!text("submitSubline").contains(QStringLiteral("진행")));  // never 「go ahead」 while blocked
   }
 
-  void errorsBlockThePackage() {
+  // 2026-10-10 사용자 결정 「검수와 상관없이 5179는 내보내기」: 오류는 알려 주고 README에 적되 꾸러미는 막지 않는다.
+  void errorsDoNotBlockThePackage() {
     KaSubmitDialog dialog;
     auto* package = dialog.findChild<QPushButton*>(QStringLiteral("btnSubmitPackage"));
     QVERIFY(package);
+    dialog.setResults({result(QStringLiteral("B"), QStringLiteral("warn"), false)}, true);
+    QVERIFY2(package->isEnabled(), "warnings alone must not block");
     dialog.setResults({result(QStringLiteral("A"), QStringLiteral("error"), false),
                        result(QStringLiteral("B"), QStringLiteral("warn"), false)},
                       true);
-    QVERIFY(!package->isEnabled());
+    QVERIFY(package->isEnabled());
     QCOMPARE(dialog.errorCount(), 1);
     QVERIFY(dialog.findChild<QLabel*>(QStringLiteral("submitBlockReason"))->text().contains(QStringLiteral("1건")));
-    package->click();  // disabled: nothing happens
-    QCOMPARE(dialog.choice(), KaSubmitDialog::Choice::None);
-
-    dialog.setResults({result(QStringLiteral("A"), QStringLiteral("error"), true),
-                       result(QStringLiteral("B"), QStringLiteral("warn"), false)},
-                      true);
-    QVERIFY2(package->isEnabled(), "warnings alone must not block");
+    package->click();
+    QCOMPARE(dialog.choice(), KaSubmitDialog::Choice::MakePackage);
   }
 
-  void missingRulesBlockLikeAnError() {
+  void missingRulesStillAllowThePackage() {
     KaSubmitDialog dialog;
     auto* package = dialog.findChild<QPushButton*>(QStringLiteral("btnSubmitPackage"));
     dialog.setResults({}, false, QStringLiteral("C:/nowhere/drawing_checklist.v1.json"));
-    QVERIFY(!package->isEnabled());
-    QVERIFY(!dialog.packageAllowed());
+    QVERIFY(package->isEnabled());
+    QVERIFY(dialog.packageAllowed());
     QVERIFY(dialog.findChild<QLabel*>(QStringLiteral("submitBlockReason"))->text().contains(QStringLiteral("규칙 파일")));
-    dialog.setResults({}, true);  // loaded but nothing evaluated is not "clean" either
-    QVERIFY(!dialog.packageAllowed());
+    dialog.setResults({}, true);  // loaded but nothing evaluated: still allowed
+    QVERIFY(dialog.packageAllowed());
   }
 
   void goToAndToolButtonsReportTheRow() {

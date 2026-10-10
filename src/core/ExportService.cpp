@@ -126,8 +126,8 @@ QString ExportService::exportSubmissionPackage(QgsProject* project, const QStrin
     return fail(QStringLiteral("제출 임시 폴더를 만들 수 없습니다: %1").arg(staging.errorString()));
   QDir dir(staging.path());
 
-  if (project && !LayoutService::isComposedStudioSheet(project, QStringLiteral("user_sheet")))
-    return fail(QStringLiteral("도면만들기에서 용지를 만든 뒤 다시 보내기 하세요."));
+  // 도면 용지가 없으면 조사도면.pdf 없이 만든다(2026-10-10 「검수와 상관없이 5179는 내보내기」).
+  const bool sheet = project && LayoutService::isComposedStudioSheet(project, QStringLiteral("user_sheet"));
 
   const QString enc = (encoding.compare(QStringLiteral("EUC-KR"), Qt::CaseInsensitive) == 0 ||
                        encoding.compare(QStringLiteral("CP949"), Qt::CaseInsensitive) == 0)
@@ -148,6 +148,7 @@ QString ExportService::exportSubmissionPackage(QgsProject* project, const QStrin
   SubmitReadme::Inputs readme;
   readme.encoding = enc;
   readme.checklistSummary = checklistSummary;
+  readme.checklistErrorsRemain = hasChecklistErrors;
   readme.surveyName = info.surveyName;
   readme.unsavedEditsIncluded = info.unsavedEditsIncluded;
 
@@ -200,6 +201,8 @@ QString ExportService::exportSubmissionPackage(QgsProject* project, const QStrin
       if (!SubmitShp::verifyWritten(shp, expected, &layerError)) return fail(layerError);
       readme.layerLines << QStringLiteral("%1.shp features=%2 crs=EPSG:5179 verified").arg(n).arg(expected);
     }
+    if (readme.layerLines.isEmpty() && !sheet)  // nothing to submit: no empty package
+      return fail(QStringLiteral("내보낼 조사 도형이 없습니다. 조사구역이나 유구를 그린 뒤 다시 만드세요."));
   }
 
   if (!step(QStringLiteral("encoding.txt"))) return fail(canceled);
@@ -212,8 +215,8 @@ QString ExportService::exportSubmissionPackage(QgsProject* project, const QStrin
   if (project) {
     if (!step(QStringLiteral("조사도면.pdf"))) return fail(canceled);
     QString pdfErr;
-    if (LayoutService::exportLayoutPdf(project, QStringLiteral("user_sheet"),
-                                       dir.filePath(QStringLiteral("조사도면.pdf")), &pdfErr).isEmpty())
+    if (sheet && LayoutService::exportLayoutPdf(project, QStringLiteral("user_sheet"),
+                                                dir.filePath(QStringLiteral("조사도면.pdf")), &pdfErr).isEmpty())
       return fail(pdfErr.isEmpty() ? QStringLiteral("조사도면.pdf 내보내기 실패")
                                    : QStringLiteral("조사도면.pdf 내보내기 실패: %1").arg(pdfErr));
     // 2. section_sheet 가 조판돼 있으면 단면도.pdf 로 넣는다.

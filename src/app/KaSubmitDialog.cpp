@@ -30,7 +30,7 @@ KaSubmitDialog::KaSubmitDialog(QWidget* parent) : QDialog(parent) {
 
   auto* intro = new QLabel(
       QStringLiteral("제출 꾸러미 = EPSG:5179 SHP + 조사도면.pdf + MANIFEST.sha256 입니다. "
-                     "검수 오류가 한 건이라도 있으면 만들 수 없습니다.\n"
+                     "검수 오류가 남아 있으면 한 번 묻고 만들며 README에 적습니다.\n"
                      "필수 도면 5종은 조사구역도·유적위치도·유구배치도·개별유구실측도·층위도입니다. "
                      "유적위치도·유구배치도·개별유구실측도는 「도면」에서 만든 용지로 확인합니다."),
       this);
@@ -125,8 +125,9 @@ int KaSubmitDialog::errorCount() const { return ChecklistEngine::failedCount(m_r
 int KaSubmitDialog::warnCount() const { return ChecklistEngine::failedCount(m_results, QStringLiteral("warn")); }
 
 bool KaSubmitDialog::packageAllowed() const {
-  // Missing rules must block like an error; an empty result list is not "OK".
-  return m_rulesLoaded && !m_results.isEmpty() && errorCount() == 0;
+  // 2026-10-10 「검수와 상관없이 5179는 내보내기」: errors and a missing rule file are told and written to the
+  // README, never a reason to refuse the package (MainWindow::makeSubmitPackage asks once).
+  return true;
 }
 
 void KaSubmitDialog::setResults(const QVector<CheckResult>& results, bool rulesLoaded, const QString& rulesHint) {
@@ -227,19 +228,18 @@ void KaSubmitDialog::rebuild() {
   m_summary->setText(QStringLiteral("오류 %1건 · 주의 %2건 · 통과 %3건").arg(errors).arg(warns).arg(passed));
   if (!m_rulesLoaded || m_results.isEmpty()) {
     m_blockReason->setText(
-        QStringLiteral("검수 규칙 파일을 찾지 못해 제출 꾸러미를 만들 수 없습니다. 프로그램 폴더의 "
-                       "data\\rules\\drawing_checklist.v1.json 이 있는지 확인하세요.%1")
+        QStringLiteral("검수 규칙 파일을 찾지 못해 검수하지 못했습니다. 제출 꾸러미는 만들 수 있고 README에 적힙니다. "
+                       "프로그램 폴더의 data\\rules\\drawing_checklist.v1.json 이 있는지 확인하세요.%1")
             .arg(m_rulesHint.isEmpty() ? QString() : QStringLiteral("\n찾아본 곳: %1").arg(m_rulesHint)));
   } else if (errors > 0) {
-    m_blockReason->setText(QStringLiteral("오류 %1건을 고쳐야 제출 꾸러미를 만들 수 있습니다. "
-                                          "「위치 보기」나 옆 단추로 고칠 곳을 여세요.").arg(errors));
+    m_blockReason->setText(QStringLiteral("오류 %1건이 남아 있습니다. 「위치 보기」나 옆 단추로 고치거나, 그대로 제출 "
+                                          "꾸러미를 만들 수 있습니다(README에 남은 오류가 적힙니다).").arg(errors));
   } else {
     m_blockReason->setText(warns > 0 ? QStringLiteral("오류가 없습니다. 주의 항목은 확인한 뒤 진행할 수 있습니다.")
                                      : QStringLiteral("오류와 주의 항목이 없습니다."));
   }
   if (m_plate) showPlateResult(errors, warns, passed);
   m_package->setEnabled(packageAllowed());
-  m_package->setToolTip(packageAllowed()
-                            ? QStringLiteral("검수 결과와 함께 5179 SHP·조사도면.pdf·MANIFEST를 새 폴더에 만듭니다.")
-                            : m_blockReason->text());
+  m_package->setToolTip(QStringLiteral("검수 결과와 함께 5179 SHP·조사도면.pdf·MANIFEST를 새 폴더에 만듭니다. "
+                                       "검수 오류가 남아 있으면 한 번 묻고 README에 적습니다."));
 }

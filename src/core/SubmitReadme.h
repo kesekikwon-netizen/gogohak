@@ -18,6 +18,7 @@ struct Inputs {
   QString surveyFile;          // file name only
   QString surveySha256;        // empty when the survey file is not on disk
   bool unsavedEditsIncluded = false;
+  bool checklistErrorsRemain = false;  // made with error checks failing or unchecked (2026-10-10)
   bool hasSheetPdf = false;
   bool hasSectionPdf = false;
 };

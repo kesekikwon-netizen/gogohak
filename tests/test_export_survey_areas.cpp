@@ -123,7 +123,7 @@ private slots:
   void longFieldNamesFitTheShapefile();
   void exportShp_matchesProjDirectWithinOneMillimetre_data();
   void exportShp_matchesProjDirectWithinOneMillimetre();
-  void exportSubmissionPackage_withoutUserSheetFails();
+  void exportSubmissionPackage_withoutUserSheetWritesShpOnly();
 };
 
 // 구역 레이어가 둘이면 두 도형이 모두 제출 SHP 에 들어가야 한다.
@@ -504,7 +504,7 @@ void TestExportSurveyAreas::exportShp_matchesProjDirectWithinOneMillimetre() {
                           .arg(metres, 0, 'f', 6)));
 }
 
-void TestExportSurveyAreas::exportSubmissionPackage_withoutUserSheetFails() {
+void TestExportSurveyAreas::exportSubmissionPackage_withoutUserSheetWritesShpOnly() {
   QTemporaryDir temporary;
   QVERIFY(temporary.isValid());
   QgsProject project;
@@ -515,11 +515,11 @@ void TestExportSurveyAreas::exportSubmissionPackage_withoutUserSheetFails() {
 
   const QString output = temporary.filePath(QStringLiteral("submission"));
   QString error;
-  QVERIFY(ExportService::exportSubmissionPackage(&project, output, QStringLiteral("UTF-8"),
-                                                 QStringLiteral("OK"), true, false, &error)
-              .isEmpty());
-  QVERIFY2(error.contains(QStringLiteral("도면만들기")), qPrintable(error));
-  QVERIFY(!QFileInfo::exists(QDir(output).filePath(QStringLiteral("README_submit.txt"))));
+  const QString out = ExportService::exportSubmissionPackage(&project, output, QStringLiteral("UTF-8"),
+                                                             QStringLiteral("OK"), true, false, &error);
+  QVERIFY2(!out.isEmpty() && QFileInfo::exists(QDir(out).filePath(QStringLiteral("survey_area.shp"))), qPrintable(error));
+  QVERIFY2(!QFileInfo::exists(QDir(out).filePath(QStringLiteral("조사도면.pdf"))), "도면 용지가 없으면 PDF만 빠진다(2026-10-10)");
+  QVERIFY(QFileInfo::exists(QDir(out).filePath(QStringLiteral("MANIFEST.sha256"))));
 }
 
 #include "test_export_survey_areas.moc"

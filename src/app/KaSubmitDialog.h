@@ -12,8 +12,8 @@ class QTreeWidgetItem;
 
 // 검수·제출: shows every checklist result (error / warn / passed) with the fix
 // and a way to reach the offending shapes or the tool that fixes them, then
-// offers the submission package (blocked while an error remains or the rules
-// are missing) and the single-layer EPSG:5179 conversion. The dialog decides
+// offers the submission package (never blocked: MainWindow asks once when an error
+// remains or the rules are missing) and the single-layer EPSG:5179 conversion. The dialog decides
 // nothing itself; MainWindow acts on choice() after exec().
 class KaSubmitDialog : public QDialog {
   Q_OBJECT

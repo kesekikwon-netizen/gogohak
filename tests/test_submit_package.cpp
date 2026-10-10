@@ -207,6 +207,22 @@ private slots:
     QVERIFY2(error.contains(QStringLiteral("폴더")), qPrintable(error));
   }
 
+  // 2026-10-10 「검수와 상관없이 5179는 내보내기」: 오류가 남은 채로 만든 꾸러미는 README가 그 사실을 적는다.
+  void packageWithChecklistErrorsSaysSoInReadme() {
+    QTemporaryDir temp;
+    QVERIFY(temp.isValid());
+    QString error;
+    const QString out = ExportService::exportSubmissionPackage(nullptr, temp.filePath(QStringLiteral("pkg")),
+                                                               QStringLiteral("UTF-8"),
+                                                               QStringLiteral("- [error] 기준점이 2개 미만입니다\n"),
+                                                               false, true, &error);
+    QVERIFY2(!out.isEmpty(), qPrintable(error));
+    const QString readme = readAll(QDir(out).filePath(QStringLiteral("README_submit.txt")));
+    QVERIFY2(readme.contains(QStringLiteral("검수 오류가 남았거나 검수하지 못한 채로 만들었습니다")), qPrintable(readme));
+    SubmitReadme::Inputs clean;
+    QVERIFY(!SubmitReadme::build(clean).contains(QStringLiteral("checklist_errors_remain")));  // only when it is so
+  }
+
   void koreanFieldNamesCutOnCodePoints() {
     QCOMPARE(SubmitShp::leftUtf8(QStringLiteral("조사구역이름"), 10), QStringLiteral("조사구"));
     QSet<QString> used;

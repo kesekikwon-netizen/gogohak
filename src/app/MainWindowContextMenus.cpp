@@ -359,7 +359,7 @@ void MainWindow::showLayerTreeContextMenu(QgsLayerTreeView* treeView, const QPoi
     // The package covers the whole survey, so an empty layer does not block it.
     const QString reason = busy ? busyReason : m_surveyPath.isEmpty() ? QStringLiteral("먼저 조사 파일을 열어 주세요.") : QString();
     add(&menu, "layer.export", QStringLiteral("제출 꾸러미 만들기…"), reason, [this]() { exportShpPackage(); },
-        QStringLiteral("현재 조사 전체를 검수한 뒤 5179 SHP·조사도면.pdf·MANIFEST 제출 꾸러미를 만듭니다. 오류가 있으면 「검수·제출」 목록을 엽니다."));
+        QStringLiteral("현재 조사 전체를 검수한 뒤 5179 SHP·조사도면.pdf·MANIFEST 제출 꾸러미를 만듭니다. 검수 오류가 남아 있으면 한 번 묻고 README에 적습니다."));
   };
 
   add(&menu, "layer.import", QStringLiteral("레이어 불러오기 (SHP·DXF·GPKG)"), busyReason, [this]() { addUserLayer(); });

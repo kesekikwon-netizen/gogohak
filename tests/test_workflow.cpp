@@ -133,7 +133,7 @@ private slots:
   void atomicProjectWrite_keepsOneBackupGeneration();
   void fullWorkflowSurveyToPackage();
   void exportSubmissionPackage_pdfIsUserSheetOnly();
-  void exportSubmissionPackage_withoutUserSheetFails();
+  void exportSubmissionPackage_withoutUserSheetWritesShpOnly();
   void exportSubmissionPackage_preservesPreviousPackage();
   void exportManifestFailurePreservesPreviousFile();
   void exportSubmissionPackage_finalizationFailure_data();
@@ -552,7 +552,7 @@ void TestWorkflow::exportSubmissionPackage_pdfIsUserSheetOnly() {
   QVERIFY(!QFile::exists(QDir(pkg).filePath(QStringLiteral("유구배치도.pdf"))));
 }
 
-void TestWorkflow::exportSubmissionPackage_withoutUserSheetFails() {
+void TestWorkflow::exportSubmissionPackage_withoutUserSheetWritesShpOnly() {
   QgsProject proj;
   proj.setCrs(QgsCoordinateReferenceSystem(QStringLiteral("EPSG:5186")));
   auto* sa = new QgsVectorLayer(QStringLiteral("Polygon?crs=EPSG:5186"),
@@ -574,11 +574,11 @@ void TestWorkflow::exportSubmissionPackage_withoutUserSheetFails() {
       QStringLiteral("ka_pkg_nosheet_") + QString::number(QDateTime::currentMSecsSinceEpoch()));
   QDir(pkg).removeRecursively();
   QString err;
-  QVERIFY(ExportService::exportSubmissionPackage(&proj, pkg, QStringLiteral("UTF-8"),
-                                                 QStringLiteral("OK"), true, false, &err)
-              .isEmpty());
-  QVERIFY2(err.contains(QStringLiteral("도면만들기")), qPrintable(err));
-  QVERIFY(!QFile::exists(QDir(pkg).filePath(QStringLiteral("README_submit.txt"))));
+  const QString out = ExportService::exportSubmissionPackage(&proj, pkg, QStringLiteral("UTF-8"),
+                                                             QStringLiteral("OK"), true, false, &err);
+  QVERIFY2(!out.isEmpty() && QFile::exists(QDir(pkg).filePath(QStringLiteral("survey_area.shp"))), qPrintable(err));
+  QVERIFY2(!QFile::exists(QDir(pkg).filePath(QStringLiteral("조사도면.pdf"))), "용지가 없으면 PDF만 빠진다(2026-10-10)");
+  QDir(pkg).removeRecursively();  // under QDir::temp(): leave nothing behind
 }
 
 void TestWorkflow::exportSubmissionPackage_preservesPreviousPackage() {
@@ -641,7 +641,7 @@ void TestWorkflow::exportSubmissionPackage_preservesPreviousPackage() {
                                                  QStringLiteral("OK"), true, false, &error)
                .isEmpty(),
            "empty project without composed user_sheet must not finalize a package");
-  QVERIFY2(error.contains(QStringLiteral("도면만들기")), qPrintable(error));
+  QVERIFY2(error.contains(QStringLiteral("내보낼 조사 도형이 없습니다")), qPrintable(error));
   QVERIFY(!QFile::exists(QDir(second).filePath(QStringLiteral("README_submit.txt"))));
 }
 
@@ -8126,10 +8126,10 @@ void TestWorkflow::test_challenge_section_sheet_bundling_variations() {
     QString err;
     const QString res = ExportService::exportSubmissionPackage(
         &proj, pkgDir, QStringLiteral("UTF-8"), QStringLiteral("OK"), true, false, &err);
-    QVERIFY(res.isEmpty());
-    QVERIFY2(err.contains(QStringLiteral("도면만들기")), qPrintable(err));
-    QVERIFY(!QFile::exists(QDir(pkgDir).filePath(QStringLiteral("README_submit.txt"))));
-    QVERIFY(!QFile::exists(QDir(pkgDir).filePath(QStringLiteral("단면도.pdf"))));
+    QVERIFY2(!res.isEmpty(), qPrintable(err));  // 2026-10-10: no user_sheet still makes a package (SHP, 단면도)
+    QVERIFY(QFile::exists(QDir(pkgDir).filePath(QStringLiteral("README_submit.txt"))));
+    QVERIFY(QFile::exists(QDir(pkgDir).filePath(QStringLiteral("survey_area.shp"))));
+    QVERIFY(QFile::exists(QDir(pkgDir).filePath(QStringLiteral("단면도.pdf"))));
     QVERIFY(!QFile::exists(QDir(pkgDir).filePath(QStringLiteral("조사도면.pdf"))));
   }
 }

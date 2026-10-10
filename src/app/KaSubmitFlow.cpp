@@ -1,5 +1,5 @@
-// 검수·제출 흐름: MainWindow members behind the ribbon chip 「검수·제출」 (Ctrl+E). No package while an
-// error remains or the rule file is missing; the check runs before any file dialog. Saving happens
+// 검수·제출 흐름: MainWindow members behind the ribbon chip 「검수·제출」 (Ctrl+E). An error left or a missing
+// rule file asks once before any file dialog and goes into the README (2026-10-10). Saving happens
 // only when the user picks 「저장하고 만들기」.
 #include "MainWindow.h"
 #include "KaProgressPlate.h"
@@ -8,7 +8,6 @@
 #include "core/ChecklistEngine.h"
 #include "core/ExportService.h"
 #include "core/LayerOps.h"
-#include "core/LayoutService.h"
 #include "core/SubmitReadme.h"
 #include "core/SurveyFacts.h"
 
@@ -42,7 +41,7 @@ bool MainWindow::ensureChecklistRules() {
 
 QVector<CheckResult> MainWindow::evaluateChecklist() {
   if (!ensureChecklistRules()) {
-    m_lastChecklistErrors = 1;  // no rules: blocked, never "0 errors"
+    m_lastChecklistErrors = 1;  // no rules: unchecked, never "0 errors"
     return {};
   }
   const QVector<CheckResult> results = m_checklist->evaluate(buildProjectState());
@@ -81,37 +80,25 @@ void MainWindow::openSubmitReview() {
 
 void MainWindow::makeSubmitPackage() {
   if (m_submitBusy) return;
-  // 1. 차단 검사를 파일 대화상자보다 먼저 한다. 규칙이 없으면 오류로 본다.
-  if (!ensureChecklistRules()) {
-    m_lastChecklistErrors = 1;
-    KaUserError::warn(this, {QStringLiteral("검수·제출"),
-                             QStringLiteral("검수 규칙 파일을 찾지 못해 제출 꾸러미를 만들지 않았습니다."),
-                             QStringLiteral("규칙 없이 만들면 검수 오류가 있어도 통과한 것처럼 됩니다. 찾아본 곳: %1")
-                                 .arg(QDir::toNativeSeparators(rulesPath())),
-                             QStringLiteral("프로그램 폴더에 data\\rules\\drawing_checklist.v1.json 이 있는지 확인하고, "
-                                            "없으면 프로그램을 다시 설치하세요."),
-                             {}});
-    statusBar()->showMessage(QStringLiteral("제출 차단: 검수 규칙 파일 없음"), 8000);
-    return;
-  }
+  // 1. 검수는 알려 주기만 한다(2026-10-10 「검수와 상관없이 5179는 내보내기」). 오류가 남았거나 규칙 파일이
+  //    없으면 한 번 묻고 만들며 README에 적는다. 도면 용지가 없으면 조사도면.pdf만 빠진다(ExportService).
+  const bool rules = ensureChecklistRules();
   const QVector<CheckResult> results = evaluateChecklist();
   const int errors = ChecklistEngine::failedCount(results, QStringLiteral("error"));
-  if (errors > 0) {
-    statusBar()->showMessage(QStringLiteral("제출 차단: 검수 오류 %1건").arg(errors), 8000);
-    openSubmitReview();  // the list with 「위치 보기」; its package button stays disabled
-    return;
+  if (!rules || errors > 0) {
+    QMessageBox ask(QMessageBox::Question, QStringLiteral("검수·제출"),
+                    (rules ? QStringLiteral("검수 오류 %1건이 남아 있습니다.").arg(errors)
+                           : QStringLiteral("검수 규칙 파일을 찾지 못해 검수하지 못했습니다.")) +
+                        QStringLiteral("\n그래도 EPSG:5179 제출 꾸러미를 만들까요? 꾸러미 안내 파일(README)에 적힙니다."),
+                    QMessageBox::NoButton, this);
+    QPushButton* make = ask.addButton(QStringLiteral("그래도 만들기"), QMessageBox::AcceptRole);
+    ask.addButton(QStringLiteral("취소"), QMessageBox::RejectRole);
+    ask.setDefaultButton(make);
+    ask.exec();
+    if (ask.clickedButton() != make) return;
   }
 #if KA_HGIS_HAS_QGIS
   QgsProject* project = QgsProject::instance();
-  if (!LayoutService::isComposedStudioSheet(project, QStringLiteral("user_sheet"))) {
-    if (KaUserError::warn(this, {QStringLiteral("검수·제출"),
-                                 QStringLiteral("「도면」에서 만든 용지가 없어 제출 꾸러미를 만들지 않았습니다."),
-                                 QStringLiteral("꾸러미의 조사도면.pdf는 「도면」에서 만든 용지로 만듭니다."),
-                                 QStringLiteral("「도면」에서 용지에 지도를 올린 뒤 다시 만드세요."),
-                                 QStringLiteral("도면 열기")}) == KaUserError::Result::ActionChosen)
-      openLayoutDesigner();
-    return;
-  }
   // 2. 저장하지 않은 편집: 묻기만 한다. 자동 저장은 하지 않는다.
   bool unsaved = surveyHasUnsavedChanges();
   if (unsaved) {
@@ -176,8 +163,9 @@ void MainWindow::makeSubmitPackage() {
   m_packageCreated = false;
   QString err;
   const QString out = ExportService::exportSubmissionPackage(
-      project, QDir(dir).filePath(packageName), enc, ChecklistEngine::summaryText(results),
-      /*blockOnError=*/true, errors > 0, &err, info);
+      project, QDir(dir).filePath(packageName), enc,
+      rules ? ChecklistEngine::summaryText(results) : QStringLiteral("- [error] 검수 규칙 파일이 없어 검수하지 못했습니다\n"),
+      /*blockOnError=*/false, !rules || errors > 0, &err, info);
   progress.hide();
   if (out.isEmpty()) {
     if (progress.wasCanceled()) {
@@ -185,7 +173,7 @@ void MainWindow::makeSubmitPackage() {
       return;
     }
     KaUserError::warn(this, {QStringLiteral("검수·제출"), QStringLiteral("제출 꾸러미를 만들지 못했습니다."), err,
-                             QStringLiteral("저장 위치와 도면 용지를 확인한 뒤 다시 만드세요. 이전에 만든 꾸러미는 그대로입니다."),
+                             QStringLiteral("저장 위치와 조사 도형을 확인한 뒤 다시 만드세요. 이전에 만든 꾸러미는 그대로입니다."),
                              {}});
     return;
   }
@@ -193,7 +181,9 @@ void MainWindow::makeSubmitPackage() {
   SurveyFacts::notePackaged(m_surveyPath);  // home page step 3 「도면 · 제출」 counts as done from here
   statusBar()->showMessage(QStringLiteral("제출 꾸러미: %1").arg(QDir::toNativeSeparators(out)), 8000);
   notify(Notice::Success, QStringLiteral("검수·제출"),
-         QStringLiteral("제출 꾸러미를 만들었습니다. 인트라넷에는 SHP를 하나씩 올리세요."),
+         QFileInfo::exists(QDir(out).filePath(QStringLiteral("조사도면.pdf")))
+             ? QStringLiteral("제출 꾸러미를 만들었습니다. 인트라넷에는 SHP를 하나씩 올리세요.")
+             : QStringLiteral("제출 꾸러미를 만들었습니다. 도면 용지가 없어 조사도면.pdf는 빠졌습니다. 인트라넷에는 SHP를 하나씩 올리세요."),
          QDir::toNativeSeparators(out));
 #endif
 }

@@ -126,6 +126,8 @@ QString build(const Inputs& in) {
            ? QStringLiteral("saved_state: unsaved_edits_included (저장하지 않은 편집이 들어 있습니다. "
                             "survey_sha256은 마지막으로 저장한 조사 파일의 값입니다)\n")
            : QStringLiteral("saved_state: saved\n");
+  if (in.checklistErrorsRemain)
+    t += QStringLiteral("checklist_errors_remain: yes (검수 오류가 남았거나 검수하지 못한 채로 만들었습니다. 아래 checklist의 [error] 항목을 확인하세요)\n");
   t += QStringLiteral("intranet: upload each domain SHP (feature_poly.shp = one file; merge polygons in-app first if required)\n\n");
   t += QStringLiteral("checklist:\n") + in.checklistSummary + QLatin1Char('\n');
   if (!in.fieldNotes.isEmpty()) t += QStringLiteral("\nshp_field_names:\n") + in.fieldNotes.join(QLatin1Char('\n')) + QLatin1Char('\n');
