@@ -2,6 +2,7 @@
 
 #include "KaChip.h"
 #include "KaHomeRecentCard.h"
+#include "KaHomeText.h"
 #include "KaIcons.h"
 #include "KaTheme.h"
 
@@ -111,8 +112,9 @@ void KaHomeRowDelegate::paintSurvey(QPainter* painter, const QRect& rect, const 
   painter->setPen(t.inkMuted);
   painter->drawText(QRect(text.left(), top + nameFm.height() + 2, text.width(), folderFm.height()),
                     Qt::AlignLeft | Qt::AlignVCenter,
-                    folderFm.elidedText(index.data(KaHomeRecentCard::kFolderRole).toString(), Qt::ElideMiddle,
-                                        text.width()));
+                    folderFm.elidedText(plate ? KaHomeText::folderEnd(index.data(KaHomeRecentCard::kFolderRole).toString())
+                                              : index.data(KaHomeRecentCard::kFolderRole).toString(),
+                                        Qt::ElideMiddle, text.width()));
 }
 
 void KaHomeRowDelegate::paintState(QPainter* painter, const QRect& rect, const QModelIndex& index) const {

@@ -18,6 +18,7 @@
 
 #include "app/KaChip.h"
 #include "app/KaHomeConnectionCard.h"
+#include "app/KaHomeText.h"
 #include "app/KaStartPage.h"
 #include "app/KaTheme.h"
 #include "core/RecentSurveys.h"
@@ -183,6 +184,30 @@ private slots:
     QTest::mouseMove(table->viewport(), first.center());
     QTRY_VERIFY2(edgeOf(0, last) != edgeOf(1, last), "the cells away from the mouse stay plain");
     QCOMPARE(edgeOf(0, last), edgeOf(0, 0));  // one wash along the whole row
+  }
+
+  // 폴더 칸과 최근 조사 줄의 경로 (보완 H3, 설계 판): the cell ends with the survey's name, the table's path line with only
+  // the last folder; a short one stays whole.
+  void folderCellAndRowPathFollowTheBoard() {
+    const QString path = touch(m_dir.filePath(QStringLiteral("p/q/r/폴더/기록.gpkg")));
+    {
+      QSettings st = RecentSurveys::userSettings();
+      RecentSurveys::remember(st, path, QStringLiteral("현장기록"));
+    }
+    KaStartPage page;
+    page.resize(1600, 900);
+    page.reload();
+    auto* block = page.findChild<QFrame*>(QStringLiteral("startTitleBlock"));
+    QVERIFY(block);
+    QCOMPARE(block->findChild<QLabel*>(QStringLiteral("startCellFolder"))->text(), QStringLiteral("… › 폴더 › 현장기록"));
+    // the survey's own name closes the cell: 「… › 폴더 › 조사명」, and a folder named like the survey is not repeated
+    QCOMPARE(KaHomeText::folderTail(QStringLiteral("C: › Temp › survey-verify"), QStringLiteral("verify1-저장")),
+             QStringLiteral("… › survey-verify › verify1-저장"));
+    QCOMPARE(KaHomeText::folderTail(QStringLiteral("바탕 화면 › 광령리1"), QStringLiteral("광령리1")), QStringLiteral("바탕 화면 › 광령리1"));
+    QCOMPARE(KaHomeText::folderTail(QStringLiteral("문서"), QStringLiteral("광령리1")), QStringLiteral("문서 › 광령리1"));
+    QCOMPARE(KaHomeText::folderEnd(QStringLiteral("C: › Users › 권을 › ka-hgis-survey-verify")), QStringLiteral("… › ka-hgis-survey-verify"));
+    QCOMPARE(KaHomeText::folderEnd(QStringLiteral("바탕 화면 › andong")), QStringLiteral("바탕 화면 › andong"));
+    QCOMPARE(KaHomeText::folderEnd(QStringLiteral("문서")), QStringLiteral("문서"));
   }
 };
 

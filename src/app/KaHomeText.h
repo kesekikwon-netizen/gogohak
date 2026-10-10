@@ -13,8 +13,11 @@ namespace KaHomeText {
 
 // "바탕 화면 › 광령리" for a survey under the desktop, otherwise the folder path with ›.
 QString folder(const QString& path);
-// The folder text of a deep path cut to its last two steps: "C: › Users › 권을 › 광령리1" → "… › 권을 › 광령리1".
-QString folderTail(const QString& folder);
+// The folder text of a deep path cut to its last two steps, the survey's name closing it:
+// ("C: › Temp › 현장", "기록") → "… › 현장 › 기록"; a folder that is the survey's own name is not repeated.
+QString folderTail(const QString& folder, const QString& name = QString());
+// The recent table's path line: only the last folder behind 「…」 when the path is deep.
+QString folderEnd(const QString& folder);
 // "오늘 14:02", "어제 09:10", "9월 3일 17:45" or "2025-11-02 08:00"; empty for 0.
 QString when(qint64 msecsSinceEpoch);
 

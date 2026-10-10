@@ -27,11 +27,19 @@ QString folder(const QString& path) {
   return dir.split(QLatin1Char('/'), Qt::SkipEmptyParts).join(QStringLiteral(" › "));
 }
 
-QString folderTail(const QString& folder) {
+QString folderTail(const QString& folder, const QString& name) {
   const QString sep = QStringLiteral(" › ");
-  const QStringList steps = folder.split(sep);
-  if (steps.size() <= 2) return folder;
+  QStringList steps = folder.split(sep, Qt::SkipEmptyParts);
+  if (!name.isEmpty() && (steps.isEmpty() || steps.last() != name)) steps << name;  // a folder named like the survey is not repeated
+  if (steps.size() <= 2) return steps.join(sep);
   return QStringLiteral("…") + sep + steps.at(steps.size() - 2) + sep + steps.last();
+}
+
+QString folderEnd(const QString& folder) {
+  const QString sep = QStringLiteral(" › ");
+  const QStringList steps = folder.split(sep, Qt::SkipEmptyParts);
+  if (steps.size() <= 2) return folder;
+  return QStringLiteral("…") + sep + steps.last();
 }
 
 QString when(qint64 ms) {

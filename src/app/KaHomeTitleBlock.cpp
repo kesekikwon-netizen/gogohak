@@ -142,7 +142,7 @@ void KaHomeTitleBlock::setSurvey(const RecentSurveys::Item& item, const SurveyFa
   m_state->setText(unsaved ? QStringLiteral("<span style=\"color:#D97757\">●</span>&nbsp;저장 안 됨") : QStringLiteral("저장됨"));
   m_state->setAccessibleName(unsaved ? QStringLiteral("저장 안 됨") : QStringLiteral("저장됨"));
   m_state->setProperty("kaTone", unsaved ? QStringLiteral("needsYou") : QString());
-  m_folderText = KaHomeText::folderTail(KaHomeText::folder(item.path));
+  m_folderText = KaHomeText::folderTail(KaHomeText::folder(item.path), item.name);
   showFolder();
   m_folder->setToolTip(item.path);
   m_when->setText(KaHomeText::when(item.lastOpenedMs));
