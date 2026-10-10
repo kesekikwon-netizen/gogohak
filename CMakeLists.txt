@@ -2326,6 +2326,21 @@ if(KA_HGIS_BUILD_TESTS)
   ka_add_qtest(window_polish ka_window_polish_tests)
   set_tests_properties(window_polish PROPERTIES
     ENVIRONMENT "GDAL_DATA=${OSGEO4W_ROOT}/apps/gdal-dev/share/gdal;PATH=${_ka_path_esc};QGIS_PREFIX_PATH=${QGIS_PREFIX_PATH};QT_QPA_PLATFORM=offscreen" TIMEOUT 90)
+  # 세부 디자인 보완(튼튼함 R1: 낮은 창의 오른쪽 판).
+  add_executable(ka_inspector_polish_tests tests/test_inspector_polish.cpp
+    src/app/KaInspectorPanel.cpp src/app/KaInspectorPanel.h
+    src/app/KaInspectorStyle.cpp src/app/KaInspectorStyle.h
+    src/app/KaBasemapQuickCard.cpp src/app/KaBasemapQuickCard.h
+    src/app/KaFeatureCard.cpp src/app/KaFeatureCard.h src/app/KaFeatureCardEdit.cpp ${_ka_p4_card_sources}
+    src/app/KaFeatureFormDialog.cpp src/app/KaFeatureFormDialog.h
+    ${_ka_p1_chip_sources} ${_ka_p4_theme_sources})
+  target_link_libraries(ka_inspector_polish_tests PRIVATE ${KA_TEST_LIBS})
+  target_include_directories(ka_inspector_polish_tests PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_BINARY_DIR}/generated)
+  target_compile_definitions(ka_inspector_polish_tests PRIVATE ${KA_TEST_DEFS})
+  set_target_properties(ka_inspector_polish_tests PROPERTIES WIN32_EXECUTABLE FALSE)
+  ka_add_qtest(inspector_polish ka_inspector_polish_tests)
+  set_tests_properties(inspector_polish PROPERTIES
+    ENVIRONMENT "GDAL_DATA=${OSGEO4W_ROOT}/apps/gdal-dev/share/gdal;PATH=${_ka_path_esc};QGIS_PREFIX_PATH=${QGIS_PREFIX_PATH};QT_QPA_PLATFORM=offscreen" TIMEOUT 90)
   set_tests_properties(map_plate PROPERTIES ENVIRONMENT
     "GDAL_DATA=${OSGEO4W_ROOT}/apps/gdal-dev/share/gdal;PATH=${_ka_path_esc};QGIS_PREFIX_PATH=${QGIS_PREFIX_PATH};QT_QPA_PLATFORM=offscreen" TIMEOUT 90)
   # 「조용한 도판」 windows (board 5): message boxes with a serif question and no icon disc (no QGIS).

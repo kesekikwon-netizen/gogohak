@@ -1318,6 +1318,7 @@ QLabel#layerFilterEmpty { color: @inkMuted@; font-size: 12px; padding: 4px 6px; 
 QFrame#inspectorPanel { background: @panelFace@; border: 1px solid @panelEdge@; border-radius: @panelRadius@px; }
 QFrame#inspectorPanel QTabBar#inspectorTabs::tab { min-width: 72px; padding: 6px 0; font-size: 12px; }
 QFrame#inspectorPanel QScrollArea#inspectorAttributeScroll, QWidget#inspectorAttributePage { background: transparent; }
+QFrame#inspectorPanel QScrollArea#inspectorStyleScroll, QScrollArea#inspectorStyleScroll > QWidget > QWidget { background: transparent; }
 QLabel#inspectorTitle { font-size: 14px; font-weight: 700; color: @ink@; }
 QLabel#inspectorSentence { color: @inkMuted@; font-size: 12px; padding: @emptyPad@; border: 1px dashed @emptyEdge@; border-radius: 8px; }
 QToolButton#inspectorCollapse { border: none; background: transparent; padding: 4px; }

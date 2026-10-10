@@ -93,8 +93,15 @@ KaInspectorPanel::KaInspectorPanel(QWidget* parent) : QFrame(parent) {
   scroll->setWidget(m_attributePage);
   m_stack->addWidget(scroll);
   // 스타일: the chosen layer's colour and width, changed right here.
-  m_style = new KaInspectorStyle(m_stack);
-  m_stack->addWidget(m_style);
+  // 보완 R1: the whole tab sits in a scroll area, like 속성, so a low window scrolls it instead of cutting it off.
+  auto* styleScroll = new QScrollArea(m_stack);
+  styleScroll->setObjectName(QStringLiteral("inspectorStyleScroll"));
+  styleScroll->setFrameShape(QFrame::NoFrame);
+  styleScroll->setWidgetResizable(true);
+  styleScroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+  m_style = new KaInspectorStyle(styleScroll);
+  styleScroll->setWidget(m_style);
+  m_stack->addWidget(styleScroll);
   connect(m_tabs, &QTabBar::currentChanged, m_stack, &QStackedWidget::setCurrentIndex);
   column->addWidget(m_stack, 1);
 
