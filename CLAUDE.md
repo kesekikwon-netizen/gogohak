@@ -22,6 +22,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - 요청하지 않은 설정·확장성·추상화, 일어날 수 없는 경우의 처리는 넣지 않는다.
 - Architecture: `src/core` → static lib `ka_core` (services, no window code); `src/app` → `ka-hgis` exe (MainWindow split over `MainWindow*.cpp`, Ka* widgets and map tools). Test exes link `ka_core` and compile the `src/app` files they need by listing them in their own `add_executable` in CMakeLists.txt, so a new app file used by a test goes into that list too. Critical path diagram: docs/architecture/data-flow.md (its "error blocks" edge predates 2026-10-10); code map: docs/agent/strata-reference.md.
 - Hotspots, keep edits narrow: KaDrawingStudio.cpp, MainWindow.cpp, LayerOps.cpp, BasemapOps.cpp. CMake source lists are explicit (no GLOB). data/ is copied next to the exe: a data/ edit needs a ka-hgis rebuild.
+- Before writing or changing a Qt, QGIS, GDAL, PROJ or CMake API call, check that version's docs with context7 (resolve-library-id → query-docs) (2026-10-11 사용자 지시). Without the tool, say so; do not guess.
 - C++ definitions, references, errors: LSP (clangd) before grep. No build/compile_commands.json → `cmake -S . -B build` (no build/ at all: the first-build command), then build.
 - 보안 검토 결과는 이 앱(Windows 데스크톱, 서버·웹 없음)에 해당하는 것만 이번 변경 안에서 고치고 나머지는 보고에 한 줄.
 
@@ -46,11 +47,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - No known failures since 2026-10-03 (the former four pass locally and in CI): every failing test is real.
 - Tests go into existing QtTest files (`ka_add_qtest(<name> <target>)`; new test_save_open.cpp functions also need a `ka_add_qtest_filter(save_open_* …)` entry), write only to QTemporaryDir, use QStandardPaths test mode, never the app's org/app name. UI with no testable seam: keep the code, build plus the nearest test.
 - Smoke (exit 0): `powershell.exe -NoProfile -ExecutionPolicy Bypass -Command '. ./scripts/dev-env.ps1; $p = Start-Process build/Release/ka-hgis.exe -ArgumentList "--smoke-quit" -WorkingDirectory build/Release -Wait -PassThru; exit $p.ExitCode'`. Never start ka-hgis.exe raw. If the user's app runs this exe, rename it before rebuilding; close it only if its title has no " *".
-- After every successful app build: smoke, then repoint the 「Strata (개발)」 desktop shortcut (docs/agent/strata-reference.md).
+- After every successful app build: smoke, then repoint the 「Strata (개발)」 desktop shortcut (docs/agent/strata-reference.md). The desktop is `[Environment]::GetFolderPath('Desktop')`, which may be redirected (OneDrive\바탕 화면), not `%USERPROFILE%\Desktop`.
 
 ## Git (main = GitHub kesekikwon-netizen/hgis)
 
-- `<main>` below = the main checkout, the first line of `git worktree list` (this PC: `C:\Users\권을\Documents\qgis`, OSGeo4W `C:\OSGeo4W`; the old PC used `A:\qgis` and `A:\OSGeo4W`).
+- `<main>` below = the main checkout, the first line of `git worktree list` (PCs: `C:\Users\권을\Documents\qgis` + `C:\OSGeo4W`; `D:\hgis` + `D:\OSGeo4W`; old `A:\qgis` + `A:\OSGeo4W`). `git remote -v` origin must be kesekikwon-netizen/hgis: `kwonyoungin11/hgis` (now http-www-dong-guk-or-kr/hgis) is a stale copy that stopped on 2026-10-01.
 - Work in the session worktree (in `<main>` itself, in place); never create another. Message `type(scope): 한국어 요약`, Korean body with a test-result line, Co-Authored-By. Commit from the Bash tool.
 - Every verified commit (2026-10-03): rebase onto main if it moved and rerun the touched tests, then `git -C <main> merge --ff-only <sha>` and `git -C <main> push origin main`. Never cancel, disable or wait on GitHub CI; check its last run once at the next task. PRs only when asked. If memory names a newer line the user calls the current app, say so in the first report.
 - `.claude/hooks/commit-gate.mjs` blocks commits touching src/, tests/, cmake/, data/, CMakeLists.txt until the build and a later ctest prove them, test-weakening commits without `시험 변경:`, and C++ files past the CI line limit (raising docs/quality/line-limit-baseline.txt needs `길이 기준 변경:`). Follow its reason; no bypass.

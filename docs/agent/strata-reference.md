@@ -7,7 +7,8 @@ CLAUDE.md에서 옮긴 내용이다(2026-10-03, docs/intent/2026-10-03-dev-setup
 Run the smoke, then create or repoint `%USERPROFILE%\Desktop\Strata (개발).lnk` (this PC: `C:\Users\권을\Desktop`; old PC: `C:\Users\kwonyoungin1\Desktop`) with WScript.Shell (`CreateShortcut` + `Save` makes it when missing):
 - TargetPath `<worktree>\scripts\start-ka-hgis.vbs`, WorkingDirectory `<worktree>`, IconLocation `<worktree>\build\Release\ka-hgis.exe,0`, Description `Strata 개발 빌드 (워크트리 <name>)`.
 - Then call `SHChangeNotify(0x08000000)` so the icon refreshes, and tell the user which worktree it now opens.
-- 「고고학 전용 HGIS.lnk」 ran `A:\qgis\build` (exe from 2026-09-28): touch or recreate it only when asked.
+- 「고고학 전용 HGIS.lnk」 ran `A:\qgis\build` (exe from 2026-09-28): touch or recreate it only when asked. On the `D:\hgis` PC the user asked (2026-10-11) for it to open `D:\hgis\build\Release`; there the desktop is `OneDrive\바탕 화면` (`[Environment]::GetFolderPath('Desktop')`).
+- Explorer keeps showing an old icon cached for the same exe path after a rebuild. Pointing IconLocation at `data\theme\ka-hgis.ico,0` (the file the exe embeds) plus `SHChangeNotify` and `ie4uinit.exe -show` makes the new icon show.
 - If the app is open, rename the running exe before rebuilding; close it only if its title has no " *".
 
 ## Code map
