@@ -47,6 +47,7 @@
 #include "KaTopographicImportDialog.h"
 #include "KaSurveyAreaDialog.h"
 #include "core/RecentSurveys.h"
+#include "core/NearbyHeritageExport.h"
 #include "core/KaSafeQgis.h"
 #include "core/SurveyStorage.h"
 #include "core/SurveySession.h"
@@ -798,40 +799,42 @@ void MainWindow::showSubToolsBuffer() {
                           this, &MainWindow::runSiteBuffer500);
   m_subToolbar->addAction(KaIcons::icon(QStringLiteral("buffer")), QStringLiteral("1000m"),
                           this, &MainWindow::runSiteBuffer1000);
+  auto* excelAct = m_subToolbar->addAction(KaIcons::icon(QStringLiteral("export")),
+                                           QStringLiteral("엑셀 내보내기"),
+                                           this, &MainWindow::exportNearbyHeritageExcel);
+  excelAct->setObjectName(QStringLiteral("actBufferExcel"));
+  excelAct->setToolTip(QStringLiteral(
+      "버퍼(500m·1000m) 안에 포함되는 주변유적의 유적명과 조사구역 기준 방향·거리(m)를 엑셀(.xlsx)로 저장합니다"));
   auto* closeAct = m_subToolbar->addAction(QStringLiteral("닫기"));
   connect(closeAct, &QAction::triggered, this, &MainWindow::hideSubTools);
   m_subToolbar->setVisible(true);
   statusBar()->showMessage(
-      QStringLiteral("면 레이어를 고른 뒤 500m 또는 1000m를 누르세요. 점선은 도형 색에서 바꿉니다."),
+      QStringLiteral("500m·1000m 경계를 그리거나 「엑셀 내보내기」로 범위 안 주변유적(유적명·방향·거리)을 저장하세요."),
       8000);
 #endif
 }
-
 void MainWindow::runSiteBuffer500() {
 #if KA_HGIS_HAS_QGIS
-  QgsVectorLayer* layer = m_layerTree ? qobject_cast<QgsVectorLayer*>(m_layerTree->currentLayer())
-                                      : nullptr;
+  auto* src = NearbyHeritageExport::resolveSourceLayer(
+      QgsProject::instance(), m_layerTree ? qobject_cast<QgsVectorLayer*>(m_layerTree->currentLayer()) : nullptr);
   QString err;
-  if (!BufferAnalysis::addDistanceRing(QgsProject::instance(), m_canvas, layer, 500.0, &err)) {
-    notify(Notice::Warning, QStringLiteral("주변유적경계"),
-           QStringLiteral("500m 경계를 그리지 못했습니다."), err);
-    return;
-  }
-  statusBar()->showMessage(QStringLiteral("주변 500m 경계를 그렸습니다"), 6000);
+  if (!BufferAnalysis::addDistanceRing(QgsProject::instance(), m_canvas, src, 500.0, &err))
+    return notify(Notice::Warning, QStringLiteral("주변유적경계"), QStringLiteral("500m 경계를 그리지 못했습니다."), err);
+  const auto near = NearbyHeritageExport::collect(QgsProject::instance(), src, 500.0);
+  statusBar()->showMessage(near.ok() ? QStringLiteral("주변 500m 경계를 그렸습니다 — 포함 주변유적 %1곳 (「엑셀 내보내기」로 저장)").arg(near.items.size())
+                                     : QStringLiteral("주변 500m 경계를 그렸습니다"), 7000);
 #endif
 }
-
 void MainWindow::runSiteBuffer1000() {
 #if KA_HGIS_HAS_QGIS
-  QgsVectorLayer* layer = m_layerTree ? qobject_cast<QgsVectorLayer*>(m_layerTree->currentLayer())
-                                      : nullptr;
+  auto* src = NearbyHeritageExport::resolveSourceLayer(
+      QgsProject::instance(), m_layerTree ? qobject_cast<QgsVectorLayer*>(m_layerTree->currentLayer()) : nullptr);
   QString err;
-  if (!BufferAnalysis::addDistanceRing(QgsProject::instance(), m_canvas, layer, 1000.0, &err)) {
-    notify(Notice::Warning, QStringLiteral("주변유적경계"),
-           QStringLiteral("1000m 경계를 그리지 못했습니다."), err);
-    return;
-  }
-  statusBar()->showMessage(QStringLiteral("주변 1000m 경계를 그렸습니다"), 6000);
+  if (!BufferAnalysis::addDistanceRing(QgsProject::instance(), m_canvas, src, 1000.0, &err))
+    return notify(Notice::Warning, QStringLiteral("주변유적경계"), QStringLiteral("1000m 경계를 그리지 못했습니다."), err);
+  const auto near = NearbyHeritageExport::collect(QgsProject::instance(), src, 1000.0);
+  statusBar()->showMessage(near.ok() ? QStringLiteral("주변 1000m 경계를 그렸습니다 — 포함 주변유적 %1곳 (「엑셀 내보내기」로 저장)").arg(near.items.size())
+                                     : QStringLiteral("주변 1000m 경계를 그렸습니다"), 7000);
 #endif
 }
 

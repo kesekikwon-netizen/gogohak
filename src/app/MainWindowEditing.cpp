@@ -962,6 +962,7 @@ void MainWindow::beginEdit(QgsVectorLayer* layer) {
     }
 
     m_editLayer = layer;
+    KaSurveyAreaDialog::ensureLayerVisibleOnCanvas(QgsProject::instance(), layer, m_canvas);
     if (m_layerTree)
       m_layerTree->setCurrentLayer(layer);
     // 조사구역 ↔ 유구면처럼 같은 캡처 도구로 대상만 바뀌면 mapToolSet 이 오지 않는다.
@@ -1115,9 +1116,6 @@ void MainWindow::startEditSurveyArea() {
     }
   }
 
-  if (m_canvas && !QgsProject::instance()->mapLayer(targetLayer->id())) {
-    LayerOps::syncMapCanvas(QgsProject::instance(), m_canvas, false);
-  }
   if (m_layerTree)
     m_layerTree->setCurrentLayer(targetLayer);
 

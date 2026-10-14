@@ -9,6 +9,7 @@ class QDoubleSpinBox;
 class QLabel;
 class QLineEdit;
 class QPushButton;
+class QgsMapCanvas;
 class QgsMapLayer;
 class QgsProject;
 class QgsVectorLayer;
@@ -29,6 +30,7 @@ public:
   // Text colour with at least 4.5:1 contrast on a swatch (white, theme ink, then black).
   static QColor readableTextOn(const QColor& fill);
   static QgsVectorLayer* layerToContinue(QgsProject* project, const QString& surveyPath, QgsMapLayer* current);
+  static void ensureLayerVisibleOnCanvas(QgsProject* project, QgsMapLayer* layer, QgsMapCanvas* canvas);
 
 private:
   void setupUi();

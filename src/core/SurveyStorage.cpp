@@ -1262,8 +1262,7 @@ bool readEmbedded(QgsProject* project, const QString& gpkgPath, bool* crashedOut
   if (!ok && errorOut)
     *errorOut = crashed ? QStringLiteral("조사 파일 안의 작업공간을 읽다 오류가 났습니다.")
                         : project->error();
-  if (ok && remountCopiedSurveyLayers(project, abs) > 0)
-    LayerOps::reloadSurveyGpkgReaders(project, abs);
+  if (ok) { remountCopiedSurveyLayers(project, abs); LayerOps::reloadSurveyGpkgReaders(project, abs); }
   return ok;
 }
 

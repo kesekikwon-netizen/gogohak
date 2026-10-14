@@ -14,6 +14,8 @@
 #include <QStyle>
 #include <QVBoxLayout>
 #include <cmath>
+#include <qgslayertree.h>
+#include <qgslayertreelayer.h>
 #include <qgsproviderregistry.h>
 #include <qgsvectorlayer.h>
 
@@ -44,7 +46,9 @@ QgsVectorLayer* KaSurveyAreaDialog::layerToContinue(QgsProject* project, const Q
   // Only this survey's own area tables: an outside file named 조사구역 opened for tracing would be
   // written on 저장, which must never touch the user's own data.
   const QString survey = QFileInfo(surveyPath).absoluteFilePath();
+  const QgsLayerTree* root = project ? project->layerTreeRoot() : nullptr;
   QList<QgsVectorLayer*> own;
+  QList<QgsVectorLayer*> visibleOwn;
   for (QgsVectorLayer* layer : LayerOps::surveyAreaLayers(project)) {
     const QString key = LayerOps::layerKeyOf(layer);
     const QString path = QgsProviderRegistry::instance()
@@ -52,11 +56,25 @@ QgsVectorLayer* KaSurveyAreaDialog::layerToContinue(QgsProject* project, const Q
                              .value(QStringLiteral("path"))
                              .toString();
     if ((key == QLatin1String("survey_area") || key.startsWith(QLatin1String("survey_area_"))) && !surveyPath.isEmpty() &&
-        QFileInfo(path).absoluteFilePath().compare(survey, Qt::CaseInsensitive) == 0)
+        QFileInfo(path).absoluteFilePath().compare(survey, Qt::CaseInsensitive) == 0) {
       own << layer;
+      const QgsLayerTreeLayer* node = root ? root->findLayer(layer->id()) : nullptr;
+      if (!node || node->isVisible())
+        visibleOwn << layer;
+    }
   }
   auto* picked = qobject_cast<QgsVectorLayer*>(current);
-  return own.contains(picked) ? picked : own.value(0);  // the area picked in the list first
+  return own.contains(picked) ? picked : visibleOwn.value(0);  // the area picked in the list first
+}
+
+void KaSurveyAreaDialog::ensureLayerVisibleOnCanvas(QgsProject* project, QgsMapLayer* layer, QgsMapCanvas* canvas) {
+  if (!project || !layer) return;
+  if (QgsLayerTree* root = project->layerTreeRoot()) {
+    if (QgsLayerTreeLayer* node = root->findLayer(layer->id()))
+      node->setItemVisibilityCheckedParentRecursive(true);
+  }
+  if (canvas)
+    LayerOps::syncMapCanvas(project, canvas, false);
 }
 
 KaSurveyAreaDialog::KaSurveyAreaDialog(QWidget* parent) : QDialog(parent) {

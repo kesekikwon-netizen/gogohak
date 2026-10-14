@@ -208,6 +208,7 @@ add_library(ka_core STATIC
   src/core/FeatureRecord.cpp
   src/core/SurveySchema.cpp
   src/core/BufferAnalysis.cpp
+  src/core/NearbyHeritageExport.cpp
   src/core/RecentSurveys.cpp
   src/core/KaSafeQgis.cpp
   src/core/MeasureOps.cpp
@@ -298,6 +299,7 @@ add_library(ka_core STATIC
   src/core/SurveySchema.h
   src/core/ControlPointCsv.h
   src/core/BufferAnalysis.h
+  src/core/NearbyHeritageExport.h
   src/core/RecentSurveys.h
   src/core/KaSafeQgis.h
   src/core/MeasureOps.h

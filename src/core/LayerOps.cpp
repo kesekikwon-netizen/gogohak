@@ -1520,8 +1520,8 @@ QgsVectorLayer* LayerOps::createSurveyAreaLayer(QgsProject* project, const QStri
       if (errorOut) *errorOut = errMsg;
       return nullptr;
     }
-    vl = new QgsVectorLayer(QStringLiteral("%1|layername=%2").arg(gpkgPath, tableName),
-                            titleKo, QStringLiteral("ogr"));
+    reloadSurveyGpkgReaders(project, gpkgPath);
+    vl = new QgsVectorLayer(QStringLiteral("%1|layername=%2").arg(gpkgPath, tableName), titleKo, QStringLiteral("ogr"));
   }
 
   if (!vl || !vl->isValid()) {

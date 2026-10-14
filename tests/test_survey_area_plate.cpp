@@ -3,6 +3,7 @@
 // its one row of named swatches (tests/test_survey_point_dialogs.cpp, which is at its line limit).
 #include "app/KaSurveyAreaDialog.h"
 #include "app/KaTheme.h"
+#include "core/LayerOps.h"
 
 #include <QApplication>
 #include <QDir>
@@ -10,9 +11,16 @@
 #include <QFontDatabase>
 #include <QLabel>
 #include <QPushButton>
+#include <QTemporaryDir>
 #include <QtTest>
 
 #include <qgsapplication.h>
+#include <qgscoordinatereferencesystem.h>
+#include <qgslayertree.h>
+#include <qgsmapcanvas.h>
+#include <qgsproject.h>
+#include <qgsvectorfilewriter.h>
+#include <qgsvectorlayer.h>
 
 class TestSurveyAreaPlate : public QObject {
   Q_OBJECT
@@ -56,6 +64,32 @@ private slots:
     QVERIFY(own->y() > widths.first()->y() + widths.first()->height() / 2);  // 「직접」 on its own row
     const QString out = qEnvironmentVariable("KA_HGIS_QA_OUTPUT_DIR");  // a picture for a look, as in the stock test
     if (!out.isEmpty()) QVERIFY(dialog.grab().save(QDir(out).filePath(QStringLiteral("survey-area-dialog-paper.png"))));
+  }
+
+  void uncheckedSurveyAreaIsNotContinuedUnlessPickedAndEditMakesItVisible() {
+    QTemporaryDir dir;
+    const QString survey = dir.filePath(QStringLiteral("조사.gpkg"));
+    QgsVectorLayer shape(QStringLiteral("Polygon?crs=EPSG:5187"), QStringLiteral("area"), QStringLiteral("memory"));
+    QgsVectorFileWriter::SaveVectorOptions options;
+    options.driverName = QStringLiteral("GPKG");
+    options.layerName = QStringLiteral("survey_area");
+    options.actionOnExistingFile = QgsVectorFileWriter::CreateOrOverwriteFile;
+    QVERIFY(QgsVectorFileWriter::writeAsVectorFormatV3(&shape, survey, QgsCoordinateTransformContext(), options) ==
+            QgsVectorFileWriter::NoError);
+    QgsProject project;
+    auto* own = new QgsVectorLayer(survey + QStringLiteral("|layername=survey_area"), QStringLiteral("임하리사지"), QStringLiteral("ogr"));
+    LayerOps::markSurveyLayer(own, QStringLiteral("survey_area"));
+    QVERIFY(own->isValid());
+    project.addMapLayer(own, false);
+    QgsLayerTreeGroup* group = project.layerTreeRoot()->addGroup(QStringLiteral("조사 데이터"));
+    QgsLayerTreeLayer* node = group->addLayer(own);
+    node->setItemVisibilityChecked(false);
+    QCOMPARE(KaSurveyAreaDialog::layerToContinue(&project, survey, nullptr), static_cast<QgsVectorLayer*>(nullptr));
+    QCOMPARE(KaSurveyAreaDialog::layerToContinue(&project, survey, own), own);
+    group->setItemVisibilityChecked(false);
+    QgsMapCanvas canvas;
+    KaSurveyAreaDialog::ensureLayerVisibleOnCanvas(&project, own, &canvas);
+    QVERIFY(node->isVisible());
   }
 };
 

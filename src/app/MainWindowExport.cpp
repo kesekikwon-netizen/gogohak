@@ -3,11 +3,13 @@
 #include "KaIcons.h"
 #include "KaTheme.h"
 #include "KaUserError.h"
+#include "core/BufferAnalysis.h"
 #include "core/ChecklistEngine.h"
 #include "core/GeometryEditOps.h"  // [int W4] F083 merge conflict question
 #include "core/LayerOps.h"
 #include "core/LayoutService.h"
 #include "core/MapGeoTiffExport.h"
+#include "core/NearbyHeritageExport.h"
 #include "core/ProjectStateBuilder.h"
 
 #include <QCoreApplication>
@@ -507,3 +509,32 @@ void MainWindow::mergeFeaturePolygons() {
 #endif
 }
 
+void MainWindow::exportNearbyHeritageExcel() {
+#if KA_HGIS_HAS_QGIS
+  auto* cur = m_layerTree ? qobject_cast<QgsVectorLayer*>(m_layerTree->currentLayer()) : nullptr;
+  const auto collected = NearbyHeritageExport::collect(QgsProject::instance(), cur);
+  if (!collected.ok()) {
+    KaUserError::warn(this, {QStringLiteral("주변유적 엑셀 내보내기"), QStringLiteral("주변유적 목록을 만들지 못했습니다."), collected.error,
+                             QStringLiteral("조사구역을 그리고 「유산」 자료를 받은 뒤 다시 눌러 주세요.")});
+    return;
+  }
+  const int radiusM = qRound(collected.maxRadiusMeters);
+  const QString startDir = preferredSurveyDir();
+  const QString suggest = QDir(startDir.isEmpty() ? QDir::homePath() : startDir)
+                              .filePath(QStringLiteral("주변유적_현황_%1m.xlsx").arg(radiusM));
+  const QString path = QFileDialog::getSaveFileName(
+      this, QStringLiteral("주변유적 현황 엑셀 저장 (%1m 이내 %2곳)").arg(radiusM).arg(collected.items.size()),
+      suggest, QStringLiteral("Excel 파일 (*.xlsx)"));
+  if (path.isEmpty()) return;
+  QString err;
+  if (!NearbyHeritageExport::writeXlsx(path, collected.items, &err)) {
+    KaUserError::warn(this, {QStringLiteral("주변유적 엑셀 내보내기"), QStringLiteral("엑셀 파일을 저장하지 못했습니다."), err, {}});
+    return;
+  }
+  statusBar()->showMessage(QStringLiteral("주변유적 %1m 이내 %2곳 엑셀 저장 완료 · %3")
+                               .arg(radiusM).arg(collected.items.size()).arg(QDir::toNativeSeparators(path)), 10000);
+  notify(Notice::Success, QStringLiteral("주변유적 엑셀 내보내기"),
+         QStringLiteral("주변 %1m 이내 유적 %2곳(유적명·방향·거리)을 엑셀로 저장했습니다.").arg(radiusM).arg(collected.items.size()),
+         QDir::toNativeSeparators(path));
+#endif
+}

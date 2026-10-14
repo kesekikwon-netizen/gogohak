@@ -8,25 +8,25 @@
 
 | Field | Value |
 |------|--------|
-| Updated (local) | 2026-09-05 23:38:02 +09:00 |
-| VERSION file | 0.3.0 |
-| Branch | `main` |
-| HEAD short | `6fc9375` |
-| HEAD full | `6fc93752e82c873b1f8e9b4fbffa12c765c04db1` |
-| HEAD date | 2026-09-05 17:39:25 +0900 |
+| Updated (local) | 2026-10-14 17:43:21 +09:00 |
+| VERSION file | 2.0.0 |
+| Branch | `export_nearby_heritage_excel` |
+| HEAD short | `69130a2` |
+| HEAD full | `69130a205300ea0b5203e36deba8476b8c2e6f3c` |
+| HEAD date | 2026-10-11 14:33:31 +0900 |
 | HEAD author | kwonyoungin11 <kyi2516@gmail.com> |
-| HEAD subject | feat: restore field drawing tools and keep imported SHP on save/open |
-| Total commits | 52 |
-| Upstream | `origin/main` |
-| Sync | up to date with origin/main |
+| HEAD subject | chore(dev): 이 PC 빌드 후 바탕화면 아이콘을 갱신하는 스크립트와 작업 지침을 넣는다 |
+| Total commits | 384 |
+| Upstream | `(none)` |
+| Sync | no upstream configured |
 | Origin | https://github.com/kwonyoungin11/hgis.git |
-| Working tree dirty | **yes** (21 paths) |
+| Working tree dirty | **yes** (15 paths) |
 
 ## How far we are
 
-- **Recorded tip when this file was written:** feat: restore field drawing tools and keep imported SHP on save/open (`6fc9375` @ 2026-09-05 17:39:25 +0900)
-- **Remote sync at write time:** up to date with origin/main
-- **Uncommitted local changes at write time:** yes (21 paths)
+- **Recorded tip when this file was written:** chore(dev): 이 PC 빌드 후 바탕화면 아이콘을 갱신하는 스크립트와 작업 지침을 넣는다 (`69130a2` @ 2026-10-11 14:33:31 +0900)
+- **Remote sync at write time:** no upstream configured
+- **Uncommitted local changes at write time:** yes (15 paths)
 
 ### Read this correctly
 
@@ -37,85 +37,66 @@
 
 ## Milestone markers
 
-- `99bd664` commit progress ledger ??Refresh COMMIT_STATUS for baseline HEAD.
-- `536977c` commit progress ledger ??Sync COMMIT_STATUS to HEAD after push.
-- `c1a3c12` commit progress ledger ??Refresh COMMIT_STATUS ledger after feature commits.
-- `31e51be` commit progress ledger ??Sync COMMIT_STATUS to HEAD after push ledger update.
-- `6b9f373` commit progress ledger ??Refresh COMMIT_STATUS after bootstrap docs commit.
-- `3a5a87a` commit progress ledger ??Sync COMMIT_STATUS to tip after bootstrap push.
-- `f4c1901` commit progress ledger ??Sync COMMIT_STATUS to tip after field HGIS push.
-- `cf8c011` commit progress ledger ??Refresh COMMIT_STATUS after theme ship; drop old no-MCP rule.
-- `ef06bf1` commit progress ledger ??Refresh COMMIT_STATUS after chrome and folder-import ship.
-- `3bd6ff8` commit progress ledger ??Refresh COMMIT_STATUS after teal chrome and digitize ship.
-- `c4cc35c` commit progress ledger ??Refresh COMMIT_STATUS after buffer and new-survey reset.
-- `cf52276` commit progress ledger ??Refresh COMMIT_STATUS after start page and layout coord ship.
-- `033fffa` commit progress ledger ??Refresh COMMIT_STATUS after section studio ship.
-- `d6db386` commit progress ledger ??Refresh COMMIT_STATUS after Malgun Gothic and unlazy ship.
+- (auto milestones not matched yet)
 
 ## Recent commits (newest first, max 30)
 
 | Hash | Date | Subject |
 |------|------|---------|
-| `6fc9375` | 2026-09-05T17:39:25+09:00 | feat: restore field drawing tools and keep imported SHP on save/open |
-| `3631571` | 2026-09-04T22:49:00+09:00 | fix(dem): 스택 오버플로우 재귀 및 WMS 렌더러 크래시 방지 |
-| `81c0d1e` | 2026-09-04T22:30:04+09:00 | style(ui): 전체 카드창 그림자(Drop Shadow) 및 버튼/리본 입체감(Elevation) 적용 |
-| `7beb4b1` | 2026-09-04T22:23:46+09:00 | chore: 최신 포터블 바이너리 및 커밋 상태 동기화 |
-| `c600253` | 2026-09-04T22:18:58+09:00 | feat(app): 구간분리 생성 취소 및 선택 도형 Delete 삭제 후 Ctrl+Z 복원 지원 |
-| `bde6a19` | 2026-09-04T22:14:01+09:00 | feat(core): 구간분리 시 원본 도형 보존 및 교차 피처 독립 분리, 피처 복원 함수 구현 |
-| `b5a903e` | 2026-09-04T22:02:40+09:00 | feat(select): 다중 레이어 Shift 피처 선택 도구 및 2개 도형 선택 시 겹침 자동 분할 연동 |
-| `77fccd7` | 2026-09-04T21:57:11+09:00 | feat(core): 선택된 두 도형 간 겹치는 구간 자동 분할(splitTwoOverlappingFeatures) 구현 |
-| `d41d825` | 2026-09-04T21:46:34+09:00 | feat(ui): 그리기 툴바에 겹치는 구간 분리(클립) 및 폴리곤 나누기 기능 연동 |
-| `72cb771` | 2026-09-04T21:39:40+09:00 | feat(core): 레이어 클립(구간 분리) 및 폴리곤 분할(Split) 코어 연산 추가 |
-| `30db1c4` | 2026-09-04T18:05:19+09:00 | fix(layers): ensure satellite layer stays at bottom and prevent deletion via reorderGroupLayers |
-| `d910e9b` | 2026-09-04T17:11:58+09:00 | fix(georef): instant canvas update on align move/save and fix raster layer order above basemaps |
-| `4a5341d` | 2026-09-02T17:57:24+09:00 | Ship align overlay viewport mapping, scan-ink overlay, paleo/soil maps, and trench field GIS. |
-| `83fe782` | 2026-08-31T10:20:41+09:00 | Ship user_sheet submit PDF, 4K/5186 satellite fill, and WMS zoom crash guard. |
-| `9592951` | 2026-08-30T18:33:14+09:00 | Widen geology, soil, and river downloads to 4x span so 1:10000 drawings stay covered. |
-| `d6db386` | 2026-08-30T12:41:15+09:00 | Refresh COMMIT_STATUS after Malgun Gothic and unlazy ship. |
-| `1eb3c3e` | 2026-08-30T12:41:00+09:00 | Ship Malgun Gothic field chrome, section/layout GIS work, and Grok unlazy expert harness. |
-| `ff8c099` | 2026-08-23T15:08:48+09:00 | Ship 4K-safe VWorld satellite tiles and pending field GIS work for another machine. |
-| `033fffa` | 2026-08-23T08:44:29+09:00 | Refresh COMMIT_STATUS after section studio ship. |
-| `bbec31e` | 2026-08-23T08:44:15+09:00 | Ship section drawing studio so Descartes GeoTIFF sheets can continue on another machine. |
-| `4a7f44d` | 2026-08-21T23:37:43+09:00 | Update Grok agent rules and hooks for the excavation GIS loop. |
-| `be276e4` | 2026-08-21T23:37:27+09:00 | Draw layout rasters in a single pass so tiled basemaps stop leaving blank chunks. |
-| `80223e1` | 2026-08-21T23:09:06+09:00 | Fix review findings: wire single-instance guard, anchor layout wheel zoom, repair portable README encoding. |
-| `5735677` | 2026-08-21T22:48:49+09:00 | Ship pro survey sheets, Korean map services, trench tools, and crash guard. |
-| `cf52276` | 2026-08-18T07:29:54+09:00 | Refresh COMMIT_STATUS after start page and layout coord ship. |
-| `a057319` | 2026-08-18T07:29:17+09:00 | Ship start page, recent surveys, splash, auto VWorld basemaps, and layout coordinate callouts. |
-| `c4cc35c` | 2026-08-17T14:04:44+09:00 | Refresh COMMIT_STATUS after buffer and new-survey reset. |
-| `2ca17b9` | 2026-08-17T14:04:33+09:00 | Ship site buffer rings, new-survey legend reset, and OSGeo launch PATH. |
-| `e896fce` | 2026-08-17T10:48:58+09:00 | Ship georef split-align, easy-draw layer, and feature kind/period presets. |
-| `3bd6ff8` | 2026-08-16T15:35:45+09:00 | Refresh COMMIT_STATUS after teal chrome and digitize ship. |
+| `69130a2` | 2026-10-11T14:33:31+09:00 | chore(dev): 이 PC 빌드 후 바탕화면 아이콘을 갱신하는 스크립트와 작업 지침을 넣는다 |
+| `a805797` | 2026-10-11T06:24:37+09:00 | fix(drawing): 범례를 용지 밖에도 놓을 수 있게 한다 — 보완 L4(범례를 용지 안에 가둠)를 되돌린다 |
+| `1a9826d` | 2026-10-11T05:50:35+09:00 | docs: 스타일 탭 스크롤 규칙이 스크롤바에 닿지 않는 시험을 오류 재발 방지표 R1 줄에 적는다 |
+| `61b5a7e` | 2026-10-11T05:42:20+09:00 | fix(polish): 검토 보완 — 스타일 탭 스크롤 규칙·되돌리기 묶음 모서리·최근 조사 3열 폭·저장 실패 알림 문구 |
+| `aaf759c` | 2026-10-11T05:29:49+09:00 | fix(look): M2·M8 보강 — 새 모양에서만 바뀌게 한다(예전 모양은 그대로) |
+| `d8139a3` | 2026-10-11T05:26:19+09:00 | fix(drawing): L4 보강 — 범례를 안쪽으로 밀 때 레이아웃의 위치 기록도 함께 옮긴다 |
+| `b5a25e0` | 2026-10-11T05:24:03+09:00 | fix(page): M1 분할선 폭이 저장된 상태와 명시한 폭에 덮이지 않는다 — 네 분할선 모두 7 px에 가운데 1 px 선 |
+| `b9ca416` | 2026-10-11T04:58:14+09:00 | docs: 세부 디자인 보완 결과·시험 지도·오류 재발 방지표를 적는다 |
+| `6f219fa` | 2026-10-11T04:57:09+09:00 | style(alert): D3 ③ 도면·인쇄·3D의 실패 알림 10곳을 한 틀(무엇이 · 왜 · 어떻게)로 맞춘다 |
+| `6afe16a` | 2026-10-11T04:30:53+09:00 | style(alert): D3 ② 지도·정합·지적의 실패 알림 8곳을 한 틀(무엇이 · 왜 · 어떻게)로 맞춘다 |
+| `6fe892c` | 2026-10-11T04:12:15+09:00 | style(alert): D3 ① 저장·내보내기의 실패 알림 11곳을 한 틀(무엇이 · 왜 · 어떻게)로 맞춘다 |
+| `7582d65` | 2026-10-11T03:56:58+09:00 | fix(drawing): L4 범례 상자 전체가 늘 용지 안에 머문다 — 걸친 만큼 안쪽으로 민다 |
+| `0469dff` | 2026-10-11T03:48:48+09:00 | style(submit): D2 검수·제출 창 — 제목은 「오류 N건을 확인하세요」와 한 줄 안내, 수치 칸은 96 px 이상, 항목 표는 삼선표 |
+| `6dc6b0b` | 2026-10-11T03:43:54+09:00 | feat(files): M8 파일함에서 「SD 카드」 단추를 빼고 「폴더 직접 찾기」로 연다, 「상위」는 오른쪽 끝, 바로가기는 조용한 24 px 글자 |
+| `339f90b` | 2026-10-11T03:38:22+09:00 | fix(inspector): R1 낮은 창에서도 오른쪽 판의 스타일 탭이 잘리지 않고 스크롤된다, 「배경 지도」 줄은 아래에 붙어 있다 |
+| `6e15cf4` | 2026-10-11T03:35:59+09:00 | style(window): D1 창의 단추는 32 px, 입력칸도 32 px (테두리·안쪽 여백까지 합친 높이) |
+| `ace5f97` | 2026-10-11T03:31:57+09:00 | style(page): M1·H1 지도 화면의 판·지도는 한 장 — 바깥 둥근 틀 없이, 7 px 분할선 가운데 1 px 선, 지도는 판 사이를 꽉 채운다 |
+| `81190f5` | 2026-10-11T03:26:43+09:00 | style(drawing): L5 용지 설정 창은 새 파일 KaPaperDialog로 옮기고, 용지에서 정해진 가로·세로는 읽는 줄로 보인다 |
+| `4125d6c` | 2026-10-11T03:20:20+09:00 | style(drawing): L1·L3 도면 오른쪽 판은 상자 대신 캡션 + 이음선, 왼쪽 머리줄은 지도 화면과 같은 조용한 글자, 빈 상태는 문장만 |
+| `4adf615` | 2026-10-11T03:13:07+09:00 | style(home): H6 보강 — 연결 상태의 「인터넷 확인」은 24 px 테두리 단추 |
+| `354a4f2` | 2026-10-11T03:11:03+09:00 | style(draw-row): M3 보강 — 「연속 그리기」 켜짐은 귀리색, 그리기 줄의 묶음 사이에 1 px 선 |
+| `51523d7` | 2026-10-11T03:05:57+09:00 | style(home): H3 보강 — 폴더 칸은 「… › 폴더 › 조사명」으로 끝나고, 최근 조사 줄의 경로는 「… › 폴더」로 줄인다 |
+| `65dda9b` | 2026-10-11T02:58:20+09:00 | style(tabs): M4 홈·지도·도면 탭은 흰 상자 탭이 아니라 글자 + 2 px 먹 밑줄(지금 보는 화면) |
+| `a2ba69a` | 2026-10-11T02:55:52+09:00 | style(draw-row): M3 그리기 줄에서 손에 든 도구는 귀리색이 아니라 먹 채움 + 상아 글자(리본 「그리기」 타일과 같은 모습) |
+| `956f7aa` | 2026-10-11T02:50:49+09:00 | style(status): M7 상태줄 「→ 제출 5179」는 테두리 칩이 아니라 조용한 모노 글자(마우스를 대면 밑줄), 상태줄 32 px |
+| `de32323` | 2026-10-11T02:46:47+09:00 | style(map): M6 지도 위 되돌리기·다시 실행은 동그라미 둘이 아니라 한 덮개(73×36)에 두 글리프와 가운데 선 |
+| `6018029` | 2026-10-11T02:42:48+09:00 | style(inspector): M5 오른쪽 판의 빈 상태 문장은 점선 상자 없이 문장만, 탭 「속성 / 스타일」은 아이콘 없이 글자 + 밑줄 |
+| `ecc372f` | 2026-10-11T02:38:59+09:00 | style(layers): M2 레이어 목록의 같은 띠 글자(주변·참조·지적도)는 처음 한 번만 쓰고, 다시 나오는 자리에는 선만 둔다 |
+| `f2b6dd6` | 2026-10-11T02:37:02+09:00 | style(home): H4 최근 조사 표는 마우스를 올린 줄 전체가 한 번에 밝아진다 |
+| `dc8d538` | 2026-10-11T02:34:12+09:00 | style(home): H2 「이어서 작업」 표제란을 한 틀 3행으로 — 캡션 · 이름과 단추 · 칸, 아래 선이 어긋나던 것을 바로잡는다 |
 
 ## Staged in this commit
 
 ```
-M	.grok/NOW.md
-A	.grok/plans/2026-09-05-save-open.md
 M	CMakeLists.txt
-M	HANDOFF.md
-M	dist/ka-hgis-portable/ka-hgis.exe
-M	docs/COMMIT_STATUS.md
-M	docs/HANDOFF.md
-M	src/app/KaApplication.cpp
-M	src/app/KaDrawingStudio.cpp
-M	src/app/MainWindow.cpp
+M	docs/ERROR_REGRESSION.md
+A	docs/intent/2026-10-14-export-nearby-heritage-excel.md
+M	src/app/KaSurveyAreaDialog.cpp
+M	src/app/KaSurveyAreaDialog.h
 M	src/app/MainWindow.h
-M	src/core/KaSafeQgis.cpp
-M	src/core/KaSafeQgis.h
+M	src/app/MainWindowEditing.cpp
+M	src/app/MainWindowExport.cpp
+M	src/app/MainWindowRibbon.cpp
 M	src/core/LayerOps.cpp
-M	src/core/LayerOps.h
-A	src/core/SurveyStorage.cpp
-A	src/core/SurveyStorage.h
-M	tests/test_recent.cpp
-A	tests/test_save_open.cpp
-M	tests/test_theme.cpp
-M	tests/test_workflow.cpp
+A	src/core/NearbyHeritageExport.cpp
+A	src/core/NearbyHeritageExport.h
+M	src/core/SurveyStorage.cpp
+M	tests/test_heritage_fetch_plan.cpp
+M	tests/test_survey_area_plate.cpp
 ```
 ## Other PC checklist
 
 ```powershell
-git clone https://github.com/kwonyoungin11/hgis.git
+git clone https://github.com/kesekikwon-netizen/hgis.git
 cd hgis
 git pull
 Get-Content docs\COMMIT_STATUS.md -Head 40

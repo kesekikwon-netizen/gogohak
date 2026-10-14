@@ -10,9 +10,19 @@
 #include <qgsproject.h>
 #include <qgsvectorlayer.h>
 
+#include "core/BufferAnalysis.h"
 #include "core/HeritageFetchPlan.h"
+#include "core/HeritageLayoutNumbers.h"
 #include "core/HeritagePledge.h"
 #include "core/HeritageRecentDownloads.h"
+#include "core/HeritageStyle.h"
+#include "core/LayerOps.h"
+#include "core/NearbyHeritageExport.h"
+#include <qgscoordinatereferencesystem.h>
+#include <qgsfeature.h>
+#include <qgsfield.h>
+#include <qgsgeometry.h>
+#include <qgsrectangle.h>
 
 // F120 / F169 / F174 core rules, without the intranet or WebEngine.
 class HeritageFetchPlanTest : public QObject {
@@ -118,6 +128,75 @@ private slots:
     QVERIFY(!HeritagePledge::isIntranetLayer(legacy));
     QCOMPARE(HeritagePledge::checklistStateKey(), QStringLiteral("HERITAGE_PLEDGE_SCOPE"));
   }
+
+  void nearbyHeritageExcelExport_writesSiteNameDirectionAndDistance() {
+    QgsProject project;
+    project.setCrs(QgsCoordinateReferenceSystem(QStringLiteral("EPSG:5187")));
+    auto* area = new QgsVectorLayer(QStringLiteral("Polygon?crs=EPSG:5187"), QStringLiteral("조사구역"),
+                                    QStringLiteral("memory"));
+    LayerOps::markSurveyLayer(area, QStringLiteral("survey_area"));
+    QgsFeature af(area->fields());
+    af.setGeometry(QgsGeometry::fromRect(QgsRectangle(200000, 450000, 200020, 450020)));
+    area->dataProvider()->addFeature(af);
+    project.addMapLayer(area);
+
+    auto* buried = new QgsVectorLayer(QStringLiteral("Polygon?crs=EPSG:5187"),
+                                      QStringLiteral("매장유산유존지역"), QStringLiteral("memory"));
+    buried->dataProvider()->addAttributes({QgsField(QStringLiteral("유적명"), QMetaType::Type::QString)});
+    buried->updateFields();
+    HeritageLayoutNumbers::tagDataset(buried, HeritageDataset::BuriedHeritageArea);
+    auto addSite = [&](const QString& name, const QgsRectangle& rect) {
+      QgsFeature f(buried->fields());
+      f.setGeometry(QgsGeometry::fromRect(rect));
+      f.setAttribute(0, name);
+      buried->dataProvider()->addFeature(f);
+    };
+    addSite(QStringLiteral("광령리 중첩유적"), QgsRectangle(200005, 450005, 200015, 450015));
+    addSite(QStringLiteral("광령리 북쪽유적"), QgsRectangle(200005, 450270, 200015, 450280));
+    addSite(QStringLiteral("광령리 동쪽유적"), QgsRectangle(200820, 450005, 200830, 450015));
+    addSite(QStringLiteral("광령리 원거리유적"), QgsRectangle(200005, 448400, 200015, 448410));
+    project.addMapLayer(buried);
+
+    QString err;
+    QVERIFY2(BufferAnalysis::addDistanceRing(&project, nullptr, nullptr, 500.0, &err) ||
+                 BufferAnalysis::addDistanceRing(&project, nullptr, area, 500.0, &err),
+             qPrintable(err));
+    QCOMPARE(NearbyHeritageExport::activeMaxRadiusMeters(&project), 500.0);
+    const auto r500 = NearbyHeritageExport::collect(&project);
+    QVERIFY2(r500.ok(), qPrintable(r500.error));
+    QCOMPARE(r500.items.size(), 2);
+    QCOMPARE(r500.items.at(0).siteName, QStringLiteral("광령리 중첩유적"));
+    QCOMPARE(r500.items.at(0).distanceMeters, 0);
+    QCOMPARE(r500.items.at(0).direction, QStringLiteral("조사구역 내"));
+    QCOMPARE(r500.items.at(1).siteName, QStringLiteral("광령리 북쪽유적"));
+    QCOMPARE(r500.items.at(1).direction, QStringLiteral("북"));
+    QCOMPARE(r500.items.at(1).distanceMeters, 250);
+
+    QVERIFY2(BufferAnalysis::addDistanceRing(&project, nullptr, area, 1000.0, &err), qPrintable(err));
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    const QString xlsx = dir.filePath(QStringLiteral("주변유적_현황_1000m.xlsx"));
+    const auto r1000 = NearbyHeritageExport::exportToXlsx(&project, xlsx);
+    QVERIFY2(r1000.ok(), qPrintable(r1000.error));
+    QCOMPARE(r1000.items.size(), 3);
+    QCOMPARE(r1000.items.at(2).siteName, QStringLiteral("광령리 동쪽유적"));
+    QCOMPARE(r1000.items.at(2).direction, QStringLiteral("동"));
+    QCOMPARE(r1000.items.at(2).distanceMeters, 800);
+    QCOMPARE(r1000.items.at(2).radiusLabel, QStringLiteral("1000m 이내"));
+
+    QgsVectorLayer sheet(xlsx + QStringLiteral("|layername=주변유적_현황"), QStringLiteral("xlsx"),
+                         QStringLiteral("ogr"));
+    QVERIFY(sheet.isValid());
+    QCOMPARE(int(sheet.featureCount()), 3);
+
+    auto* area2 = new QgsVectorLayer(QStringLiteral("Polygon?crs=EPSG:5187"), QStringLiteral("조사구역 2"),
+                                     QStringLiteral("memory"));
+    LayerOps::markSurveyLayer(area2, QStringLiteral("survey_area_2"));
+    area2->dataProvider()->addFeature(af);
+    project.addMapLayer(area2);
+    if (auto* n1 = project.layerTreeRoot()->findLayer(area->id())) n1->setItemVisibilityChecked(false);
+    QCOMPARE(NearbyHeritageExport::resolveSourceLayer(&project, nullptr), area2);
+  }
 };
 
 int main(int argc, char** argv) {
@@ -132,3 +211,4 @@ int main(int argc, char** argv) {
   return result;
 }
 #include "test_heritage_fetch_plan.moc"
+
