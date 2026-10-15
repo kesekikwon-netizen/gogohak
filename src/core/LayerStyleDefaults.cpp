@@ -9,6 +9,8 @@
 #include <qgslinesymbol.h>
 #include <qgslinesymbollayer.h>
 #include <qgsmarkersymbol.h>
+#include <qgsvectorlayer.h>
+#include <qgsvectorlayerselectionproperties.h>
 
 namespace {
 double linear(double channel) {
@@ -75,8 +77,8 @@ LayerStyleDefaults::DomainStyle LayerStyleDefaults::forKey(const QString& key) {
   return s;
 }
 
-QgsSymbol* LayerStyleDefaults::casedLineSymbol(const DomainStyle& base, const QColor& core,
-                                               double coreWidthMm, bool dashed) {
+QgsSymbol* LayerStyleDefaults::casedLineSymbol(const DomainStyle& base, const QColor& core, double coreWidthMm,
+                                               bool dashed) {
   auto line = QgsLineSymbol::createSimple({
       {QStringLiteral("line_color"), base.casingColor.name(QColor::HexArgb)},
       {QStringLiteral("line_width"), QString::number(base.casingWidthMm)},
@@ -91,41 +93,57 @@ QgsSymbol* LayerStyleDefaults::casedLineSymbol(const DomainStyle& base, const QC
 }
 
 QgsSymbol* LayerStyleDefaults::buildSymbol(int geometryType, const DomainStyle& base, const QColor& fill,
-                                           const QColor& stroke, double strokeWidthMm, double markerSizeMm,
-                                           bool noFill, bool noStroke, bool dashed) {
+                                           const QColor& stroke, double strokeWidthMm, double markerSizeMm, bool noFill,
+                                           bool noStroke, bool dashed) {
   const auto gt = static_cast<Qgis::GeometryType>(geometryType);
   const QString lineStyle = noStroke ? QStringLiteral("no") : dashed ? QStringLiteral("dash") : QStringLiteral("solid");
   if (gt == Qgis::GeometryType::Polygon) {
-    return QgsFillSymbol::createSimple({
-        {QStringLiteral("color"), fill.name(QColor::HexArgb)},
-        {QStringLiteral("style"), noFill ? QStringLiteral("no") : QStringLiteral("solid")},
-        {QStringLiteral("outline_color"), stroke.name(QColor::HexArgb)},
-        {QStringLiteral("outline_width"), QString::number(noStroke ? 0.0 : strokeWidthMm)},
-        {QStringLiteral("outline_width_unit"), QStringLiteral("MM")},
-        {QStringLiteral("outline_style"), lineStyle},
-    }).release();
+    return QgsFillSymbol::createSimple(
+               {
+                   {QStringLiteral("color"), fill.name(QColor::HexArgb)},
+                   {QStringLiteral("style"), noFill ? QStringLiteral("no") : QStringLiteral("solid")},
+                   {QStringLiteral("outline_color"), stroke.name(QColor::HexArgb)},
+                   {QStringLiteral("outline_width"), QString::number(noStroke ? 0.0 : strokeWidthMm)},
+                   {QStringLiteral("outline_width_unit"), QStringLiteral("MM")},
+                   {QStringLiteral("outline_style"), lineStyle},
+               })
+        .release();
   }
   if (gt == Qgis::GeometryType::Line) {
     if (base.casing && !noStroke) return casedLineSymbol(base, stroke, strokeWidthMm, dashed);
-    return QgsLineSymbol::createSimple({
-        {QStringLiteral("line_color"), stroke.name(QColor::HexArgb)},
-        {QStringLiteral("line_width"), QString::number(noStroke ? 0.0 : strokeWidthMm)},
-        {QStringLiteral("line_width_unit"), QStringLiteral("MM")},
-        {QStringLiteral("line_style"), lineStyle},
-    }).release();
+    return QgsLineSymbol::createSimple(
+               {
+                   {QStringLiteral("line_color"), stroke.name(QColor::HexArgb)},
+                   {QStringLiteral("line_width"), QString::number(noStroke ? 0.0 : strokeWidthMm)},
+                   {QStringLiteral("line_width_unit"), QStringLiteral("MM")},
+                   {QStringLiteral("line_style"), lineStyle},
+               })
+        .release();
   }
   if (gt == Qgis::GeometryType::Point) {
-    return QgsMarkerSymbol::createSimple({
-        {QStringLiteral("name"), QStringLiteral("circle")},
-        {QStringLiteral("color"), noFill ? QStringLiteral("#00000000") : fill.name(QColor::HexArgb)},
-        {QStringLiteral("outline_color"), stroke.name(QColor::HexArgb)},
-        {QStringLiteral("outline_width"), noStroke ? QStringLiteral("0") : QStringLiteral("0.6")},
-        {QStringLiteral("outline_style"), noStroke ? QStringLiteral("no") : QStringLiteral("solid")},
-        {QStringLiteral("size"), QString::number(markerSizeMm)},
-        {QStringLiteral("size_unit"), QStringLiteral("MM")},
-    }).release();
+    return QgsMarkerSymbol::createSimple(
+               {
+                   {QStringLiteral("name"), QStringLiteral("circle")},
+                   {QStringLiteral("color"), noFill ? QStringLiteral("#00000000") : fill.name(QColor::HexArgb)},
+                   {QStringLiteral("outline_color"), stroke.name(QColor::HexArgb)},
+                   {QStringLiteral("outline_width"), noStroke ? QStringLiteral("0") : QStringLiteral("0.6")},
+                   {QStringLiteral("outline_style"), noStroke ? QStringLiteral("no") : QStringLiteral("solid")},
+                   {QStringLiteral("size"), QString::number(markerSizeMm)},
+                   {QStringLiteral("size_unit"), QStringLiteral("MM")},
+               })
+        .release();
   }
   return nullptr;
+}
+
+void LayerStyleDefaults::applySelectionStyle(QgsVectorLayer* layer, bool noFill) {
+  if (!layer || layer->geometryType() != Qgis::GeometryType::Polygon) return;
+  auto* selProps = qobject_cast<QgsVectorLayerSelectionProperties*>(layer->selectionProperties());
+  if (!selProps) return;
+  selProps->setSelectionRenderingMode(Qgis::SelectionRenderingMode::CustomColor);
+  // 채우기 없음(noFill)이면 선택해도 내부가 색으로 채워지지 않게(alpha=0) 없애고,
+  // 일반 채움 도형도 뒤 배경이 보이도록 흐린 반투명(alpha=45)으로 표시한다.
+  selProps->setSelectionColor(noFill ? QColor(255, 235, 59, 0) : QColor(255, 235, 59, 45));
 }
 
 QVector<QColor> LayerStyleDefaults::reservedColors() {
@@ -135,7 +153,8 @@ QVector<QColor> LayerStyleDefaults::reservedColors() {
     out.append(opaque(s.stroke));
     if (s.fill.alpha() >= 60) out.append(opaque(s.fill));  // near-transparent fills are not seen
   }
-  for (HeritageDataset dataset : HeritageStyle::allDatasets()) out.append(HeritageStyle::color(dataset));
+  for (HeritageDataset dataset : HeritageStyle::allDatasets())
+    out.append(HeritageStyle::color(dataset));
   return out;
 }
 

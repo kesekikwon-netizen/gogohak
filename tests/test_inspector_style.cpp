@@ -3,19 +3,23 @@
 // (code review 2026-10-03): both boxes, point layers, a change made in another window.
 #include <QtTest>
 
+#include <memory>
 #include <QCheckBox>
 #include <QDoubleSpinBox>
 #include <QLabel>
 #include <QPushButton>
 #include <QStandardPaths>
-#include <memory>
 
+#include <QPainter>
 #include <qgsapplication.h>
 #include <qgsfeature.h>
 #include <qgsgeometry.h>
+#include <qgsmaprenderercustompainterjob.h>
+#include <qgsmapsettings.h>
 #include <qgsrectangle.h>
 #include <qgsvectordataprovider.h>
 #include <qgsvectorlayer.h>
+#include <qgsvectorlayerselectionproperties.h>
 
 #include "app/KaInspectorStyle.h"
 #include "app/KaTheme.h"
@@ -23,11 +27,13 @@
 
 namespace {
 std::unique_ptr<QgsVectorLayer> surveyLayer(const QString& geometry, const QString& key) {
-  auto layer = std::make_unique<QgsVectorLayer>(geometry + QStringLiteral("?crs=EPSG:5187"), key, QStringLiteral("memory"));
+  auto layer =
+      std::make_unique<QgsVectorLayer>(geometry + QStringLiteral("?crs=EPSG:5187"), key, QStringLiteral("memory"));
   LayerOps::markSurveyLayer(layer.get(), key);
   QgsFeature f(layer->fields());
-  f.setGeometry(geometry == QLatin1String("Point") ? QgsGeometry::fromPointXY(QgsPointXY(200000, 450000))
-                                                   : QgsGeometry::fromRect(QgsRectangle(200000, 450000, 200010, 450005)));
+  f.setGeometry(geometry == QLatin1String("Point")
+                    ? QgsGeometry::fromPointXY(QgsPointXY(200000, 450000))
+                    : QgsGeometry::fromRect(QgsRectangle(200000, 450000, 200010, 450005)));
   layer->dataProvider()->addFeature(f);
   return layer;
 }
@@ -44,7 +50,9 @@ Look lookOf(QgsVectorLayer* layer) {
   return l;
 }
 
-QCheckBox* box(KaInspectorStyle& style, const char* name) { return style.findChild<QCheckBox*>(QString::fromLatin1(name)); }
+QCheckBox* box(KaInspectorStyle& style, const char* name) {
+  return style.findChild<QCheckBox*>(QString::fromLatin1(name));
+}
 
 QPushButton* swatch(KaInspectorStyle& style, int index) {
   return style.findChildren<QPushButton*>(QStringLiteral("inspectorStyleSwatch")).value(index);
@@ -73,7 +81,8 @@ class TestInspectorStyle : public QObject {
     auto* width = style.findChild<QDoubleSpinBox*>(QStringLiteral("inspectorStyleWidth"));
     QVERIFY(swatchHead && label && width);
     const bool shown = swatchHead->isVisible() && swatchHead->pixmap().size() == QSize(20, 14);
-    const int paperGap = qAbs(label->mapTo(&style, label->rect().center()).y() - width->mapTo(&style, width->rect().center()).y());
+    const int paperGap =
+        qAbs(label->mapTo(&style, label->rect().center()).y() - width->mapTo(&style, width->rect().center()).y());
     const int paperBox = width->width();
     KaTheme::setDisplayOptions(nullptr, KaTheme::DisplayOptions());
     style.setLayer(layer.get());
@@ -172,6 +181,48 @@ class TestInspectorStyle : public QObject {
     QVERIFY(!box(style, "inspectorStyleNoFill")->isChecked());
     LayerOps::applySimpleVectorStyle(layer.get(), QColor(0, 0, 0, 0), QColor(0xDC, 0x26, 0x26), 1.0, 3.5, true, false);
     QVERIFY(box(style, "inspectorStyleNoFill")->isChecked());
+  }
+
+  // 「채우기 없음 (선만)」일 때 도형을 선택해도 내부가 노란색으로 채워져 뒤 배경을 가리지 않아야 한다.
+  void selectedNoFillPolygonDoesNotBlockBackground() {
+    auto layer = surveyLayer(QStringLiteral("Polygon"), QStringLiteral("survey_area"));
+    KaInspectorStyle style;
+    style.setLayer(layer.get());
+    box(style, "inspectorStyleNoFill")->click();
+    QVERIFY(box(style, "inspectorStyleNoFill")->isChecked());
+    layer->selectAll();
+    QCOMPARE(layer->selectedFeatureCount(), 1);
+
+    auto* selProps = qobject_cast<QgsVectorLayerSelectionProperties*>(layer->selectionProperties());
+    QVERIFY(selProps);
+    QCOMPARE(selProps->selectionRenderingMode(), Qgis::SelectionRenderingMode::CustomColor);
+    QCOMPARE(selProps->selectionColor().alpha(), 0);
+
+    // 실제 렌더러로 그렸을 때 다각형 한가운데 픽셀이 배경색(흰색) 그대로 남는지 확인한다.
+    QgsMapSettings ms;
+    ms.setDestinationCrs(layer->crs());
+    ms.setExtent(QgsRectangle(199998, 449998, 200012, 450007));
+    ms.setOutputSize(QSize(64, 64));
+    ms.setBackgroundColor(Qt::white);
+    ms.setFlag(Qgis::MapSettingsFlag::DrawSelection, true);
+    ms.setLayers({layer.get()});
+    QImage img(64, 64, QImage::Format_ARGB32_Premultiplied);
+    img.fill(Qt::white);
+    {
+      QPainter p(&img);
+      QgsMapRendererCustomPainterJob job(ms, &p);
+      job.start();
+      job.waitForFinished();
+    }
+    const QColor centerPx = img.pixelColor(32, 32);
+    QCOMPARE(centerPx.red(), 255);
+    QCOMPARE(centerPx.green(), 255);
+    QCOMPARE(centerPx.blue(), 255);
+
+    // 채우기를 다시 켜도 선택 색은 불투명(255)이 아니라 반투명(<= 60)이어야 뒤가 비쳐 보인다.
+    box(style, "inspectorStyleNoFill")->click();
+    QVERIFY(!box(style, "inspectorStyleNoFill")->isChecked());
+    QVERIFY(selProps->selectionColor().alpha() > 0 && selProps->selectionColor().alpha() <= 60);
   }
 };
 

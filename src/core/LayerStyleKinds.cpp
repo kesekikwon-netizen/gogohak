@@ -3,8 +3,8 @@
 #include "LayerOps.h"
 #include "LayerStyleDefaults.h"
 
-#include <QStringList>
 #include <algorithm>
+#include <QStringList>
 
 #include <qgscategorizedsymbolrenderer.h>
 #include <qgsfeature.h>
@@ -14,9 +14,9 @@
 #include <qgsvectorlayer.h>
 
 namespace {
-constexpr int kHueSteps = 24;                 // hues 15 degrees apart
-constexpr int kCandidates = kHueSteps * 2;    // each hue in a light and a dark tone
-constexpr int kStride = 7;                    // coprime with kCandidates: probing visits all once
+constexpr int kHueSteps = 24;               // hues 15 degrees apart
+constexpr int kCandidates = kHueSteps * 2;  // each hue in a light and a dark tone
+constexpr int kStride = 7;                  // coprime with kCandidates: probing visits all once
 
 // FNV-1a over UTF-8. qHash is seeded per process in Qt 6, so it would recolour
 // the same kind on every start.
@@ -36,7 +36,9 @@ QColor candidate(int index) {
 }
 }  // namespace
 
-QString LayerStyleKinds::unclassifiedLabel() { return QStringLiteral("미분류"); }
+QString LayerStyleKinds::unclassifiedLabel() {
+  return QStringLiteral("미분류");
+}
 
 QColor LayerStyleKinds::colorForKind(const QString& kind, const QSet<QRgb>& taken) {
   const int start = static_cast<int>(stableHash(kind.trimmed()) % kCandidates);
@@ -91,28 +93,32 @@ bool LayerStyleKinds::apply(QgsVectorLayer* layer) {
     taken.insert(color.rgb());
     QColor kindFill = color;
     kindFill.setAlpha(150);
-    QgsSymbol* symbol = LayerStyleDefaults::buildSymbol(geometry, base, kindFill, color.darker(160),
-                                                        widthMm, markerMm, false, false, false);
+    QgsSymbol* symbol = LayerStyleDefaults::buildSymbol(geometry, base, kindFill, color.darker(160), widthMm, markerMm,
+                                                        false, false, false);
     if (symbol) categories.append(QgsRendererCategory(QVariant(kind), symbol, kind.trimmed()));
   }
   // Empty, NULL and not-yet-listed kinds keep the layer's own symbol.
-  if (QgsSymbol* rest = LayerStyleDefaults::buildSymbol(geometry, base, fill, stroke, widthMm, markerMm,
-                                                         false, false, false))
+  if (QgsSymbol* rest =
+          LayerStyleDefaults::buildSymbol(geometry, base, fill, stroke, widthMm, markerMm, false, false, false))
     categories.append(QgsRendererCategory(QVariant(), rest, unclassifiedLabel()));
   if (categories.isEmpty()) return false;
   layer->setRenderer(new QgsCategorizedSymbolRenderer(field, categories));
   layer->setCustomProperty(QString::fromLatin1(kPropStyleMode), QString::fromLatin1(kModeByKind));
+  LayerStyleDefaults::applySelectionStyle(layer, false);
   layer->triggerRepaint();
   return true;
 }
 
 bool LayerStyleKinds::isByKind(const QgsVectorLayer* layer) {
-  return layer && layer->customProperty(QString::fromLatin1(kPropStyleMode)).toString() ==
-                      QLatin1String(kModeByKind);
+  return layer && layer->customProperty(QString::fromLatin1(kPropStyleMode)).toString() == QLatin1String(kModeByKind);
 }
 
 void LayerStyleKinds::clearMode(QgsVectorLayer* layer) {
-  if (layer && isByKind(layer)) layer->removeCustomProperty(QString::fromLatin1(kPropStyleMode));
+  if (!layer) return;
+  if (isByKind(layer)) layer->removeCustomProperty(QString::fromLatin1(kPropStyleMode));
+  const bool noFill = layer->customProperty(QStringLiteral("ka_hgis/style_no_fill")).toBool() ||
+                      QColor(layer->customProperty(QStringLiteral("ka_hgis/style_fill")).toString()).alpha() == 0;
+  LayerStyleDefaults::applySelectionStyle(layer, noFill);
 }
 
 bool LayerStyleKinds::hasOtherAutomaticLook(const QgsVectorLayer* layer) {
@@ -122,5 +128,9 @@ bool LayerStyleKinds::hasOtherAutomaticLook(const QgsVectorLayer* layer) {
 }
 
 void LayerStyleKinds::clearAnyAutomaticLook(QgsVectorLayer* layer) {
-  if (layer) layer->removeCustomProperty(QString::fromLatin1(kPropStyleMode));
+  if (!layer) return;
+  layer->removeCustomProperty(QString::fromLatin1(kPropStyleMode));
+  const bool noFill = layer->customProperty(QStringLiteral("ka_hgis/style_no_fill")).toBool() ||
+                      QColor(layer->customProperty(QStringLiteral("ka_hgis/style_fill")).toString()).alpha() == 0;
+  LayerStyleDefaults::applySelectionStyle(layer, noFill);
 }

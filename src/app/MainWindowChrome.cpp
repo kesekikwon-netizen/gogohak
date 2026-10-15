@@ -11,15 +11,16 @@
 #include "KaFeatureCard.h"  // KaInspectorPanel.h's inline featureCard() needs the complete type
 #include "KaIcons.h"
 #include "KaInspectorPanel.h"
-#include "KaMapPagePlate.h"
 #include "KaInspectorStyle.h"
 #include "KaLayerOpacityRail.h"
+#include "KaMapPagePlate.h"
 #include "KaShellFocus.h"
 #include "KaStartPage.h"
 #include "KaStatusBar.h"
 #include "KaSurveyBadge.h"
 #include "core/EditBufferSummary.h"
 #include "core/LayerOps.h"
+#include "core/LayerStyleDefaults.h"
 #include "core/RecentSurveys.h"
 #include "core/SurveyFacts.h"
 
@@ -81,33 +82,45 @@ QString hintForTool(const QString& iconId) {
 void MainWindow::setupStrataShell() {
 #if KA_HGIS_HAS_QGIS
   if (m_inspector || !m_mainSplit || !m_canvas) return;
+  // 도형을 선택했을 때 내부가 불투명 노란색으로 막혀 뒤 배경이 가려지지 않게 반투명 선택 색을 기본으로 둔다.
+  m_canvas->setSelectionColor(QColor(255, 235, 59, 45));
+  QgsProject::instance()->setSelectionColor(QColor(255, 235, 59, 45));
   // 1. Inspector: third pane; the feature card is built into its 속성 tab (host API of P4).
   m_inspector = new KaInspectorPanel(m_mainSplit);
   m_mainSplit->addWidget(m_inspector);
   m_mainSplit->setStretchFactor(2, 0);
   m_mainSplit->setSizes({348, 932 - KaShellFocus::kDefaultRightWidth, KaShellFocus::kDefaultRightWidth});
-  KaMapPagePlate::follow(m_mapPage, m_mainSplit, findChild<QFrame*>(QStringLiteral("mapCard")));  // 새 모양: the panels are one sheet (보완 M1)
+  KaMapPagePlate::follow(m_mapPage, m_mainSplit,
+                         findChild<QFrame*>(QStringLiteral("mapCard")));  // 새 모양: the panels are one sheet (보완 M1)
   setupFeatureCard(m_inspector->attributeHost(), m_inspector->attributeLayout());
   m_inspector->setFeatureCard(m_featureCard);
   // 스타일 tab: the most recent choice wins, a record on the card or a layer picked in the list (user 2026-10-03).
   const auto styleListLayer = [this] {
-    m_inspector->styleEditor()->setLayer(qobject_cast<QgsVectorLayer*>(m_layerTree ? m_layerTree->currentLayer() : nullptr));
+    m_inspector->styleEditor()->setLayer(
+        qobject_cast<QgsVectorLayer*>(m_layerTree ? m_layerTree->currentLayer() : nullptr));
   };
   connect(m_featureCard, &KaFeatureCard::featureChanged, this, [this, styleListLayer] {
-    if (m_featureCard->hasFeature()) m_inspector->styleEditor()->setLayer(m_featureCard->layer());
-    else styleListLayer();
+    if (m_featureCard->hasFeature())
+      m_inspector->styleEditor()->setLayer(m_featureCard->layer());
+    else
+      styleListLayer();
   });
   if (m_layerTree) connect(m_layerTree, &QgsLayerTreeView::currentLayerChanged, this, styleListLayer);
   connect(m_inspector->styleEditor(), &KaInspectorStyle::styleApplied, this, [this](QgsVectorLayer*) {
     QgsProject::instance()->setDirty(true);  // the title gets ' *'; 저장 keeps the colour
+    LayerOps::applyLayerOrderToLabels(QgsProject::instance(), m_canvas);
+    LayerOps::refreshCanvasIfIdle(m_canvas);
     if (m_drawingStudio) m_drawingStudio->refreshMapFromProject();
   });
   styleListLayer();
-  connect(m_inspector, &KaInspectorPanel::collapseRequested, this,
-          [this] { if (m_shellFocus) m_shellFocus->setRightPanelCollapsed(true); });
+  connect(m_inspector, &KaInspectorPanel::collapseRequested, this, [this] {
+    if (m_shellFocus) m_shellFocus->setRightPanelCollapsed(true);
+  });
   auto* foldRight = new QShortcut(QKeySequence(KaShellFocus::rightPanelKey()), this);
   foldRight->setContext(Qt::WindowShortcut);
-  connect(foldRight, &QShortcut::activated, this, [this] { if (m_shellFocus) m_shellFocus->toggleRightPanel(); });
+  connect(foldRight, &QShortcut::activated, this, [this] {
+    if (m_shellFocus) m_shellFocus->toggleRightPanel();
+  });
   // 2. 「배경 지도」 card: the ribbon's buttons again; the legend stays the only truth.
   m_basemapCard = new KaBasemapQuickCard(m_inspector);
   m_inspector->footerLayout()->addWidget(m_basemapCard);
@@ -118,8 +131,10 @@ void MainWindow::setupStrataShell() {
       if (auto* oldMaps = findChild<QToolButton*>(QStringLiteral("btnOldMaps"))) oldMaps->showMenu();
     } else if (id == QLatin1String("satellite")) {
       QgsLayerTreeLayer* node = satelliteNode(QgsProject::instance());
-      if (node) node->setItemVisibilityChecked(!node->isVisible());
-      else ensureDefaultBasemaps();
+      if (node)
+        node->setItemVisibilityChecked(!node->isVisible());
+      else
+        ensureDefaultBasemaps();
     }
     syncBasemapCard();
   });
@@ -168,9 +183,16 @@ void MainWindow::setupStrataShell() {
   connect(QgsProject::instance(), &QgsProject::isDirtyChanged, this, [this](bool) { syncShellChips(); });
   // A buffered edit does not flip the dirty flag once it is set: the layers report too.
   const auto watch = [this](const QList<QgsMapLayer*>& layers) {
+    if (m_canvas) m_canvas->setSelectionColor(QColor(255, 235, 59, 45));
+    QgsProject::instance()->setSelectionColor(QColor(255, 235, 59, 45));
     for (QgsMapLayer* layer : layers) {
       auto* vector = qobject_cast<QgsVectorLayer*>(layer);
       if (!vector) continue;
+      if (!LayerOps::layerKeyOf(vector).isEmpty()) {
+        bool noFill = false;
+        LayerOps::readSimpleVectorStyle(vector, nullptr, nullptr, nullptr, nullptr, &noFill);
+        LayerStyleDefaults::applySelectionStyle(vector, noFill);
+      }
       connect(vector, &QgsVectorLayer::layerModified, this, &MainWindow::syncShellChips, Qt::UniqueConnection);
       connect(vector, &QgsVectorLayer::editingStopped, this, &MainWindow::syncShellChips, Qt::UniqueConnection);
     }
@@ -184,10 +206,14 @@ void MainWindow::setupStrataShell() {
 
 void MainWindow::openAccountSetup(AccountStatus::Source source) {
   using Source = AccountStatus::Source;
-  if (source == Source::VworldKey || source == Source::HistoryGisKey) configureVworldKey();
-  else if (source == Source::CadastralAccount) configureCadastralAccount();
-  else if (source == Source::TopographicAccount) configureTopographicAccount();
-  else if (source == Source::HeritageAccount) configureHeritageAccount();
+  if (source == Source::VworldKey || source == Source::HistoryGisKey)
+    configureVworldKey();
+  else if (source == Source::CadastralAccount)
+    configureCadastralAccount();
+  else if (source == Source::TopographicAccount)
+    configureTopographicAccount();
+  else if (source == Source::HeritageAccount)
+    configureHeritageAccount();
   if (!m_startPage) return;
   m_startPage->reload();
   m_startPage->refreshConnections();  // 「설정됨」 dot and text; deferred past the clicked row's own button
@@ -216,8 +242,8 @@ void MainWindow::recordSurveyFacts() {
   if (m_surveyPath.isEmpty()) return;
   QgsProject* project = QgsProject::instance();
   const int areas = featureTotal(project, QStringLiteral("survey_area"));
-  const int features = featureTotal(project, QStringLiteral("feature_poly")) +
-                       featureTotal(project, QStringLiteral("feature_line"));
+  const int features =
+      featureTotal(project, QStringLiteral("feature_poly")) + featureTotal(project, QStringLiteral("feature_line"));
   QSettings st = RecentSurveys::userSettings();
   SurveyFacts::rememberCounts(st, m_surveyPath, areas, features, project->crs().authid());
 #endif
@@ -225,4 +251,6 @@ void MainWindow::recordSurveyFacts() {
 
 // currentToolIconId() lives next to currentToolLabel() in KaDrawSketchTools.cpp (same tool
 // dispatch, same tool headers); the sentence table is here so the wording stays in one file.
-QString MainWindow::currentToolHint() const { return hintForTool(currentToolIconId()); }
+QString MainWindow::currentToolHint() const {
+  return hintForTool(currentToolIconId());
+}

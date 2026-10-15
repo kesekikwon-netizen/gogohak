@@ -5,6 +5,7 @@
 #include <QVector>
 
 class QgsSymbol;
+class QgsVectorLayer;
 
 // The one table of default symbols for survey domain layers. applyDomainDrawStyle
 // draws from it and readSimpleVectorStyle falls back to it, so both always agree.
@@ -27,15 +28,18 @@ struct DomainStyle {
 DomainStyle forKey(const QString& layerKey);
 
 // Line symbol with the white casing plus a core line of the given colour/width.
-QgsSymbol* casedLineSymbol(const DomainStyle& base, const QColor& core, double coreWidthMm,
-                           bool dashed = false);
+QgsSymbol* casedLineSymbol(const DomainStyle& base, const QColor& core, double coreWidthMm, bool dashed = false);
 
 // The simple symbol both applyDomainDrawStyle and applySimpleVectorStyle draw with.
 // geometryType is a Qgis::GeometryType value; null for unsupported geometry. A cased
 // base (section_line) keeps its casing whenever the stroke is drawn.
-QgsSymbol* buildSymbol(int geometryType, const DomainStyle& base, const QColor& fill,
-                       const QColor& stroke, double strokeWidthMm, double markerSizeMm,
-                       bool noFill, bool noStroke, bool dashed);
+QgsSymbol* buildSymbol(int geometryType, const DomainStyle& base, const QColor& fill, const QColor& stroke,
+                       double strokeWidthMm, double markerSizeMm, bool noFill, bool noStroke, bool dashed);
+
+// Keeps selected polygons from painting an opaque yellow block over the map behind them:
+// noFill polygons stay completely unfilled (alpha 0) when selected; filled polygons get a faint
+// see-through highlight (alpha 45).
+void applySelectionStyle(QgsVectorLayer* layer, bool noFill);
 
 // Colours owned by the survey domain defaults and the heritage datasets. Colours the
 // app picks by itself (e.g. 종류별 자동 색) keep away from them so survey output and

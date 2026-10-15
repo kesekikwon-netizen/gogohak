@@ -26,14 +26,16 @@ void keepOverlayLayersOff(const QPointer<QgsMapCanvas>& canvas) {
     return;
   }
   QList<QgsMapLayer*> base = canvas->layers();
-  for (QgsMapLayer* layer : LayerOps::layersDrawnAboveLabels(QgsProject::instance())) base.removeAll(layer);
+  for (QgsMapLayer* layer : LayerOps::layersDrawnAboveLabels(QgsProject::instance()))
+    base.removeAll(layer);
   if (base != canvas->layers()) canvas->setLayers(base);
 }
 
 }  // namespace
 
 KaAboveLabelsOverlay::KaAboveLabelsOverlay(QgsMapCanvas* canvas)
-    : QgsMapCanvasItem(canvas), m_canvasContext(std::make_unique<QObject>()),
+    : QgsMapCanvasItem(canvas),
+      m_canvasContext(std::make_unique<QObject>()),
       m_layerContext(std::make_unique<QObject>()) {
   // 좌표격자(1000)보다 아래, 지도보다는 위. 격자와 눈금은 계속 맨 위에 남는다.
   setZValue(900);
@@ -44,7 +46,8 @@ KaAboveLabelsOverlay::KaAboveLabelsOverlay(QgsMapCanvas* canvas)
     QObject::connect(canvas, &QgsMapCanvas::renderComplete, m_canvasContext.get(), [this](QPainter*) {
       // 본 지도가 방금 다 그린 레이어 목록. 그림이 바뀌는 이때에 맞춰 이름을 누가 쓸지도 바꾼다(rebuildCache).
       QStringList drawn;
-      for (const QgsMapLayer* layer : mMapCanvas->layers()) drawn << layer->id();
+      for (const QgsMapLayer* layer : mMapCanvas->layers())
+        drawn << layer->id();
       if (drawn != m_canvasDrawnIds) {
         m_canvasDrawnIds = drawn;
         markDirty();
@@ -67,7 +70,8 @@ QgsLayerTreeMapCanvasBridge* KaAboveLabelsOverlay::makeLayerTreeBridge(QgsLayerT
 void KaAboveLabelsOverlay::syncWithProject() {
   const QList<QgsMapLayer*> above = LayerOps::layersDrawnAboveLabels(QgsProject::instance());
   bool same = above.size() == m_layers.size();
-  for (int i = 0; same && i < above.size(); ++i) same = m_layers.at(i).data() == above.at(i);
+  for (int i = 0; same && i < above.size(); ++i)
+    same = m_layers.at(i).data() == above.at(i);
   if (same) {
     if (!above.isEmpty() && !isVisible()) setVisible(true);
     return;
@@ -105,10 +109,11 @@ void KaAboveLabelsOverlay::watchLayers() {
     QObject::connect(watched, &QgsMapLayer::crsChanged, context, dirty);
     QObject::connect(watched, &QObject::destroyed, context, dirty);
     if (auto* vector = qobject_cast<QgsVectorLayer*>(watched)) {
-      // Edit buffer changes, undo/redo, commit and roll back.
+      // Edit buffer changes, undo/redo, commit, roll back, and feature selection changes.
       QObject::connect(vector, &QgsVectorLayer::layerModified, context, dirty);
       QObject::connect(vector, &QgsVectorLayer::afterRollBack, context, dirty);
       QObject::connect(vector, &QgsVectorLayer::afterCommitChanges, context, dirty);
+      QObject::connect(vector, &QgsVectorLayer::selectionChanged, context, dirty);
     }
   }
 }
@@ -174,8 +179,7 @@ void KaAboveLabelsOverlay::paint(QPainter* painter) {
     rebuildCache(dpr);
     m_dirty = false;
   }
-  if (!m_cache.isNull())
-    painter->drawImage(QPointF(0, 0), m_cache);
+  if (!m_cache.isNull()) painter->drawImage(QPointF(0, 0), m_cache);
 }
 
 void KaAboveLabelsOverlay::rebuildCache(qreal dpr) {
