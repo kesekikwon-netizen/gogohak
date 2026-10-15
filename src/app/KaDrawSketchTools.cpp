@@ -1,16 +1,17 @@
 // MainWindow's drawing-session UI: on-screen 완료·되돌리기·취소 for pen and touch,
 // 연속 그리기, the current-tool chip in the status bar, and keeping an unfinished sketch
 // while another tab is open. Drawing itself lives in KaCaptureMapTool.
-#include "MainWindow.h"
 #include "KaAlignMapTool.h"
 #include "KaAttributeMapTool.h"
 #include "KaCaptureMapTool.h"
-#include "KaDrawRowRules.h"
 #include "KaDrawGuideBand.h"
+#include "KaDrawRowRules.h"
 #include "KaFeatureSelectTool.h"
 #include "KaIcons.h"
 #include "KaMeasureMapTool.h"
+#include "KaSnapSettingsWidget.h"
 #include "KaTrenchMoveTool.h"
+#include "MainWindow.h"
 #include "core/LayerOps.h"
 
 #include <QAction>
@@ -30,6 +31,39 @@
 void MainWindow::addDrawSketchButtons() {
 #if KA_HGIS_HAS_QGIS
   if (!m_subToolbar) return;
+  QAction* easyAct = nullptr;
+  for (QAction* act : m_subToolbar->actions()) {
+    if (act && act->property("kaSubTool").toString() == QLatin1String("easy")) {
+      easyAct = act;
+      break;
+    }
+  }
+  auto* traceAct = new QAction(KaIcons::icon(QStringLiteral("snap")), QStringLiteral("선 따라 자석"), m_subToolbar);
+  traceAct->setObjectName(QStringLiteral("actSnapTrace"));
+  traceAct->setProperty("kaSnapTrace", true);
+  traceAct->setCheckable(true);
+  if (easyAct)
+    m_subToolbar->insertAction(easyAct, traceAct);
+  else
+    m_subToolbar->addAction(traceAct);
+  if (QWidget* toggle = m_subToolbar->widgetForAction(traceAct)) toggle->setProperty("kaToggle", true);
+  traceAct->setToolTip(QStringLiteral(
+      "선 따라 자석 — 사업자 도면·지적 경계를 따라 그릴 때 자석점을 빠뜨리지 않게 돕습니다.\n"
+      "· 마우스가 선·꼭짓점에 가까이 갔을 때만 주변 자석점을 미리 보여 줍니다(평소에는 숨겨 어지럽지 않음).\n"
+      "· 같은 선·경계 위에서 자석점 한두 칸을 건너뛰어 찍어도 빠진 사이 꼭짓점을 선을 따라 자동으로 채워 넣습니다."));
+  connect(traceAct, &QAction::toggled, this, [this](bool on) {
+    setProperty("kaSnapTrace", on);
+    if (on && !m_snapEnabled) {
+      m_snapEnabled = true;
+      applySnapConfig();
+      if (auto* w = m_subToolbar ? m_subToolbar->findChild<KaSnapSettingsWidget*>() : nullptr) w->syncFromProject();
+    }
+    if (m_captureTool) m_captureTool->setSnapTrace(on);
+    statusBar()->showMessage(on ? QStringLiteral("선 따라 자석 켜짐 — 마우스가 가까울 때만 주변 자석점을 표시하고, "
+                                                 "빠진 사이 자석점을 자동으로 채웁니다.")
+                                : QStringLiteral("선 따라 자석 꺼짐"),
+                             5000);
+  });
   auto* finishAct = m_subToolbar->addAction(KaIcons::icon(QStringLiteral("check")), QStringLiteral("완료"));
   finishAct->setProperty("kaSketch", QStringLiteral("finish"));
   finishAct->setToolTip(QStringLiteral("그리던 도형을 마칩니다. 우클릭·Enter·더블클릭과 같습니다."));
@@ -52,11 +86,12 @@ void MainWindow::addDrawSketchButtons() {
   auto* continuousAct = m_subToolbar->addAction(QStringLiteral("연속 그리기"));
   continuousAct->setProperty("kaSketch", QStringLiteral("continuous"));
   continuousAct->setCheckable(true);
-  if (QWidget* toggle = m_subToolbar->widgetForAction(continuousAct)) toggle->setProperty("kaToggle", true);  // oat when on, not slate
-  continuousAct->setToolTip(QStringLiteral(
-      "켜면 도형을 마칠 때마다 이름·번호 창을 띄우지 않고 바로 다음 도형을 그립니다.\n"
-      "이름·번호는 나중에 도형을 우클릭해 「이 도형 기록 입력」으로 넣습니다.\n"
-      "끄면 도형을 마친 뒤 창이 뜨고, Esc로 건너뛸 수 있습니다."));
+  if (QWidget* toggle = m_subToolbar->widgetForAction(continuousAct))
+    toggle->setProperty("kaToggle", true);  // oat when on, not slate
+  continuousAct->setToolTip(
+      QStringLiteral("켜면 도형을 마칠 때마다 이름·번호 창을 띄우지 않고 바로 다음 도형을 그립니다.\n"
+                     "이름·번호는 나중에 도형을 우클릭해 「이 도형 기록 입력」으로 넣습니다.\n"
+                     "끄면 도형을 마친 뒤 창이 뜨고, Esc로 건너뛸 수 있습니다."));
   connect(continuousAct, &QAction::toggled, this, [this](bool on) {
     m_continuousDraw = on;
     statusBar()->showMessage(on ? QStringLiteral("연속 그리기 — 이름·번호 창 없이 이어서 그립니다.")
@@ -70,11 +105,19 @@ void MainWindow::addDrawSketchButtons() {
 
 void MainWindow::syncDrawSketchButtons() {
 #if KA_HGIS_HAS_QGIS
+  const bool snapTrace = property("kaSnapTrace").toBool();
+  if (m_captureTool && m_captureTool->snapTrace() != snapTrace) m_captureTool->setSnapTrace(snapTrace);
   if (!m_subToolbar) return;
-  const bool sketching = m_captureTool && m_canvas && m_canvas->mapTool() == m_captureTool &&
-                         m_captureTool->hasSketch();
+  const bool sketching =
+      m_captureTool && m_canvas && m_canvas->mapTool() == m_captureTool && m_captureTool->hasSketch();
   for (QAction* action : m_subToolbar->actions()) {
-    const QString id = action ? action->property("kaSketch").toString() : QString();
+    if (!action) continue;
+    if (action->property("kaSnapTrace").toBool()) {
+      const QSignalBlocker block(action);
+      action->setChecked(snapTrace);
+      continue;
+    }
+    const QString id = action->property("kaSketch").toString();
     if (id.isEmpty()) continue;
     if (id == QLatin1String("continuous")) {
       const QSignalBlocker block(action);
@@ -96,17 +139,24 @@ QString MainWindow::currentToolLabel() const {
   if (m_captureTool && tool == m_captureTool) {
     QString target = m_editLayer ? m_editLayer->name() : QString();
     const QString key = m_editLayer ? LayerOps::layerKeyOf(m_editLayer) : QString();
-    if (m_isSplittingPolygon) target = QStringLiteral("나누기 선");
-    else if (m_captureTool->easyDraw()) target = QStringLiteral("쉽게그리기");
-    else if (key == QLatin1String("survey_area")) target = QStringLiteral("조사구역");
-    else if (key == QLatin1String("feature_poly")) target = QStringLiteral("유구 면");
-    else if (key == QLatin1String("feature_line")) target = QStringLiteral("유구 선");
-    else if (key == QLatin1String("section_line")) target = QStringLiteral("단면선");
-    else if (key == QLatin1String("control_points")) target = QStringLiteral("기준점");
-    else if (key.startsWith(QLatin1String("artifact"))) target = QStringLiteral("유물 위치");
+    if (m_isSplittingPolygon)
+      target = QStringLiteral("나누기 선");
+    else if (m_captureTool->easyDraw())
+      target = QStringLiteral("쉽게그리기");
+    else if (key == QLatin1String("survey_area"))
+      target = QStringLiteral("조사구역");
+    else if (key == QLatin1String("feature_poly"))
+      target = QStringLiteral("유구 면");
+    else if (key == QLatin1String("feature_line"))
+      target = QStringLiteral("유구 선");
+    else if (key == QLatin1String("section_line"))
+      target = QStringLiteral("단면선");
+    else if (key == QLatin1String("control_points"))
+      target = QStringLiteral("기준점");
+    else if (key.startsWith(QLatin1String("artifact")))
+      target = QStringLiteral("유물 위치");
     QString text = target.isEmpty() ? QStringLiteral("그리기") : QStringLiteral("그리기 · %1").arg(target);
-    if (m_captureTool->pointCount() > 0)
-      text += QStringLiteral(" · 점 %1").arg(m_captureTool->pointCount());
+    if (m_captureTool->pointCount() > 0) text += QStringLiteral(" · 점 %1").arg(m_captureTool->pointCount());
     return text;
   }
   if (m_featureSelectTool && tool == m_featureSelectTool) return QStringLiteral("도형선택");
@@ -158,8 +208,7 @@ void MainWindow::updateToolChip() {
     statusBar()->insertPermanentWidget(0, m_toolChip);
     // The chip is the context: it goes before the canvas and the tools when the window closes.
     if (m_canvas)
-      connect(m_canvas, &QgsMapCanvas::mapToolSet, m_toolChip,
-              [this](QgsMapTool*, QgsMapTool*) { updateToolChip(); });
+      connect(m_canvas, &QgsMapCanvas::mapToolSet, m_toolChip, [this](QgsMapTool*, QgsMapTool*) { updateToolChip(); });
   }
   const bool onMap = m_viewTabs && m_mapPage && m_viewTabs->currentWidget() == m_mapPage;
   const QString label = onMap ? currentToolLabel() : QString();
@@ -183,9 +232,8 @@ bool MainWindow::parkSketchForOtherTab() {
     // The capture tool stays on the hidden map with its points; only the map-only
     // drawing row goes away until the map tab is shown again. Nothing is saved.
     if (m_subToolbar) m_subToolbar->setVisible(false);
-    statusBar()->showMessage(QStringLiteral("그리던 도형(점 %1개)은 지도 탭에 그대로 있습니다.")
-                                 .arg(m_captureTool->pointCount()),
-                             5000);
+    statusBar()->showMessage(
+        QStringLiteral("그리던 도형(점 %1개)은 지도 탭에 그대로 있습니다.").arg(m_captureTool->pointCount()), 5000);
   }
   updateToolChip();
   return keep;
@@ -201,9 +249,8 @@ void MainWindow::resumeParkedSketch() {
       m_subToolbar->setVisible(true);
       syncDrawSketchButtons();
       if (m_captureTool->hasSketch())
-        statusBar()->showMessage(QStringLiteral("그리던 도형에 이어서 점을 찍으세요 (점 %1개).")
-                                     .arg(m_captureTool->pointCount()),
-                                 6000);
+        statusBar()->showMessage(
+            QStringLiteral("그리던 도형에 이어서 점을 찍으세요 (점 %1개).").arg(m_captureTool->pointCount()), 6000);
     } else {
       // The parked tool was stopped meanwhile (another survey opened): a hidden row
       // must not stay registered as the open drawing mode.

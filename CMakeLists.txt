@@ -239,6 +239,7 @@ add_library(ka_core STATIC
   src/core/LineMapStyle.cpp
   src/core/CadDrawingStore.cpp
   src/core/CadDrawingLayers.cpp
+  src/core/SnapTraceOps.cpp
   src/core/ChecklistEngine.h
   src/core/SurveyProjectFactory.h
   src/core/FileCleanup.h
@@ -325,6 +326,7 @@ add_library(ka_core STATIC
   src/core/LineMapStyle.h
   src/core/CadDrawingStore.h
   src/core/CadDrawingLayers.h
+  src/core/SnapTraceOps.h
 )
 # clangd (C++ code tool): the Visual Studio generator writes no compile_commands.json, so leave a
 # CMake file-API codemodel query (answered by every later cmake run) and convert the reply whenever

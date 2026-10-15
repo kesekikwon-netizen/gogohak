@@ -1,10 +1,11 @@
 #pragma once
-#include <qgsmaptool.h>
-#include <qgsgeometry.h>
-#include <qgspointxy.h>
-#include <qgsmapmouseevent.h>
-#include <QVector>
+#include <QList>
 #include <QPointer>
+#include <QVector>
+#include <qgsgeometry.h>
+#include <qgsmapmouseevent.h>
+#include <qgsmaptool.h>
+#include <qgspointxy.h>
 
 class QgsRubberBand;
 class QgsVertexMarker;
@@ -17,7 +18,7 @@ class QTimer;
 // (neighbouring features may share that corner).
 class KaCaptureMapTool : public QgsMapTool {
   Q_OBJECT
-public:
+ public:
   enum class Mode { Polygon, Line, Point };
 
   explicit KaCaptureMapTool(QgsMapCanvas* canvas);
@@ -26,6 +27,9 @@ public:
   void setMode(Mode mode);
   void setTargetLayer(QgsVectorLayer* layer);
   void setSnapEnabled(bool on);
+  void setSnapTrace(bool on);
+  bool snapTrace() const { return m_snapTrace; }
+  int previewMarkerCount() const { return m_previewMarks.size(); }
   void setEasyDraw(bool on);
   bool easyDraw() const { return m_easyDraw; }
   void resetSession();
@@ -46,12 +50,12 @@ public:
   void activate() override;
   void deactivate() override;
 
-public slots:
+ public slots:
   // On-screen buttons for pen and touch: the same as right-click/Enter and Esc.
-  void finishSketch();
-  void cancelSketch();
+  void finishSketch() { finish(); }
+  void cancelSketch() { cancel(); }
 
-signals:
+ signals:
   void geometryCaptured(const QgsGeometry& geom);
   // Finishing did not produce a shape (too few points, unusable geometry).
   void captureCanceled();
@@ -62,15 +66,14 @@ signals:
   // 「변 4.20 m · 면적 32.9 ㎡」 for the guide band (KaSketchMeasure); empty when nothing is drawn.
   void measureChanged(const QString& text);
 
-private:
+ private:
   void finish();
   void cancel();
   void rebuildRubber(const QgsPointXY* cursorOrNull);
   void destroyRubber();
   void updateSnapMarker(const QgsPointXY& mapPt, bool snapped, bool isIntersection = false);
   void destroySnapMarker();
-  bool mapPointFromEvent(QgsMapMouseEvent* e, QgsPointXY* out, bool* snapped = nullptr,
-                         bool* onVertex = nullptr);
+  bool mapPointFromEvent(QgsMapMouseEvent* e, QgsPointXY* out, bool* snapped = nullptr, bool* onVertex = nullptr);
   bool nearPoint(const QgsPointXY& a, const QgsPointXY& b) const;
   int indexOfSketchVertex(const QgsPointXY& pt) const;
   void announceSketch();
@@ -82,9 +85,12 @@ private:
   QPointer<QgsVectorLayer> m_layer;
   QgsRubberBand* m_rubber = nullptr;
   QgsVertexMarker* m_snapMark = nullptr;
+  QList<QgsVertexMarker*> m_previewMarks;
   QVector<QgsPointXY> m_points;
+  QVector<QgsPointXY> m_tracedPreview;
   bool m_finishing = false;
   bool m_snapEnabled = true;
+  bool m_snapTrace = false;
   bool m_easyDraw = false;
   int m_announcedCount = 0;
   QString m_repairNotice;
