@@ -8,25 +8,25 @@
 
 | Field | Value |
 |------|--------|
-| Updated (local) | 2026-10-15 11:41:03 +09:00 |
+| Updated (local) | 2026-10-15 11:46:55 +09:00 |
 | VERSION file | 2.0.0 |
 | Branch | `export_nearby_heritage_excel` |
-| HEAD short | `924b84c` |
-| HEAD full | `924b84c14f219f969a043549d6eb1be5f00d2a6a` |
-| HEAD date | 2026-10-15 10:04:43 +0900 |
+| HEAD short | `2879dcc` |
+| HEAD full | `2879dccbe6e205a706be761358248e2a658a531e` |
+| HEAD date | 2026-10-15 11:41:02 +0900 |
 | HEAD author | kwonyoungin11 <kyi2516@gmail.com> |
-| HEAD subject | fix(buffer): 주변 500m·1000m 경계를 모든 방향 실제 거리(Round) 버퍼로 변경 |
-| Total commits | 386 |
+| HEAD subject | docs(agents): Antigravity 워크스페이스 규칙(AGENTS.md) 및 스킬(.agents/skills) 등록 |
+| Total commits | 387 |
 | Upstream | `(none)` |
 | Sync | no upstream configured |
 | Origin | https://github.com/kesekikwon-netizen/hgis.git |
-| Working tree dirty | **yes** (2 paths) |
+| Working tree dirty | **yes** (3 paths) |
 
 ## How far we are
 
-- **Recorded tip when this file was written:** fix(buffer): 주변 500m·1000m 경계를 모든 방향 실제 거리(Round) 버퍼로 변경 (`924b84c` @ 2026-10-15 10:04:43 +0900)
+- **Recorded tip when this file was written:** docs(agents): Antigravity 워크스페이스 규칙(AGENTS.md) 및 스킬(.agents/skills) 등록 (`2879dcc` @ 2026-10-15 11:41:02 +0900)
 - **Remote sync at write time:** no upstream configured
-- **Uncommitted local changes at write time:** yes (2 paths)
+- **Uncommitted local changes at write time:** yes (3 paths)
 
 ### Read this correctly
 
@@ -43,6 +43,7 @@
 
 | Hash | Date | Subject |
 |------|------|---------|
+| `2879dcc` | 2026-10-15T11:41:02+09:00 | docs(agents): Antigravity 워크스페이스 규칙(AGENTS.md) 및 스킬(.agents/skills) 등록 |
 | `924b84c` | 2026-10-15T10:04:43+09:00 | fix(buffer): 주변 500m·1000m 경계를 모든 방향 실제 거리(Round) 버퍼로 변경 |
 | `013f78f` | 2026-10-14T17:43:20+09:00 | feat(export): 주변유적 경계 내 유적 현황 엑셀 내보내기 추가 및 숨긴 조사구역 이어그리기 오류 수정 |
 | `69130a2` | 2026-10-11T14:33:31+09:00 | chore(dev): 이 PC 빌드 후 바탕화면 아이콘을 갱신하는 스크립트와 작업 지침을 넣는다 |
@@ -72,12 +73,12 @@
 | `956f7aa` | 2026-10-11T02:50:49+09:00 | style(status): M7 상태줄 「→ 제출 5179」는 테두리 칩이 아니라 조용한 모노 글자(마우스를 대면 밑줄), 상태줄 32 px |
 | `de32323` | 2026-10-11T02:46:47+09:00 | style(map): M6 지도 위 되돌리기·다시 실행은 동그라미 둘이 아니라 한 덮개(73×36)에 두 글리프와 가운데 선 |
 | `6018029` | 2026-10-11T02:42:48+09:00 | style(inspector): M5 오른쪽 판의 빈 상태 문장은 점선 상자 없이 문장만, 탭 「속성 / 스타일」은 아이콘 없이 글자 + 밑줄 |
-| `ecc372f` | 2026-10-11T02:38:59+09:00 | style(layers): M2 레이어 목록의 같은 띠 글자(주변·참조·지적도)는 처음 한 번만 쓰고, 다시 나오는 자리에는 선만 둔다 |
 
 ## Staged in this commit
 
 ```
-A	AGENTS.md
+M	AGENTS.md
+M	docs/ERROR_REGRESSION.md
 ```
 ## Other PC checklist
 
