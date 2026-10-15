@@ -31,6 +31,11 @@
 void MainWindow::addDrawSketchButtons() {
 #if KA_HGIS_HAS_QGIS
   if (!m_subToolbar) return;
+  if (!property("kaSnapTraceInit").toBool()) {
+    setProperty("kaSnapTraceInit", true);
+    setProperty("kaSnapTrace", true);
+    setProperty("kaSnapPreview", true);
+  }
   QAction* easyAct = nullptr;
   for (QAction* act : m_subToolbar->actions()) {
     if (act && act->property("kaSubTool").toString() == QLatin1String("easy")) {
@@ -38,32 +43,38 @@ void MainWindow::addDrawSketchButtons() {
       break;
     }
   }
-  auto* traceAct = new QAction(KaIcons::icon(QStringLiteral("snap")), QStringLiteral("선 따라 자석"), m_subToolbar);
-  traceAct->setObjectName(QStringLiteral("actSnapTrace"));
-  traceAct->setProperty("kaSnapTrace", true);
-  traceAct->setCheckable(true);
-  if (easyAct)
-    m_subToolbar->insertAction(easyAct, traceAct);
-  else
-    m_subToolbar->addAction(traceAct);
-  if (QWidget* toggle = m_subToolbar->widgetForAction(traceAct)) toggle->setProperty("kaToggle", true);
-  traceAct->setToolTip(QStringLiteral(
-      "선 따라 자석 — 사업자 도면·지적 경계를 따라 그릴 때 자석점을 빠뜨리지 않게 돕습니다.\n"
-      "· 마우스가 선·꼭짓점에 가까이 갔을 때만 주변 자석점을 미리 보여 줍니다(평소에는 숨겨 어지럽지 않음).\n"
-      "· 같은 선·경계 위에서 자석점 한두 칸을 건너뛰어 찍어도 빠진 사이 꼭짓점을 선을 따라 자동으로 채워 넣습니다."));
-  connect(traceAct, &QAction::toggled, this, [this](bool on) {
-    setProperty("kaSnapTrace", on);
-    if (on && !m_snapEnabled) {
-      m_snapEnabled = true;
-      applySnapConfig();
-      if (auto* w = m_subToolbar ? m_subToolbar->findChild<KaSnapSettingsWidget*>() : nullptr) w->syncFromProject();
-    }
-    if (m_captureTool) m_captureTool->setSnapTrace(on);
-    statusBar()->showMessage(on ? QStringLiteral("선 따라 자석 켜짐 — 마우스가 가까울 때만 주변 자석점을 표시하고, "
-                                                 "빠진 사이 자석점을 자동으로 채웁니다.")
-                                : QStringLiteral("선 따라 자석 꺼짐"),
-                             5000);
-  });
+  auto addSnapToggle = [&](const QString& text, const char* objName, const char* propName, bool isTrace,
+                           const QString& tip, const QString& onMsg) {
+    // 아이콘 없이 글자만 두어 창이 좁아져도(KaToolbarFit IconOnly 단계) 글자가 절대 숨겨지지 않게 한다.
+    auto* act = new QAction(text, m_subToolbar);
+    act->setObjectName(QString::fromLatin1(objName));
+    act->setProperty(propName, true);
+    act->setCheckable(true);
+    easyAct ? m_subToolbar->insertAction(easyAct, act) : m_subToolbar->addAction(act);
+    if (QWidget* toggle = m_subToolbar->widgetForAction(act)) toggle->setProperty("kaToggle", true);
+    act->setToolTip(tip);
+    connect(act, &QAction::toggled, this, [this, propName, isTrace, text, onMsg](bool on) {
+      setProperty(propName, on);
+      if (on && !m_snapEnabled) {
+        m_snapEnabled = true;
+        applySnapConfig();
+        if (auto* w = m_subToolbar ? m_subToolbar->findChild<KaSnapSettingsWidget*>() : nullptr) w->syncFromProject();
+      }
+      if (m_captureTool) isTrace ? m_captureTool->setSnapTrace(on) : m_captureTool->setSnapPreview(on);
+      statusBar()->showMessage(on ? onMsg : (text + QStringLiteral(" 꺼짐")), 5000);
+    });
+  };
+  addSnapToggle(
+      QStringLiteral("선 따라 자동채움"), "actSnapTrace", "kaSnapTrace", true,
+      QStringLiteral("1번 기능(선 따라 빠진 사이 자석점 자동 채우기)\n"
+                     "· 사업자 도면(CAD)·지적 경계 위에서 자석점 한두 칸을 건너뛰어 찍어도\n"
+                     "  그 사이의 경계 꼭짓점을 선을 따라 자동으로 채워 미세한 차이를 막습니다."),
+      QStringLiteral("선 따라 자동채움 켜짐 — 자석점을 한두 칸 건너뛰어 찍어도 사이 꼭짓점을 자동으로 채웁니다."));
+  addSnapToggle(QStringLiteral("근접 자석점 표시"), "actSnapPreview", "kaSnapPreview", false,
+                QStringLiteral("3번 기능(마우스가 가까이 갔을 때만 주변 자석점 미리 표시)\n"
+                               "· 화면 전체에 자석점을 띄우면 어지러우므로, 마우스가 선·꼭짓점에 가까이 갔을 때만\n"
+                               "  주변 자석점을 미리 보여 주고 마우스가 멀어지면 숨깁니다."),
+                QStringLiteral("근접 자석점 표시 켜짐 — 마우스가 가까이 갔을 때만 주변 자석점을 미리 보여 줍니다."));
   auto* finishAct = m_subToolbar->addAction(KaIcons::icon(QStringLiteral("check")), QStringLiteral("완료"));
   finishAct->setProperty("kaSketch", QStringLiteral("finish"));
   finishAct->setToolTip(QStringLiteral("그리던 도형을 마칩니다. 우클릭·Enter·더블클릭과 같습니다."));
@@ -106,7 +117,11 @@ void MainWindow::addDrawSketchButtons() {
 void MainWindow::syncDrawSketchButtons() {
 #if KA_HGIS_HAS_QGIS
   const bool snapTrace = property("kaSnapTrace").toBool();
-  if (m_captureTool && m_captureTool->snapTrace() != snapTrace) m_captureTool->setSnapTrace(snapTrace);
+  const bool snapPreview = property("kaSnapPreview").toBool();
+  if (m_captureTool) {
+    if (m_captureTool->snapTrace() != snapTrace) m_captureTool->setSnapTrace(snapTrace);
+    if (m_captureTool->snapPreview() != snapPreview) m_captureTool->setSnapPreview(snapPreview);
+  }
   if (!m_subToolbar) return;
   const bool sketching =
       m_captureTool && m_canvas && m_canvas->mapTool() == m_captureTool && m_captureTool->hasSketch();
@@ -115,6 +130,11 @@ void MainWindow::syncDrawSketchButtons() {
     if (action->property("kaSnapTrace").toBool()) {
       const QSignalBlocker block(action);
       action->setChecked(snapTrace);
+      continue;
+    }
+    if (action->property("kaSnapPreview").toBool()) {
+      const QSignalBlocker block(action);
+      action->setChecked(snapPreview);
       continue;
     }
     const QString id = action->property("kaSketch").toString();

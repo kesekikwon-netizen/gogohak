@@ -63,12 +63,14 @@ void KaCaptureMapTool::setSnapEnabled(bool on) {
 
 void KaCaptureMapTool::setSnapTrace(bool on) {
   m_snapTrace = on;
-  if (on) {
-    m_snapEnabled = true;
-  } else {
-    m_tracedPreview.clear();
-    SnapTraceOps::clearPreviewMarkers(m_previewMarks);
-  }
+  if (on) m_snapEnabled = true;
+  if (!on) m_tracedPreview.clear();
+}
+
+void KaCaptureMapTool::setSnapPreview(bool on) {
+  m_snapPreview = on;
+  if (on) m_snapEnabled = true;
+  if (!on) SnapTraceOps::clearPreviewMarkers(m_previewMarks);
 }
 
 void KaCaptureMapTool::setEasyDraw(bool on) {
@@ -176,7 +178,7 @@ bool KaCaptureMapTool::mapPointFromEvent(QgsMapMouseEvent* e, QgsPointXY* out, b
   }
   if (!std::isfinite(out->x()) || !std::isfinite(out->y())) return false;
   updateSnapMarker(*out, snapped, isInter);
-  if (m_snapEnabled && m_snapTrace) {
+  if (m_snapEnabled && m_snapPreview) {
     SnapTraceOps::syncPreviewMarkers(canvas(), m_previewMarks,
                                      SnapTraceOps::nearbyVertices(canvas(), rawPt, snapped ? out : nullptr));
   } else {

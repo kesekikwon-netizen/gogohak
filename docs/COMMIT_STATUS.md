@@ -8,25 +8,25 @@
 
 | Field | Value |
 |------|--------|
-| Updated (local) | 2026-10-15 15:24:39 +09:00 |
+| Updated (local) | 2026-10-15 16:37:29 +09:00 |
 | VERSION file | 2.0.0 |
 | Branch | `export_nearby_heritage_excel` |
-| HEAD short | `f626cb2` |
-| HEAD full | `f626cb209671cdddb6a94e44dfd3c6f6a3168220` |
-| HEAD date | 2026-10-15 11:46:55 +0900 |
+| HEAD short | `179c901` |
+| HEAD full | `179c90189bb42dd1871a1b23676d3a5eb3cbcc15` |
+| HEAD date | 2026-10-15 15:24:39 +0900 |
 | HEAD author | kwonyoungin11 <kyi2516@gmail.com> |
-| HEAD subject | docs(agents): Strata ???꾩껜 ?꾪궎?띿쿂쨌洹쒖튃쨌?ㅽ궗??AGENTS.md 諛??뚭? ?쒖뿉 ?듯빀 |
-| Total commits | 388 |
+| HEAD subject | 洹몃━湲??꾧뎄 紐⑥쓬?????곕씪 ?먯꽍 蹂꾨룄 ?좉? 諛?洹쇱젒 ?먯꽍???쒖떆쨌?ъ씠 瑗?쭞???먮룞 梨꾩슦湲?異붽? |
+| Total commits | 389 |
 | Upstream | `(none)` |
 | Sync | no upstream configured |
 | Origin | https://github.com/kesekikwon-netizen/hgis.git |
-| Working tree dirty | **yes** (7 paths) |
+| Working tree dirty | **yes** (5 paths) |
 
 ## How far we are
 
-- **Recorded tip when this file was written:** docs(agents): Strata ???꾩껜 ?꾪궎?띿쿂쨌洹쒖튃쨌?ㅽ궗??AGENTS.md 諛??뚭? ?쒖뿉 ?듯빀 (`f626cb2` @ 2026-10-15 11:46:55 +0900)
+- **Recorded tip when this file was written:** 洹몃━湲??꾧뎄 紐⑥쓬?????곕씪 ?먯꽍 蹂꾨룄 ?좉? 諛?洹쇱젒 ?먯꽍???쒖떆쨌?ъ씠 瑗?쭞???먮룞 梨꾩슦湲?異붽? (`179c901` @ 2026-10-15 15:24:39 +0900)
 - **Remote sync at write time:** no upstream configured
-- **Uncommitted local changes at write time:** yes (7 paths)
+- **Uncommitted local changes at write time:** yes (5 paths)
 
 ### Read this correctly
 
@@ -43,6 +43,7 @@
 
 | Hash | Date | Subject |
 |------|------|---------|
+| `179c901` | 2026-10-15T15:24:39+09:00 | 洹몃━湲??꾧뎄 紐⑥쓬?????곕씪 ?먯꽍 蹂꾨룄 ?좉? 諛?洹쇱젒 ?먯꽍???쒖떆쨌?ъ씠 瑗?쭞???먮룞 梨꾩슦湲?異붽? |
 | `f626cb2` | 2026-10-15T11:46:55+09:00 | docs(agents): Strata ???꾩껜 ?꾪궎?띿쿂쨌洹쒖튃쨌?ㅽ궗??AGENTS.md 諛??뚭? ?쒖뿉 ?듯빀 |
 | `2879dcc` | 2026-10-15T11:41:02+09:00 | docs(agents): Antigravity ?뚰겕?ㅽ럹?댁뒪 洹쒖튃(AGENTS.md) 諛??ㅽ궗(.agents/skills) ?깅줉 |
 | `924b84c` | 2026-10-15T10:04:43+09:00 | fix(buffer): 二쇰? 500m쨌1000m 寃쎄퀎瑜?紐⑤뱺 諛⑺뼢 ?ㅼ젣 嫄곕━(Round) 踰꾪띁濡?蹂寃?013f78f/2026-10-14T17:43:20+09:00/feat(export): 二쇰??좎쟻 寃쎄퀎 ???좎쟻 ?꾪솴 ?묒? ?대낫?닿린 異붽? 諛??④릿 議곗궗援ъ뿭 ?댁뼱洹몃━湲??ㅻ쪟 ?섏젙 |
@@ -56,17 +57,13 @@
 | `354a4f2` | 2026-10-11T03:11:03+09:00 | style(draw-row): M3 蹂닿컯 ???뚯뿰??洹몃━湲겹?耳쒖쭚? 洹由ъ깋, 洹몃━湲?以꾩쓽 臾띠쓬 ?ъ씠??1 px ??51523d7/2026-10-11T03:05:57+09:00/style(home): H3 蹂닿컯 ???대뜑 移몄? ?뚢????대뜑 ??議곗궗紐끹띿쑝濡??앸굹怨? 理쒓렐 議곗궗 以꾩쓽 寃쎈줈???뚢????대뜑?띾줈 以꾩씤??65dda9b/2026-10-11T02:58:20+09:00/style(tabs): M4 ?댟룹??꽷룸룄硫???? ???곸옄 ??씠 ?꾨땲??湲??+ 2 px 癒?諛묒쨪(吏湲?蹂대뒗 ?붾㈃) |
 | `a2ba69a` | 2026-10-11T02:55:52+09:00 | style(draw-row): M3 洹몃━湲?以꾩뿉???먯뿉 ???꾧뎄??洹由ъ깋???꾨땲??癒?梨꾩? + ?곸븘 湲??由щ낯 ?뚭렇由ш린????쇨낵 媛숈? 紐⑥뒿) |
 | `956f7aa` | 2026-10-11T02:50:49+09:00 | style(status): M7 ?곹깭以??뚢넂 ?쒖텧 5179?띾뒗 ?뚮몢由?移⑹씠 ?꾨땲??議곗슜??紐⑤끂 湲??留덉슦?ㅻ? ?硫?諛묒쨪), ?곹깭以?32 px |
-| `de32323` | 2026-10-11T02:46:47+09:00 | style(map): M6 吏?????섎룎由ш린쨌?ㅼ떆 ?ㅽ뻾? ?숆렇?쇰? ?섏씠 ?꾨땲??????컻(73횞36)????湲由ы봽? 媛?대뜲 ?? |
 
 ## Staged in this commit
 
 ```
-M	CMakeLists.txt
 M	src/app/KaCaptureMapTool.cpp
 M	src/app/KaCaptureMapTool.h
 M	src/app/KaDrawSketchTools.cpp
-A	src/core/SnapTraceOps.cpp
-A	src/core/SnapTraceOps.h
 M	tests/test_parcel_copy_keys.cpp
 ```
 ## Other PC checklist

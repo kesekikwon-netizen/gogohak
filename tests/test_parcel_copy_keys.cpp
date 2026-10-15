@@ -147,6 +147,7 @@ class ParcelCopyKeysTest : public QObject {
     KaCaptureMapTool tool(&canvas);
     tool.setMode(KaCaptureMapTool::Mode::Line);
     tool.setSnapTrace(true);
+    tool.setSnapPreview(true);
 
     QgsMapMouseEvent farMove(&canvas, QEvent::MouseMove, px(200050, 450035), Qt::NoButton, Qt::NoButton);
     tool.canvasMoveEvent(&farMove);
@@ -165,7 +166,8 @@ class ParcelCopyKeysTest : public QObject {
     QFile sketchSrc(QStringLiteral("src/app/KaDrawSketchTools.cpp"));
     if (sketchSrc.open(QIODevice::ReadOnly | QIODevice::Text)) {
       const QString code = QString::fromUtf8(sketchSrc.readAll());
-      QVERIFY(code.contains(QLatin1String("actSnapTrace")) && code.contains(QStringLiteral("선 따라 자석")));
+      QVERIFY(code.contains(QLatin1String("actSnapTrace")) && code.contains(QStringLiteral("선 따라 자동채움")));
+      QVERIFY(code.contains(QLatin1String("actSnapPreview")) && code.contains(QStringLiteral("근접 자석점 표시")));
     }
     canvas.setLayers({});
     project->clear();

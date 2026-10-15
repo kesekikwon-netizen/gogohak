@@ -29,6 +29,8 @@ class KaCaptureMapTool : public QgsMapTool {
   void setSnapEnabled(bool on);
   void setSnapTrace(bool on);
   bool snapTrace() const { return m_snapTrace; }
+  void setSnapPreview(bool on);
+  bool snapPreview() const { return m_snapPreview; }
   int previewMarkerCount() const { return m_previewMarks.size(); }
   void setEasyDraw(bool on);
   bool easyDraw() const { return m_easyDraw; }
@@ -91,6 +93,7 @@ class KaCaptureMapTool : public QgsMapTool {
   bool m_finishing = false;
   bool m_snapEnabled = true;
   bool m_snapTrace = false;
+  bool m_snapPreview = false;
   bool m_easyDraw = false;
   int m_announcedCount = 0;
   QString m_repairNotice;
