@@ -5,28 +5,22 @@
 #include "KaLogExcept.h"
 #include "LayerFeatures.h"
 #include "LayerOps.h"
-#include <QDir>
-#include <QFile>
-#include <QFileInfo>
-#include <QMap>
-#include <QSaveFile>
-#include <QSet>
-#include <QTemporaryDir>
 #include <algorithm>
 #include <cmath>
 #include <cpl_error.h>
 #include <gdal_priv.h>
 #include <ogrsf_frmts.h>
-#include <qgscoordinatereferencesystem.h>
+#include <QDir>
+#include <QFileInfo>
+#include <QMap>
+#include <QSaveFile>
+#include <QTemporaryDir>
 #include <qgscoordinatetransform.h>
-#include <qgsfeature.h>
 #include <qgsfeatureiterator.h>
 #include <qgsgeometry.h>
 #include <qgslayertree.h>
 #include <qgslayertreelayer.h>
 #include <qgslinestring.h>
-#include <qgsmaplayer.h>
-#include <qgspointxy.h>
 #include <qgsproject.h>
 #include <qgsvectorlayer.h>
 
@@ -41,10 +35,11 @@ QgsGeometry polygonsOnly(const QgsGeometry& g) {
   return polys.isEmpty() ? QgsGeometry() : QgsGeometry::collectGeometry(polys);
 }
 
-QgsGeometry unionPolygonsInCrs(QgsVectorLayer* source, const QgsCoordinateReferenceSystem& dest,
-                               QgsProject* project, QString* errorOut) {
+QgsGeometry unionPolygonsInCrs(QgsVectorLayer* source, const QgsCoordinateReferenceSystem& dest, QgsProject* project,
+                               QString* errorOut) {
   const bool needXf = source->crs().isValid() && dest.isValid() && source->crs() != dest;
-  QgsCoordinateTransform xf(source->crs(), dest, project ? project->transformContext() : QgsCoordinateTransformContext());
+  QgsCoordinateTransform xf(source->crs(), dest,
+                            project ? project->transformContext() : QgsCoordinateTransformContext());
   if (needXf) xf.setBallparkTransformsAreAppropriate(true);
   QgsFeatureIterator it = source->getFeatures();
   QgsFeature f;
@@ -53,8 +48,12 @@ QgsGeometry unionPolygonsInCrs(QgsVectorLayer* source, const QgsCoordinateRefere
     QgsGeometry g = f.geometry();
     if (g.isEmpty()) continue;
     if (needXf) {
-      try { if (g.transform(xf) != Qgis::GeometryOperationResult::Success) continue; }
-      catch (...) { KA_LOG_EXCEPT(); continue; }
+      try {
+        if (g.transform(xf) != Qgis::GeometryOperationResult::Success) continue;
+      } catch (...) {
+        KA_LOG_EXCEPT();
+        continue;
+      }
     }
     parts << g;
   }
@@ -78,7 +77,8 @@ std::optional<HeritageDataset> datasetForLayer(const QgsProject* project, const 
   if (auto ds = HeritageStyle::fromLayerName(name)) return ds;
   for (HeritageDataset ds : HeritageStyle::allDatasets())
     if (const QString base = HeritageStyle::layerName(ds); !base.isEmpty() && name.startsWith(base)) return ds;
-  if (name.contains(QStringLiteral("지정유산")) || name.contains(QStringLiteral("등록문화유산")) || name.contains(QStringLiteral("보호구역")))
+  if (name.contains(QStringLiteral("지정유산")) || name.contains(QStringLiteral("등록문화유산")) ||
+      name.contains(QStringLiteral("보호구역")))
     return HeritageDataset::DesignatedHeritage;
   return std::nullopt;
 }
@@ -94,8 +94,10 @@ QList<QgsVectorLayer*> heritageLayersInProject(QgsProject* project) {
     out.append(vl);
   };
   if (project->layerTreeRoot())
-    for (QgsLayerTreeLayer* node : project->layerTreeRoot()->findLayers()) tryAdd(node->layer());
-  for (QgsMapLayer* ml : project->mapLayers()) tryAdd(ml);
+    for (QgsLayerTreeLayer* node : project->layerTreeRoot()->findLayers())
+      tryAdd(node->layer());
+  for (QgsMapLayer* ml : project->mapLayers())
+    tryAdd(ml);
   return out;
 }
 
@@ -107,14 +109,17 @@ double computeAzimuthDeg(const QgsGeometry& sitePoly, const QgsGeometry& target)
     if (p1.distance(p2) > 1e-4) return std::fmod(std::fmod(p1.azimuth(p2), 360.0) + 360.0, 360.0);
   }
   const QgsGeometry c1 = sitePoly.pointOnSurface(), c2 = target.pointOnSurface();
-  return (!c1.isEmpty() && !c2.isEmpty()) ? std::fmod(std::fmod(c1.asPoint().azimuth(c2.asPoint()), 360.0) + 360.0, 360.0) : 0.0;
+  return (!c1.isEmpty() && !c2.isEmpty())
+             ? std::fmod(std::fmod(c1.asPoint().azimuth(c2.asPoint()), 360.0) + 360.0, 360.0)
+             : 0.0;
 }
 }  // namespace
 
 QgsVectorLayer* resolveSourceLayer(QgsProject* project, QgsVectorLayer* preferred) {
   auto isUsable = [](QgsVectorLayer* vl) {
     return vl && vl->isValid() && vl->geometryType() == Qgis::GeometryType::Polygon &&
-           !LayerOps::isReferenceLayer(vl) && !LayerOps::layerKeyOf(vl).startsWith(QLatin1String("user:buffer_")) && LayerFeatures::any(vl);
+           !LayerOps::isReferenceLayer(vl) && !LayerOps::layerKeyOf(vl).startsWith(QLatin1String("user:buffer_")) &&
+           LayerFeatures::any(vl);
   };
   if (isUsable(preferred)) return preferred;
   const QgsLayerTree* root = project ? project->layerTreeRoot() : nullptr;
@@ -137,7 +142,10 @@ double activeMaxRadiusMeters(const QgsProject* project) {
   };
   if (hasRing(QStringLiteral("user:buffer_ring_1000"), true)) return 1000.0;
   if (hasRing(QStringLiteral("user:buffer_ring_500"), true)) return 500.0;
-  return hasRing(QStringLiteral("user:buffer_ring_500"), false) && !hasRing(QStringLiteral("user:buffer_ring_1000"), false) ? 500.0 : 1000.0;
+  return hasRing(QStringLiteral("user:buffer_ring_500"), false) &&
+                 !hasRing(QStringLiteral("user:buffer_ring_1000"), false)
+             ? 500.0
+             : 1000.0;
 }
 
 QString cardinalDirection8(double azimuthDegrees) {
@@ -148,7 +156,10 @@ QString cardinalDirection8(double azimuthDegrees) {
 
 Result collect(QgsProject* project, QgsVectorLayer* sourceLayer, double maxRadiusMeters) {
   Result out;
-  if (!project) { out.error = QStringLiteral("열린 조사가 없습니다."); return out; }
+  if (!project) {
+    out.error = QStringLiteral("열린 조사가 없습니다.");
+    return out;
+  }
   QgsVectorLayer* source = resolveSourceLayer(project, sourceLayer);
   if (!source || !source->isValid() || source->geometryType() != Qgis::GeometryType::Polygon) {
     out.error = QStringLiteral("조사구역 면 레이어를 먼저 그리거나 선택하세요.");
@@ -166,31 +177,27 @@ Result collect(QgsProject* project, QgsVectorLayer* sourceLayer, double maxRadiu
 
   const QgsGeometry sitePoly = unionPolygonsInCrs(source, dest, project, &out.error);
   if (sitePoly.isEmpty()) return out;
-  const QgsGeometry buf500 = sitePoly.buffer(500.0, 16, Qgis::EndCapStyle::Flat, Qgis::JoinStyle::Miter, 5.0);
-  const QgsGeometry bufMax = (std::abs(out.maxRadiusMeters - 500.0) < 0.5)
-                                 ? buf500
-                                 : sitePoly.buffer(out.maxRadiusMeters, 16, Qgis::EndCapStyle::Flat, Qgis::JoinStyle::Miter, 5.0);
 
   for (QgsVectorLayer* layer : heritageLayers) {
     const auto ds = datasetForLayer(project, layer);
     if (!ds) continue;
     const QString datasetName = HeritageStyle::layerName(*ds), nameField = HeritageImport::chooseNameField(layer);
     const bool needXf = layer->crs().isValid() && layer->crs() != dest;
-    QgsCoordinateTransform xf;
-    if (needXf) {
-      xf = QgsCoordinateTransform(layer->crs(), dest, project->transformContext());
-      xf.setBallparkTransformsAreAppropriate(true);
-    }
+    QgsCoordinateTransform xf(layer->crs(), dest, project->transformContext());
+    if (needXf) xf.setBallparkTransformsAreAppropriate(true);
     QMap<QString, QPair<QString, QVector<QgsGeometry>>> grouped;
     QgsFeatureIterator it = layer->getFeatures();
     QgsFeature f;
     while (it.nextFeature(f)) {
-      if (!f.hasGeometry()) continue;
       QgsGeometry g = f.geometry();
       if (g.isEmpty()) continue;
       if (needXf) {
-        try { if (g.transform(xf) != Qgis::GeometryOperationResult::Success) continue; }
-        catch (...) { KA_LOG_EXCEPT(); continue; }
+        try {
+          if (g.transform(xf) != Qgis::GeometryOperationResult::Success) continue;
+        } catch (...) {
+          KA_LOG_EXCEPT();
+          continue;
+        }
       }
       const QString rawName = nameField.isEmpty() ? QString() : f.attribute(nameField).toString().trimmed();
       const QString key = rawName.isEmpty() ? QStringLiteral("__unnamed_%1").arg(f.id()) : rawName;
@@ -201,8 +208,7 @@ Result collect(QgsProject* project, QgsVectorLayer* sourceLayer, double maxRadiu
     for (auto git = grouped.cbegin(); git != grouped.cend(); ++git) {
       const QgsGeometry g = (git->second.size() == 1) ? git->second.first() : QgsGeometry::unaryUnion(git->second);
       const double rawDist = g.isEmpty() ? -1.0 : sitePoly.distance(g);
-      if (rawDist < 0.0 || !std::isfinite(rawDist)) continue;
-      if (rawDist > out.maxRadiusMeters && (bufMax.isEmpty() || !bufMax.intersects(g))) continue;
+      if (rawDist < 0.0 || !std::isfinite(rawDist) || rawDist > out.maxRadiusMeters) continue;
 
       Item item{datasetName, layer->name(), git->first, {}, {}, 0, -1.0, {}};
       if (sitePoly.intersects(g) || rawDist < 0.05) {
@@ -211,8 +217,8 @@ Result collect(QgsProject* project, QgsVectorLayer* sourceLayer, double maxRadiu
         item.description = QStringLiteral("조사구역 내 (0m)");
       } else {
         item.distanceMeters = std::max(1, qRound(rawDist));
-        const bool in500 = (rawDist <= 500.0) || (!buf500.isEmpty() && buf500.intersects(g));
-        item.radiusLabel = in500 ? QStringLiteral("500m 이내") : QStringLiteral("%1m 이내").arg(qRound(out.maxRadiusMeters));
+        item.radiusLabel = (rawDist <= 500.0) ? QStringLiteral("500m 이내")
+                                              : QStringLiteral("%1m 이내").arg(qRound(out.maxRadiusMeters));
         const double az = computeAzimuthDeg(sitePoly, g);
         item.azimuthDeg = std::round(az * 10.0) / 10.0;
         item.direction = cardinalDirection8(az);
@@ -240,54 +246,46 @@ bool writeXlsx(const QString& path, const QVector<Item>& items, QString* errorOu
   GDALDriver* driver = GetGDALDriverManager()->GetDriverByName("XLSX");
   GDALDataset* ds = driver ? driver->Create(scratchXlsx.toUtf8().constData(), 0, 0, 0, GDT_Unknown, nullptr) : nullptr;
   OGRLayer* sheet = ds ? ds->CreateLayer("주변유적_현황", nullptr, wkbNone, nullptr) : nullptr;
-  if (!sheet) {
+  auto fail = [&](const QString& msg) {
     if (ds) GDALClose(ds);
-    if (errorOut) *errorOut = QStringLiteral("엑셀 시트를 만들지 못했습니다.");
+    if (errorOut) *errorOut = msg;
     return false;
-  }
+  };
+  if (!sheet) return fail(QStringLiteral("엑셀 시트를 만들지 못했습니다."));
   const QPair<const char*, OGRFieldType> kCols[] = {
-      {"연번", OFTInteger}, {"자료구분", OFTString}, {"레이어명", OFTString}, {"유적명", OFTString},
-      {"반경구분", OFTString}, {"방향", OFTString}, {"거리(m)", OFTInteger}, {"방위각(도)", OFTString}, {"위치설명", OFTString}};
+      {"연번", OFTInteger},    {"자료구분", OFTString},   {"레이어명", OFTString},
+      {"유적명", OFTString},   {"반경구분", OFTString},   {"방향", OFTString},
+      {"거리(m)", OFTInteger}, {"방위각(도)", OFTString}, {"위치설명", OFTString}};
   for (const auto& col : kCols) {
     OGRFieldDefn fd(col.first, col.second);
-    if (sheet->CreateField(&fd) == OGRERR_NONE) continue;
-    GDALClose(ds);
-    if (errorOut) *errorOut = QStringLiteral("엑셀 열(%1) 생성에 실패했습니다.").arg(QString::fromUtf8(col.first));
-    return false;
+    if (sheet->CreateField(&fd) != OGRERR_NONE)
+      return fail(QStringLiteral("엑셀 열(%1) 생성에 실패했습니다.").arg(QString::fromUtf8(col.first)));
   }
   for (int i = 0; i < items.size(); ++i) {
     const Item& it = items.at(i);
     OGRFeature* feat = OGRFeature::CreateFeature(sheet->GetLayerDefn());
-    feat->SetField(0, i + 1);
-    feat->SetField(1, it.datasetName.toUtf8().constData());
-    feat->SetField(2, it.layerName.toUtf8().constData());
-    feat->SetField(3, it.siteName.toUtf8().constData());
-    feat->SetField(4, it.radiusLabel.toUtf8().constData());
-    feat->SetField(5, it.direction.toUtf8().constData());
-    feat->SetField(6, it.distanceMeters);
     const QString az = (it.azimuthDeg < 0.0) ? QStringLiteral("-") : QString::number(it.azimuthDeg, 'f', 1);
+    feat->SetField(0, i + 1);
+    const QString strs[] = {it.datasetName, it.layerName, it.siteName, it.radiusLabel, it.direction};
+    for (int c = 0; c < 5; ++c)
+      feat->SetField(c + 1, strs[c].toUtf8().constData());
+    feat->SetField(6, it.distanceMeters);
     feat->SetField(7, az.toUtf8().constData());
     feat->SetField(8, it.description.toUtf8().constData());
     const OGRErr err = sheet->CreateFeature(feat);
     OGRFeature::DestroyFeature(feat);
-    if (err == OGRERR_NONE) continue;
-    GDALClose(ds);
-    if (errorOut) *errorOut = QStringLiteral("엑셀 행 기록에 실패했습니다.");
-    return false;
+    if (err != OGRERR_NONE) return fail(QStringLiteral("엑셀 행 기록에 실패했습니다."));
   }
   GDALClose(ds);
+  ds = nullptr;
   QFile src(scratchXlsx);
   QDir().mkpath(QFileInfo(path).absolutePath());
   QSaveFile dst(path);
-  if (!src.open(QIODevice::ReadOnly) || !dst.open(QIODevice::WriteOnly)) {
-    if (errorOut) *errorOut = QStringLiteral("엑셀 저장 경로를 열지 못했습니다: %1").arg(path);
-    return false;
-  }
+  if (!src.open(QIODevice::ReadOnly) || !dst.open(QIODevice::WriteOnly))
+    return fail(QStringLiteral("엑셀 저장 경로를 열지 못했습니다: %1").arg(path));
   const QByteArray bytes = src.readAll();
-  if (dst.write(bytes) != bytes.size() || !dst.commit()) {
-    if (errorOut) *errorOut = QStringLiteral("엑셀 파일을 저장하지 못했습니다: %1").arg(path);
-    return false;
-  }
+  if (dst.write(bytes) != bytes.size() || !dst.commit())
+    return fail(QStringLiteral("엑셀 파일을 저장하지 못했습니다: %1").arg(path));
   return true;
 }
 

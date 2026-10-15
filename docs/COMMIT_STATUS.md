@@ -8,25 +8,25 @@
 
 | Field | Value |
 |------|--------|
-| Updated (local) | 2026-10-14 17:43:21 +09:00 |
+| Updated (local) | 2026-10-15 10:04:44 +09:00 |
 | VERSION file | 2.0.0 |
 | Branch | `export_nearby_heritage_excel` |
-| HEAD short | `69130a2` |
-| HEAD full | `69130a205300ea0b5203e36deba8476b8c2e6f3c` |
-| HEAD date | 2026-10-11 14:33:31 +0900 |
+| HEAD short | `013f78f` |
+| HEAD full | `013f78f0ec910f2936f44bdc2e76ad99a4a22798` |
+| HEAD date | 2026-10-14 17:43:20 +0900 |
 | HEAD author | kwonyoungin11 <kyi2516@gmail.com> |
-| HEAD subject | chore(dev): 이 PC 빌드 후 바탕화면 아이콘을 갱신하는 스크립트와 작업 지침을 넣는다 |
-| Total commits | 384 |
+| HEAD subject | feat(export): 주변유적 경계 내 유적 현황 엑셀 내보내기 추가 및 숨긴 조사구역 이어그리기 오류 수정 |
+| Total commits | 385 |
 | Upstream | `(none)` |
 | Sync | no upstream configured |
-| Origin | https://github.com/kwonyoungin11/hgis.git |
-| Working tree dirty | **yes** (15 paths) |
+| Origin | https://github.com/kesekikwon-netizen/hgis.git |
+| Working tree dirty | **yes** (3 paths) |
 
 ## How far we are
 
-- **Recorded tip when this file was written:** chore(dev): 이 PC 빌드 후 바탕화면 아이콘을 갱신하는 스크립트와 작업 지침을 넣는다 (`69130a2` @ 2026-10-11 14:33:31 +0900)
+- **Recorded tip when this file was written:** feat(export): 주변유적 경계 내 유적 현황 엑셀 내보내기 추가 및 숨긴 조사구역 이어그리기 오류 수정 (`013f78f` @ 2026-10-14 17:43:20 +0900)
 - **Remote sync at write time:** no upstream configured
-- **Uncommitted local changes at write time:** yes (15 paths)
+- **Uncommitted local changes at write time:** yes (3 paths)
 
 ### Read this correctly
 
@@ -43,6 +43,7 @@
 
 | Hash | Date | Subject |
 |------|------|---------|
+| `013f78f` | 2026-10-14T17:43:20+09:00 | feat(export): 주변유적 경계 내 유적 현황 엑셀 내보내기 추가 및 숨긴 조사구역 이어그리기 오류 수정 |
 | `69130a2` | 2026-10-11T14:33:31+09:00 | chore(dev): 이 PC 빌드 후 바탕화면 아이콘을 갱신하는 스크립트와 작업 지침을 넣는다 |
 | `a805797` | 2026-10-11T06:24:37+09:00 | fix(drawing): 범례를 용지 밖에도 놓을 수 있게 한다 — 보완 L4(범례를 용지 안에 가둠)를 되돌린다 |
 | `1a9826d` | 2026-10-11T05:50:35+09:00 | docs: 스타일 탭 스크롤 규칙이 스크롤바에 닿지 않는 시험을 오류 재발 방지표 R1 줄에 적는다 |
@@ -72,26 +73,13 @@
 | `6018029` | 2026-10-11T02:42:48+09:00 | style(inspector): M5 오른쪽 판의 빈 상태 문장은 점선 상자 없이 문장만, 탭 「속성 / 스타일」은 아이콘 없이 글자 + 밑줄 |
 | `ecc372f` | 2026-10-11T02:38:59+09:00 | style(layers): M2 레이어 목록의 같은 띠 글자(주변·참조·지적도)는 처음 한 번만 쓰고, 다시 나오는 자리에는 선만 둔다 |
 | `f2b6dd6` | 2026-10-11T02:37:02+09:00 | style(home): H4 최근 조사 표는 마우스를 올린 줄 전체가 한 번에 밝아진다 |
-| `dc8d538` | 2026-10-11T02:34:12+09:00 | style(home): H2 「이어서 작업」 표제란을 한 틀 3행으로 — 캡션 · 이름과 단추 · 칸, 아래 선이 어긋나던 것을 바로잡는다 |
 
 ## Staged in this commit
 
 ```
-M	CMakeLists.txt
-M	docs/ERROR_REGRESSION.md
-A	docs/intent/2026-10-14-export-nearby-heritage-excel.md
-M	src/app/KaSurveyAreaDialog.cpp
-M	src/app/KaSurveyAreaDialog.h
-M	src/app/MainWindow.h
-M	src/app/MainWindowEditing.cpp
-M	src/app/MainWindowExport.cpp
-M	src/app/MainWindowRibbon.cpp
-M	src/core/LayerOps.cpp
-A	src/core/NearbyHeritageExport.cpp
-A	src/core/NearbyHeritageExport.h
-M	src/core/SurveyStorage.cpp
-M	tests/test_heritage_fetch_plan.cpp
-M	tests/test_survey_area_plate.cpp
+M	src/core/BufferAnalysis.cpp
+M	src/core/NearbyHeritageExport.cpp
+M	tests/test_buffer.cpp
 ```
 ## Other PC checklist
 

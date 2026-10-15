@@ -114,7 +114,7 @@ void TestBuffer::offsetIs500mFromSource() {
     const double d = site.distance(pt);
     if (d > maxD) maxD = d;
   }
-  QVERIFY2(maxD >= 500.0 && maxD < 720.0, qPrintable(QStringLiteral("maxD=%1").arg(maxD)));
+  QVERIFY2(maxD > 498.0 && maxD < 502.0, qPrintable(QStringLiteral("maxD=%1").arg(maxD)));
 }
 
 static QgsVectorLayer* bufferLayer(QgsProject& proj, const QString& key) {

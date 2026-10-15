@@ -215,7 +215,7 @@ bool addDistanceRing(QgsProject* project, QgsMapCanvas* canvas, QgsVectorLayer* 
   // Parallel offset of the site outline. Do not simplify — that collapsed small
   // sites into a diamond. Dash/gaps are style, not geometry.
   const QgsGeometry buf =
-      poly.buffer(meters, 16, Qgis::EndCapStyle::Flat, Qgis::JoinStyle::Miter, 5.0);
+      poly.buffer(meters, 36, Qgis::EndCapStyle::Round, Qgis::JoinStyle::Round, 2.0);
   if (buf.isEmpty()) {
     if (errorOut) *errorOut = QStringLiteral("주변 범위를 만들지 못했습니다");
     return false;
