@@ -163,9 +163,30 @@ class ParcelCopyKeysTest : public QObject {
     tool.canvasPressEvent(&p2);
     QCOMPARE(tool.pointCount(), 3);  // 빠뜨린 중간 자석점 (200010, 450001.2)가 자동으로 채워짐
 
+    // 지적도 위에 대략 그린 조사구역 도형이 버튼을 누르면 가장 가까운 지적선에 붙고 사이 꼭짓점도 채워져야 한다.
+    auto* area = new QgsVectorLayer(QStringLiteral("Polygon?crs=EPSG:5187"), QStringLiteral("조사구역"),
+                                    QStringLiteral("memory"));
+    LayerOps::markSurveyLayer(area, QStringLiteral("survey_area"));
+    {
+      QgsFeature rough(area->fields());
+      rough.setGeometry(QgsGeometry::fromPolygonXY(
+          {{QgsPointXY(200001.2, 449999.1), QgsPointXY(200019.0, 450000.8), QgsPointXY(200020.8, 450019.2),
+            QgsPointXY(199999.3, 450020.6), QgsPointXY(200001.2, 449999.1)}}));
+      area->dataProvider()->addFeature(rough);
+    }
+    project->addMapLayer(area);
+    QString snapMsg;
+    QCOMPARE(SnapTraceOps::snapCanvasShapesToNearestLines(&canvas, nullptr, FID_NULL, &snapMsg), 1);
+    QgsFeature snappedFeat;
+    area->getFeatures().nextFeature(snappedFeat);
+    const QgsPolygonXY snappedPoly = snappedFeat.geometry().asPolygon();
+    QVERIFY(!snappedPoly.isEmpty());
+    QCOMPARE(snappedPoly[0].size(), 6);  // 4개 모서리 스냅 + 빠진 중간 꼭짓점 (200010, 450001.2) 자동 삽입 + 닫힘점
+
     QFile sketchSrc(QStringLiteral("src/app/KaDrawSketchTools.cpp"));
     if (sketchSrc.open(QIODevice::ReadOnly | QIODevice::Text)) {
       const QString code = QString::fromUtf8(sketchSrc.readAll());
+      QVERIFY(code.contains(QLatin1String("actSnapToLines")) && code.contains(QStringLiteral("가까운 선에 붙이기")));
       QVERIFY(code.contains(QLatin1String("actSnapTrace")) && code.contains(QStringLiteral("선 따라 자동채움")));
       QVERIFY(code.contains(QLatin1String("actSnapPreview")) && code.contains(QStringLiteral("근접 자석점 표시")));
     }

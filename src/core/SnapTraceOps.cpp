@@ -1,96 +1,13 @@
 #include "core/SnapTraceOps.h"
-#include "core/KaLogExcept.h"
-#include "core/LayerOps.h"
+#include "core/SnapTraceGraph.h"
 
-#include <algorithm>
-#include <cmath>
-#include <limits>
 #include <QColor>
-#include <queue>
-
-#include <qgsabstractgeometry.h>
-#include <qgscoordinatetransform.h>
-#include <qgsfeature.h>
-#include <qgsfeatureiterator.h>
-#include <qgsfeaturerequest.h>
-#include <qgsgeometry.h>
-#include <qgsmapcanvas.h>
-#include <qgsmaplayer.h>
-#include <qgsmapsettings.h>
-#include <qgspoint.h>
-#include <qgsproject.h>
-#include <qgsrectangle.h>
-#include <qgsvectorlayer.h>
-#include <qgsvertexid.h>
 #include <qgsvertexmarker.h>
 
 namespace SnapTraceOps {
-namespace {
-
-QList<QgsVectorLayer*> eligibleLayers(QgsMapCanvas* canvas) {
-  QList<QgsVectorLayer*> out;
-  if (!canvas) return out;
-  QgsProject* proj = QgsProject::instance();
-  if (proj && LayerOps::readSnapSettings(proj).target == LayerOps::SnapTarget::CurrentLayer) {
-    if (auto* cur = qobject_cast<QgsVectorLayer*>(canvas->currentLayer())) {
-      if (cur->isValid() && LayerOps::isSnapSourceLayer(cur)) out.append(cur);
-      return out;
-    }
-  }
-  QList<QgsMapLayer*> raw = canvas->layers();
-  if (raw.isEmpty() && proj) raw = proj->mapLayers().values();
-  for (QgsMapLayer* ml : raw) {
-    auto* vl = qobject_cast<QgsVectorLayer*>(ml);
-    if (vl && vl->isValid() && LayerOps::isSnapSourceLayer(vl) && !out.contains(vl)) out.append(vl);
-  }
-  return out;
-}
-
-bool toCanvasAndFetch(QgsVectorLayer* vl, const QgsRectangle& canvasBox, const QgsCoordinateReferenceSystem& canvasCrs,
-                      QVector<QgsGeometry>& out) {
-  if (!vl) return false;
-  QgsRectangle reqBox = canvasBox;
-  const bool needXf = canvasCrs.isValid() && vl->crs().isValid() && vl->crs() != canvasCrs;
-  QgsCoordinateTransform toLayer, toCanvas;
-  if (needXf) {
-    const auto ctx =
-        QgsProject::instance() ? QgsProject::instance()->transformContext() : QgsCoordinateTransformContext();
-    toLayer = QgsCoordinateTransform(canvasCrs, vl->crs(), ctx);
-    toCanvas = QgsCoordinateTransform(vl->crs(), canvasCrs, ctx);
-    toLayer.setBallparkTransformsAreAppropriate(true);
-    toCanvas.setBallparkTransformsAreAppropriate(true);
-    try {
-      reqBox = toLayer.transformBoundingBox(canvasBox);
-    } catch (...) {
-      KA_LOG_EXCEPT();
-    }
-  }
-  QgsFeature feat;
-  QgsFeatureIterator it = vl->getFeatures(QgsFeatureRequest().setFilterRect(reqBox).setNoAttributes());
-  while (it.nextFeature(feat)) {
-    if (!feat.hasGeometry()) continue;
-    QgsGeometry g = feat.geometry();
-    if (needXf) {
-      try {
-        if (g.transform(toCanvas) != Qgis::GeometryOperationResult::Success) continue;
-      } catch (...) {
-        KA_LOG_EXCEPT();
-        continue;
-      }
-    }
-    out.append(g);
-  }
-  return !out.isEmpty();
-}
-
-QgsPointXY projectOnSegment(const QgsPointXY& p, const QgsPointXY& a, const QgsPointXY& b) {
-  const double dx = b.x() - a.x(), dy = b.y() - a.y(), lenSq = dx * dx + dy * dy;
-  if (lenSq <= 1e-12) return a;
-  const double t = std::clamp(((p.x() - a.x()) * dx + (p.y() - a.y()) * dy) / lenSq, 0.0, 1.0);
-  return QgsPointXY(a.x() + t * dx, a.y() + t * dy);
-}
-
-}  // namespace
+using detail::BoundaryGraph;
+using detail::eligibleLayers;
+using detail::toCanvasAndFetch;
 
 QVector<QgsPointXY> nearbyVertices(QgsMapCanvas* canvas, const QgsPointXY& cursorMapPt, const QgsPointXY* activeSnapPt,
                                    double radiusPx, int maxCount) {
@@ -106,21 +23,19 @@ QVector<QgsPointXY> nearbyVertices(QgsMapCanvas* canvas, const QgsPointXY& curso
   QVector<QPair<double, QgsPointXY>> cands;
   for (QgsVectorLayer* vl : eligibleLayers(canvas)) {
     QVector<QgsGeometry> geoms;
-    if (!toCanvasAndFetch(vl, box, canvasCrs, geoms)) continue;
+    if (!toCanvasAndFetch(vl, box, canvasCrs, nullptr, FID_NULL, geoms)) continue;
     for (const QgsGeometry& geom : geoms) {
       for (auto vit = geom.vertices_begin(); vit != geom.vertices_end(); ++vit) {
         const QgsPointXY pt((*vit).x(), (*vit).y());
         const double dSq = cursorMapPt.sqrDist(pt);
         if (dSq > radiusSq || (activeSnapPt && activeSnapPt->sqrDist(pt) <= dedupSq)) continue;
-        const bool dup =
-            std::any_of(cands.begin(), cands.end(), [&](const auto& c) { return c.second.sqrDist(pt) <= dedupSq; });
-        if (!dup) cands.append({dSq, pt});
+        if (!std::any_of(cands.begin(), cands.end(), [&](const auto& c) { return c.second.sqrDist(pt) <= dedupSq; }))
+          cands.append({dSq, pt});
       }
     }
   }
   std::sort(cands.begin(), cands.end(), [](const auto& a, const auto& b) { return a.first < b.first; });
-  const int take = std::min(static_cast<int>(cands.size()), maxCount);
-  for (int i = 0; i < take; ++i)
+  for (int i = 0, take = std::min(static_cast<int>(cands.size()), maxCount); i < take; ++i)
     result.append(cands[i].second);
   return result;
 }
@@ -158,115 +73,196 @@ QVector<QgsPointXY> traceBetween(QgsMapCanvas* canvas, const QgsPointXY& fromMap
   const double chord = fromMapPt.distance(toMapPt);
   const double mupp = canvas->mapUnitsPerPixel() > 0.0 ? canvas->mapUnitsPerPixel() : 0.05;
   const double snapTol = std::max(mupp * 16.0, 0.25), mergeTol = std::max(mupp * 0.4, 0.005);
-  const double mergeSq = mergeTol * mergeTol, skipSq = std::pow(std::max(mupp * 2.0, 0.02), 2);
+  const double skipSq = std::pow(std::max(mupp * 2.0, 0.02), 2), vTol = std::max(mergeTol * 4.0, mupp * 4.0);
   if (!std::isfinite(chord) || chord <= snapTol * 0.5) return {};
-
-  QgsRectangle canvasBox(fromMapPt, toMapPt);
-  canvasBox.grow(std::max(chord * 0.6, snapTol * 2.0));
+  QgsRectangle box(fromMapPt, toMapPt);
+  box.grow(std::max(chord * 0.6, snapTol * 2.0));
   const QgsCoordinateReferenceSystem canvasCrs = canvas->mapSettings().destinationCrs();
-  QVector<QgsPointXY> bestPath;
-  double bestDist = std::numeric_limits<double>::infinity();
-
+  BoundaryGraph graph{mergeTol, mergeTol * mergeTol, {}, {}, {}};
   for (QgsVectorLayer* vl : eligibleLayers(canvas)) {
     QVector<QgsGeometry> geoms;
-    if (!toCanvasAndFetch(vl, canvasBox, canvasCrs, geoms)) continue;
-    QVector<QgsPointXY> nodes;
-    QVector<QVector<QPair<int, double>>> adj;
-    QVector<QPair<int, int>> segs;
-    auto addNode = [&](const QgsPointXY& p) -> int {
-      for (int i = 0; i < nodes.size(); ++i)
-        if (nodes[i].sqrDist(p) <= mergeSq) return i;
-      nodes.append(p);
-      adj.emplaceBack();
-      return nodes.size() - 1;
-    };
-    auto addEdge = [&](int u, int v) {
-      if (u == v) return;
-      const double w = nodes[u].distance(nodes[v]);
-      adj[u].append({v, w});
-      adj[v].append({u, w});
-      segs.append({u, v});
-    };
-    for (const QgsGeometry& geom : geoms) {
-      if (nodes.size() >= 600) break;
-      const QgsAbstractGeometry* ag = geom.constGet();
-      if (!ag) continue;
-      for (int p = 0; p < ag->partCount(); ++p) {
-        for (int r = 0; r < ag->ringCount(p); ++r) {
-          const int n = ag->vertexCount(p, r);
-          for (int v = 0; v + 1 < n; ++v) {
-            const QgsPoint p0 = ag->vertexAt(QgsVertexId(p, r, v));
-            const QgsPoint p1 = ag->vertexAt(QgsVertexId(p, r, v + 1));
-            const QgsPointXY a(p0.x(), p0.y()), b(p1.x(), p1.y());
-            if (canvasBox.contains(a) || canvasBox.contains(b)) addEdge(addNode(a), addNode(b));
-          }
-        }
-      }
-    }
-    if (nodes.size() < 3) continue;
+    if (toCanvasAndFetch(vl, box, canvasCrs, nullptr, FID_NULL, geoms)) graph.addGeometries(geoms, box);
+  }
+  return graph.trace(fromMapPt, toMapPt, snapTol, vTol, skipSq, maxIntermediate);
+}
 
-    auto attach = [&](const QgsPointXY& target) -> int {
-      const double vTol = std::max(mergeTol * 4.0, mupp * 4.0);
-      int bestNode = -1, bestSeg = -1;
-      double bestNodeDist = snapTol, bestSegDist = snapTol;
-      QgsPointXY bestProj;
-      for (int i = 0; i < nodes.size(); ++i) {
-        if (const double d = nodes[i].distance(target); d <= bestNodeDist) {
-          bestNodeDist = d;
-          bestNode = i;
-        }
-      }
-      if (bestNode >= 0 && bestNodeDist <= vTol) return bestNode;
-      for (int i = 0; i < segs.size(); ++i) {
-        const QgsPointXY proj = projectOnSegment(target, nodes[segs[i].first], nodes[segs[i].second]);
-        if (const double d = proj.distance(target); d < bestSegDist) {
-          bestSegDist = d;
-          bestSeg = i;
-          bestProj = proj;
-        }
-      }
-      if (bestSeg < 0) return bestNode;
-      const auto [u, v] = segs[bestSeg];
-      if (bestProj.distance(nodes[u]) <= vTol) return u;
-      if (bestProj.distance(nodes[v]) <= vTol) return v;
-      const int w = addNode(bestProj);
-      addEdge(w, u);
-      addEdge(w, v);
-      return w;
-    };
-
-    const int s = attach(fromMapPt), t = attach(toMapPt);
-    if (s < 0 || t < 0 || s == t) continue;
-    QVector<double> dist(nodes.size(), std::numeric_limits<double>::infinity());
-    QVector<int> parent(nodes.size(), -1);
-    using Item = QPair<double, int>;
-    std::priority_queue<Item, QVector<Item>, std::greater<Item>> pq;
-    pq.push({dist[s] = 0.0, s});
-    while (!pq.empty()) {
-      const auto [d, u] = pq.top();
-      pq.pop();
-      if (u == t) break;
-      if (d > dist[u]) continue;
-      for (const auto& [v, w] : adj[u]) {
-        if (d + w < dist[v]) {
-          parent[v] = u;
-          pq.push({dist[v] = d + w, v});
-        }
-      }
-    }
-    if (!std::isfinite(dist[t]) || dist[t] > chord * 2.2 || dist[t] >= bestDist) continue;
-    QVector<int> chain;
-    for (int cur = parent[t]; cur >= 0 && cur != s; cur = parent[cur])
-      chain.prepend(cur);
-    QVector<QgsPointXY> mids;
-    for (int idx : chain)
-      if (nodes[idx].sqrDist(fromMapPt) > skipSq && nodes[idx].sqrDist(toMapPt) > skipSq) mids.append(nodes[idx]);
-    if (!mids.isEmpty() && mids.size() <= maxIntermediate) {
-      bestDist = dist[t];
-      bestPath = mids;
+QgsGeometry snapGeometryToNearestLines(QgsMapCanvas* canvas, QgsVectorLayer* targetLayer, QgsFeatureId ignoreFid,
+                                       const QgsGeometry& geom, int* movedOut, int* insertedOut) {
+  if (movedOut) *movedOut = 0;
+  if (insertedOut) *insertedOut = 0;
+  if (!targetLayer || geom.isEmpty()) return geom;
+  const QgsCoordinateReferenceSystem canvasCrs = (canvas && canvas->mapSettings().destinationCrs().isValid())
+                                                     ? canvas->mapSettings().destinationCrs()
+                                                     : targetLayer->crs();
+  const bool needXf = canvasCrs.isValid() && targetLayer->crs().isValid() && targetLayer->crs() != canvasCrs;
+  const auto ctx =
+      QgsProject::instance() ? QgsProject::instance()->transformContext() : QgsCoordinateTransformContext();
+  QgsGeometry gMap = geom;
+  if (needXf) {
+    QgsCoordinateTransform toMap(targetLayer->crs(), canvasCrs, ctx);
+    toMap.setBallparkTransformsAreAppropriate(true);
+    try {
+      if (gMap.transform(toMap) != Qgis::GeometryOperationResult::Success) return geom;
+    } catch (...) {
+      KA_LOG_EXCEPT();
+      return geom;
     }
   }
-  return bestPath;
+  const QgsRectangle bbox = gMap.boundingBox();
+  const double diag = std::hypot(bbox.width(), bbox.height());
+  const double mupp = (canvas && canvas->mapUnitsPerPixel() > 0.0) ? canvas->mapUnitsPerPixel() : 0.08;
+  const double snapTol = std::clamp(std::max(mupp * 48.0, diag * 0.24), 2.5, 25.0);
+  const double vTol = snapTol * 0.78, mergeTol = std::max(mupp * 0.3, 0.01), skipSq = std::pow(mergeTol * 2.5, 2);
+  QgsRectangle searchBox = bbox;
+  searchBox.grow(snapTol * 1.5);
+  BoundaryGraph graph{mergeTol, mergeTol * mergeTol, {}, {}, {}};
+  for (QgsVectorLayer* vl : eligibleLayers(canvas)) {
+    QVector<QgsGeometry> geoms;
+    if (toCanvasAndFetch(vl, searchBox, canvasCrs, targetLayer, ignoreFid, geoms))
+      graph.addGeometries(geoms, searchBox);
+  }
+  if (graph.nodes.isEmpty()) return geom;
+
+  auto processRing = [&](const QVector<QgsPointXY>& inRing, bool closed) -> QVector<QgsPointXY> {
+    const int n = closed && inRing.size() > 1 && inRing.first() == inRing.last() ? inRing.size() - 1 : inRing.size();
+    if (n < (closed ? 3 : 2)) return inRing;
+    QVector<QgsPointXY> snapped(n);
+    for (int i = 0; i < n; ++i) {
+      bool moved = false;
+      snapped[i] = graph.snapPoint(inRing[i], vTol, snapTol, &moved);
+      if (moved && movedOut) ++(*movedOut);
+    }
+    QVector<QgsPointXY> built;
+    for (int i = 0; i < n; ++i) {
+      built.append(snapped[i]);
+      if (!closed && i + 1 >= n) break;
+      const QgsPointXY& nextPt = snapped[(i + 1) % n];
+      const QVector<QgsPointXY> mids = graph.trace(snapped[i], nextPt, snapTol, vTol, skipSq, 24);
+      if (!mids.isEmpty()) {
+        built.append(mids);
+        if (insertedOut) *insertedOut += mids.size();
+      }
+    }
+    QVector<QgsPointXY> clean;
+    for (const QgsPointXY& pt : built) {
+      if (!clean.isEmpty() && clean.last().sqrDist(pt) <= graph.mergeSq) continue;
+      if (clean.size() >= 2 && clean[clean.size() - 2].sqrDist(pt) <= graph.mergeSq) {
+        clean.removeLast();
+        continue;
+      }
+      clean.append(pt);
+    }
+    if (closed && clean.size() >= 3) {
+      if (clean.first().sqrDist(clean.last()) <= graph.mergeSq) clean.removeLast();
+      if (clean.size() >= 3) clean.append(clean.first());
+    }
+    return clean.size() >= (closed ? 4 : 2) ? clean : inRing;
+  };
+
+  QgsGeometry outGeom = gMap;
+  if (gMap.type() == Qgis::GeometryType::Polygon) {
+    QgsPolygonXY poly = gMap.isMultipart() ? gMap.asMultiPolygon().value(0) : gMap.asPolygon();
+    if (!poly.isEmpty()) {
+      poly[0] = processRing(poly[0], true);
+      outGeom = QgsGeometry::fromPolygonXY(poly);
+    }
+  } else if (gMap.type() == Qgis::GeometryType::Line) {
+    QgsPolylineXY line = gMap.isMultipart() ? gMap.asMultiPolyline().value(0) : gMap.asPolyline();
+    if (!line.isEmpty()) outGeom = QgsGeometry::fromPolylineXY(processRing(line, false));
+  }
+  if (needXf) {
+    QgsCoordinateTransform toLayer(canvasCrs, targetLayer->crs(), ctx);
+    toLayer.setBallparkTransformsAreAppropriate(true);
+    try {
+      outGeom.transform(toLayer);
+    } catch (...) {
+      KA_LOG_EXCEPT();
+      return geom;
+    }
+  }
+  return outGeom;
+}
+
+bool snapFeatureToNearestLines(QgsMapCanvas* canvas, QgsVectorLayer* targetLayer, QgsFeatureId targetFid, int* movedOut,
+                               int* insertedOut) {
+  if (!targetLayer || !targetLayer->isValid() || FID_IS_NULL(targetFid)) return false;
+  const QgsFeature feat = targetLayer->getFeature(targetFid);
+  if (!feat.isValid() || !feat.hasGeometry()) return false;
+  int moved = 0, inserted = 0;
+  QgsGeometry snapped = snapGeometryToNearestLines(canvas, targetLayer, targetFid, feat.geometry(), &moved, &inserted);
+  if (movedOut) *movedOut = moved;
+  if (insertedOut) *insertedOut = inserted;
+  if ((moved == 0 && inserted == 0) || snapped.isEmpty()) return false;
+  if (!targetLayer->isEditable() && !targetLayer->startEditing()) return false;
+  targetLayer->beginEditCommand(QStringLiteral("가까운 선에 붙이기"));
+  const bool ok = targetLayer->changeGeometry(targetFid, snapped);
+  if (ok)
+    targetLayer->endEditCommand();
+  else
+    targetLayer->destroyEditCommand();
+  if (ok) targetLayer->triggerRepaint();
+  return ok;
+}
+
+int snapCanvasShapesToNearestLines(QgsMapCanvas* canvas, QgsVectorLayer* fallbackLayer, QgsFeatureId fallbackFid,
+                                   QString* statusOut) {
+  QgsProject* proj = QgsProject::instance();
+  if (!proj) return 0;
+  QList<QPair<QgsVectorLayer*, QgsFeatureId>> targets;
+  for (QgsMapLayer* ml : proj->mapLayers().values()) {
+    auto* vl = qobject_cast<QgsVectorLayer*>(ml);
+    if (!vl || !vl->isValid() || LayerOps::layerKeyOf(vl).isEmpty() || LayerOps::isReferenceLayer(vl) ||
+        LayerOps::isCadastralLayer(vl))
+      continue;
+    for (QgsFeatureId fid : vl->selectedFeatureIds())
+      targets.append({vl, fid});
+  }
+  if (targets.isEmpty() && fallbackLayer && !FID_IS_NULL(fallbackFid) &&
+      fallbackLayer->getFeature(fallbackFid).hasGeometry()) {
+    fallbackLayer->selectByIds({fallbackFid});
+    targets.append({fallbackLayer, fallbackFid});
+  }
+  if (targets.isEmpty()) {
+    for (const QString& key : {QStringLiteral("survey_area"), QStringLiteral("feature_poly"),
+                               QStringLiteral("feature_line"), QStringLiteral("trial_trench")}) {
+      for (QgsVectorLayer* vl : LayerOps::findAllByLayerKey(proj, key)) {
+        if (!vl || !vl->isValid()) continue;
+        QgsFeature f, lastF;
+        QgsFeatureIterator it = vl->getFeatures();
+        while (it.nextFeature(f))
+          if (f.hasGeometry()) lastF = f;
+        if (lastF.isValid()) {
+          vl->selectByIds({lastF.id()});
+          targets.append({vl, lastF.id()});
+          break;
+        }
+      }
+      if (!targets.isEmpty()) break;
+    }
+  }
+  if (targets.isEmpty()) {
+    if (statusOut) *statusOut = QStringLiteral("먼저 지적도·도면 위에 도형을 그리거나 도형선택으로 도형을 고르세요.");
+    return 0;
+  }
+  int changedCount = 0, totalMoved = 0, totalInserted = 0;
+  for (const auto& [vl, fid] : targets) {
+    int m = 0, ins = 0;
+    if (snapFeatureToNearestLines(canvas, vl, fid, &m, &ins)) {
+      ++changedCount;
+      totalMoved += m;
+      totalInserted += ins;
+    }
+  }
+  if (statusOut) {
+    *statusOut = changedCount > 0
+                     ? QStringLiteral(
+                           "도형을 가장 가까운 선에 붙였습니다 (꼭짓점 %1개 맞춤 · 사이점 %2개 채움). Ctrl+Z로 되돌릴 "
+                           "수 있습니다.")
+                           .arg(totalMoved)
+                           .arg(totalInserted)
+                     : QStringLiteral("이미 가장 가까운 선에 붙어 있거나 주변에 붙일 기준 선(지적·도면)이 없습니다.");
+  }
+  return changedCount;
 }
 
 }  // namespace SnapTraceOps

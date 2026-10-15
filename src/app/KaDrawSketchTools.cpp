@@ -13,6 +13,7 @@
 #include "KaTrenchMoveTool.h"
 #include "MainWindow.h"
 #include "core/LayerOps.h"
+#include "core/SnapTraceOps.h"
 
 #include <QAction>
 #include <QLabel>
@@ -43,9 +44,23 @@ void MainWindow::addDrawSketchButtons() {
       break;
     }
   }
+  auto runSnapToLines = [this]() -> bool {
+    QString msg;
+    const int n = SnapTraceOps::snapCanvasShapesToNearestLines(m_canvas, m_lastDrawnLayer, m_lastDrawnFid, &msg);
+    if (m_featureSelectTool) m_featureSelectTool->refreshSelectedGeometry();
+    LayerOps::refreshCanvasIfIdle(m_canvas);
+    if (!msg.isEmpty()) statusBar()->showMessage(msg, 6000);
+    return n > 0;
+  };
+  auto* snapNowAct = new QAction(QStringLiteral("가까운 선에 붙이기"), m_subToolbar);
+  snapNowAct->setObjectName(QStringLiteral("actSnapToLines"));
+  easyAct ? m_subToolbar->insertAction(easyAct, snapNowAct) : m_subToolbar->addAction(snapNowAct);
+  snapNowAct->setToolTip(QStringLiteral(
+      "지적도·사업자 도면 위에 그린 도형(방금 그린 도형 또는 선택한 도형)을\n"
+      "가장 가까운 지적선·도면선에 자동으로 붙이고 빠진 사이 꺾임점도 채웁니다 (Ctrl+Z 되돌리기 가능)."));
+  connect(snapNowAct, &QAction::triggered, this, runSnapToLines);
   auto addSnapToggle = [&](const QString& text, const char* objName, const char* propName, bool isTrace,
                            const QString& tip, const QString& onMsg) {
-    // 아이콘 없이 글자만 두어 창이 좁아져도(KaToolbarFit IconOnly 단계) 글자가 절대 숨겨지지 않게 한다.
     auto* act = new QAction(text, m_subToolbar);
     act->setObjectName(QString::fromLatin1(objName));
     act->setProperty(propName, true);
@@ -53,7 +68,7 @@ void MainWindow::addDrawSketchButtons() {
     easyAct ? m_subToolbar->insertAction(easyAct, act) : m_subToolbar->addAction(act);
     if (QWidget* toggle = m_subToolbar->widgetForAction(act)) toggle->setProperty("kaToggle", true);
     act->setToolTip(tip);
-    connect(act, &QAction::toggled, this, [this, propName, isTrace, text, onMsg](bool on) {
+    connect(act, &QAction::toggled, this, [this, propName, isTrace, text, onMsg, runSnapToLines](bool on) {
       setProperty(propName, on);
       if (on && !m_snapEnabled) {
         m_snapEnabled = true;
@@ -61,19 +76,19 @@ void MainWindow::addDrawSketchButtons() {
         if (auto* w = m_subToolbar ? m_subToolbar->findChild<KaSnapSettingsWidget*>() : nullptr) w->syncFromProject();
       }
       if (m_captureTool) isTrace ? m_captureTool->setSnapTrace(on) : m_captureTool->setSnapPreview(on);
+      if (isTrace && runSnapToLines()) return;
       statusBar()->showMessage(on ? onMsg : (text + QStringLiteral(" 꺼짐")), 5000);
     });
   };
   addSnapToggle(
       QStringLiteral("선 따라 자동채움"), "actSnapTrace", "kaSnapTrace", true,
       QStringLiteral("1번 기능(선 따라 빠진 사이 자석점 자동 채우기)\n"
-                     "· 사업자 도면(CAD)·지적 경계 위에서 자석점 한두 칸을 건너뛰어 찍어도\n"
-                     "  그 사이의 경계 꼭짓점을 선을 따라 자동으로 채워 미세한 차이를 막습니다."),
+                     "· 그릴 때 자석점 한두 칸을 건너뛰어도 사이 꼭짓점을 선을 따라 자동으로 채우며,\n"
+                     "  이미 그린 도형이 있을 때 누르면 가장 가까운 선에 바로 붙입니다."),
       QStringLiteral("선 따라 자동채움 켜짐 — 자석점을 한두 칸 건너뛰어 찍어도 사이 꼭짓점을 자동으로 채웁니다."));
   addSnapToggle(QStringLiteral("근접 자석점 표시"), "actSnapPreview", "kaSnapPreview", false,
                 QStringLiteral("3번 기능(마우스가 가까이 갔을 때만 주변 자석점 미리 표시)\n"
-                               "· 화면 전체에 자석점을 띄우면 어지러우므로, 마우스가 선·꼭짓점에 가까이 갔을 때만\n"
-                               "  주변 자석점을 미리 보여 주고 마우스가 멀어지면 숨깁니다."),
+                               "· 마우스가 선·꼭짓점에 가까이 갔을 때만 주변 자석점을 미리 보여 줍니다."),
                 QStringLiteral("근접 자석점 표시 켜짐 — 마우스가 가까이 갔을 때만 주변 자석점을 미리 보여 줍니다."));
   auto* finishAct = m_subToolbar->addAction(KaIcons::icon(QStringLiteral("check")), QStringLiteral("완료"));
   finishAct->setProperty("kaSketch", QStringLiteral("finish"));
