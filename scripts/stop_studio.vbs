@@ -1,3 +1,15 @@
+Option Explicit
+Dim fso, WshShell, scriptDir, serverScript, userProfile, nodeExe
+Set fso = CreateObject("Scripting.FileSystemObject")
 Set WshShell = CreateObject("WScript.Shell")
-userProfile = WshShell.ExpandEnvironmentStrings("%USERPROFILE%")
-WshShell.Run """C:\Program Files\nodejs\node.exe"" """ & userProfile & "\.gemini\config\plugins\gemini-desktop\scripts\gemini_mcp_server.js"" --off", 0, True
+scriptDir = fso.GetParentFolderName(WScript.ScriptFullName)
+serverScript = scriptDir & "\gemini_mcp_server.js"
+If Not fso.FileExists(serverScript) Then
+  userProfile = WshShell.ExpandEnvironmentStrings("%USERPROFILE%")
+  serverScript = userProfile & "\.gemini\config\plugins\gemini-desktop\scripts\gemini_mcp_server.js"
+End If
+nodeExe = "node"
+If fso.FileExists("C:\Program Files\nodejs\node.exe") Then
+  nodeExe = """C:\Program Files\nodejs\node.exe"""
+End If
+WshShell.Run nodeExe & " """ & serverScript & """ --off", 0, True
