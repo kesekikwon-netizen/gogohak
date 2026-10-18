@@ -2,7 +2,7 @@
     "mcpServers":  {
                        "gemini-desktop":  {
                                               "args":  [
-                                                           "C:/Users/kyi25/.gemini/config/plugins/gemini-desktop/scripts/gemini_mcp_server.js"
+                                                           "C:/Users/kwonyoungin1/.gemini/config/plugins/gemini-desktop/scripts/gemini_mcp_server.js"
                                                        ],
                                               "env":  {
 
