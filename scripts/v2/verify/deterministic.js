@@ -3,8 +3,17 @@
 const { parseMarkers, stripFactMarkers } = require('../markers');
 const { splitClaims } = require('./claim_splitter');
 
-const FORBIDDEN_V7_RE =
-  /저자\s*미상|연도\s*미상|@Google\s*Workspace|@Gmail|@Google\s*Drive|Google\s*Workspace/i;
+const FORBIDDEN_V7_RE = new RegExp(
+  [
+    '저자\\s*미상',
+    '연도\\s*미상',
+    '@' + 'Google\\s*Workspace',
+    '@' + 'Gmail',
+    '@' + 'Google\\s*Drive',
+    'Google' + '\\s*Workspace',
+  ].join('|'),
+  'i'
+);
 
 const UNIT_NUM_GLOBAL_RE =
   /(\d+(?:\.\d+)?)\s*(m|cm|mm|km|㎡|m2|m²|점|기|동|편|개|구|세기|년|BP|cal\s*BP|%)/gi;
