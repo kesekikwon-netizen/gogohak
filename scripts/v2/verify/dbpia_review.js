@@ -273,16 +273,12 @@ async function runDbpiaFinalReview({
   if (jobDir) {
     const verifyDir = path.join(jobDir, 'verify');
     fs.mkdirSync(verifyDir, { recursive: true });
-    fs.writeFileSync(
-      path.join(verifyDir, 'dbpia_final_review.json'),
-      JSON.stringify(reviewResult, null, 2),
-      'utf8'
-    );
-    fs.writeFileSync(
-      path.join(verifyDir, 'dbpia_final_review.md'),
-      formatDbpiaReviewMarkdown(reviewResult),
-      'utf8'
-    );
+    const jsonStr = JSON.stringify(reviewResult, null, 2);
+    const mdStr = formatDbpiaReviewMarkdown(reviewResult);
+    fs.writeFileSync(path.join(verifyDir, 'dbpia_final_review.json'), jsonStr, 'utf8');
+    fs.writeFileSync(path.join(verifyDir, 'dbpia_final_review.md'), mdStr, 'utf8');
+    fs.writeFileSync(path.join(jobDir, 'dbpia_review.json'), jsonStr, 'utf8');
+    fs.writeFileSync(path.join(jobDir, 'dbpia_review.md'), mdStr, 'utf8');
   }
 
   return reviewResult;
@@ -348,12 +344,27 @@ function evaluateGateG7(reviewResult) {
 
 /**
  * 7.7.4 사용자 선택 처리 (handleDbpiaReviewAction)
- * - action === 'rewrite': 보충 문헌을 literature.json에 병합하고 상충 절의 완료 체크포인트를 해제하여 재작성 준비
- * - action === 'tag': 원고는 재작성하지 않고 상충 문장에 〔확인 필요: DBpia 문헌 검수 상충 — ...〕 표식만 부착
- * - action === 'ignore': 원고 변경 없이 통과 처리
+ * - action === 'rewrite' | 'rework': 보충 문헌을 literature.json에 병합하고 상충 절의 완료 체크포인트를 해제하여 재작성 준비
+ * - action === 'tag' | 'export': 원고는 재작성하지 않고 상충 문장에 〔확인 필요: DBpia 문헌 검수 상충 — ...〕 표식만 부착
+ * - action === 'ignore' | 'abort': 원고 변경 없이 통과 처리
  */
-function handleDbpiaReviewAction(jobDir, action = 'tag') {
-  const reviewPath = path.join(jobDir, 'verify', 'dbpia_final_review.json');
+function handleDbpiaReviewAction(jobDir, actionOrPayload = 'tag') {
+  const rawAction =
+    typeof actionOrPayload === 'object' && actionOrPayload !== null
+      ? actionOrPayload.action || 'tag'
+      : String(actionOrPayload || 'tag');
+  const action =
+    rawAction === 'rework'
+      ? 'rewrite'
+      : rawAction === 'export'
+        ? 'tag'
+        : rawAction === 'abort'
+          ? 'ignore'
+          : rawAction;
+
+  const reviewPath = fs.existsSync(path.join(jobDir, 'verify', 'dbpia_final_review.json'))
+    ? path.join(jobDir, 'verify', 'dbpia_final_review.json')
+    : path.join(jobDir, 'dbpia_review.json');
   if (!fs.existsSync(reviewPath)) {
     throw new Error('dbpia_final_review.json 파일이 없습니다.');
   }

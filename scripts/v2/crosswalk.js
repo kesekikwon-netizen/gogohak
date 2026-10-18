@@ -31,7 +31,9 @@ function buildCrosswalk(md = '', facts = [], lit = [], matrices = [], dbpiaRevie
       for (const fId of parsed.factIds) {
         const fc = factMap.get(fId);
         if (fc) {
-          const displayId = fc.librarySiteKey ? `라이브러리: ${fc.librarySiteKey}/${fc.id}` : fc.id;
+          const displayId =
+            fc.sourceTag ||
+            (fc.librarySiteKey ? `라이브러리: ${fc.librarySiteKey}/${fc.id}` : fc.id);
           const pageLabel =
             fc.source?.page != null && fc.source?.page !== ''
               ? `p.${fc.source.page}`
@@ -59,7 +61,9 @@ function buildCrosswalk(md = '', facts = [], lit = [], matrices = [], dbpiaRevie
       for (const lId of parsed.litIds) {
         const lc = litMap.get(lId);
         if (lc) {
-          const displayId = lc.librarySiteKey ? `라이브러리: ${lc.librarySiteKey}/${lc.id}` : lc.id;
+          const displayId =
+            lc.sourceTag ||
+            (lc.librarySiteKey ? `라이브러리: ${lc.librarySiteKey}/${lc.id}` : lc.id);
           const authors = Array.isArray(lc.authors) ? lc.authors.join('·') : '';
           const quoteOrBib =
             Array.isArray(lc.quotes) && lc.quotes.length > 0
