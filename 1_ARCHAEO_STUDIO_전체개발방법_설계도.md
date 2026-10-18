@@ -274,14 +274,44 @@ $Shortcut.Save()
   2) **프롬프트 내 `@` 멘션 및 외부 앱 이름 완전 배제**: 프롬프트에 `Google`, `Drive`, `Gmail`, `Workspace` 단어를 일절 넣지 않고, `"외부 도구나 외부 문서를 일절 조회하지 말고 바로 이 메시지 아래에 직접 수록된 기초 조사자료와 DBpia 학술논문 서지 데이터만을 근거로 지금 즉시 완성된 원고 본문 전체를 작성하십시오"`로 지시합니다.
   3) **브리지 서버 시작 시 구버전 포트(`18787`) 점유 프로세스 자동 교체 (`ensureBridgeServerProcess`)**: 스튜디오 실행 시 이전 프로세스가 남아 구버전 코드를 실행하는 일이 없도록 유휴 프로세스를 자동 종료하고 최신 코드로 기동합니다.
 
-### 4.3 [핵심 규칙 3] DBpia AI 하이브리드 수집 엔진 (React DOM + Vetter JSON API)
-`askDbpiaAi(query)` 및 `extractLatestDbpiaAnswer()`는 다음 2단계로 국내 학술논문·발굴조사보고서 서지정보를 수집합니다:
+### 4.3 [핵심 규칙 3] DBpia AI 하이브리드 수집 엔진 (React DOM + Vetter JSON API `node_autr`·`node_pbsh_yy`·`node_plct_nm` + OpenAlex/DBpia 병렬 서지 보강)
+`askDbpiaAi(query)`, `extractLatestDbpiaAnswer()`, 및 `enrichDbpiaReferencesMetadata()`는 다음 3단계로 국내외 학술논문·발굴조사보고서 서지정보를 무손실 수집합니다:
 1. **질의 전송**: `https://ai.dbpia.co.kr/ko/search`의 `#agent-search-textarea`에 `HTMLTextAreaElement.prototype.value` 네이티브 세터로 검색어를 주입·전송하거나, 실패 시 `https://ai.dbpia.co.kr/ko/search/redirect?message=${encodeURIComponent(query)}&searchType=dbpia_landing&source=DBpia_main`으로 즉시 이동합니다.
-2. **REA로 발굴한 Vetter Agent 내부 JSON API 직접 조회**:
+2. **REA로 발굴한 Vetter Agent 내부 JSON API 직접 조회 (`node_autr`, `node_pbsh_yy`, `node_plct_nm`, `hovers`)**:
    응답 완료 후 URL 경로(`/search/{convId}` 또는 `/deep-research/{convId}`)에서 대화 ID를 추출하여 브라우저 세션 쿠키(`credentials: 'include'`)로 다음 API를 직접 호출합니다:
    - 일반 AI 검색: `GET https://agent.dbpia.co.kr/vetter_conversations/${convId}`
    - 딥리서치: `GET https://drs-api.dbpia.co.kr/deepresearch_conversations/${convId}`
-   이를 통해 DOM에 축약된 텍스트뿐만 아니라 `authors`, `pub_year`, `title`, `journal_title`, `pages`, `kci_listed`, `node_id`, `abstract` 전체를 무손실 JSON으로 획득합니다.
+   - `messages[last].references` 배열 내 각 객체의 실제 필드명 규격:
+     - `node_id`: 국내 논문(`NODE12737994`) 또는 해외 OpenAlex 논문(`W4411273501`)
+     - `node_title`: 논문 원제
+     - `node_autr`: 저자명 (예: `"<오대양>"`, `"<권봉재, 유기윤>"` ➔ 양끝 `< >` 제거 및 `·` 결합)
+     - `node_pbsh_yy`: 발행연도 (예: `2026`)
+     - `node_plct_nm`: 국내 학술지명 (예: `"인문콘텐츠"`, `"보존과학회지"`)
+     - `node_iprd_nm`: 발행기관·학회명 또는 해외 학술지명 (예: `"인문콘텐츠학회"`, `"ISPRS International Journal of Geo-Information"`)
+     - `dmst_lstd_info` / `ovse_lstd_info`: 등재 정보 (`"KCI우수등재"`, `"SCOPUS"`, `"SCI(E)"`)
+   - `messages[last].hovers`: `{ "NODE12737994_0": { "content": "본문 인용 스니펫..." } }` 구조에서 논문별 핵심 인용 단락을 추출합니다.
+3. **권·호수 및 수록 쪽수(`00~00쪽`) 병렬 보강 (`enrichDbpiaReferencesMetadata`)**:
+   - 국내 논문(`NODE...`): `https://www.dbpia.co.kr/journal/articleDetail?nodeId=NODE...`의 `citation_authors`, `citation_volume`, `citation_issue`, `citation_firstpage`, `citation_lastpage` 메타태그를 병렬 파싱하여 `제80호, 167~190쪽`까지 완성합니다.
+   - 해외 논문(`W...`): OpenAlex 단일 배치 API(`https://api.openalex.org/works?filter=openalex:W1|W2|...&per-page=50`)로 권·호·쪽수·저자명을 일괄 보강합니다.
+
+### 4.4 [핵심 규칙 4] `/goal` 기반 8대 판단 기준 수립 · 다각도 DBpia 수집 · 자율 교차검증 루프
+단 1회 질문·답변으로 끝나는 단순 생성 방식이 아니라, 파이프라인 시작 시점에 **국가유산청 『문화재발굴조사보고서 Ⅳ. 고찰』 작성 기준** 또는 **대학원 석사학위 논문 이상(『한국고고학보』 등재학술지) 심사 기준**에 부합하는 **8대 완료 판단 기준(`buildGoalPlanAndRubric`)**을 수립하고, 모든 기준이 통과(`8/8 충족 · 100점`)될 때까지 자율 루프를 수행합니다:
+1. **Phase 1 (`/goal` 완료 기준 및 검색 계획 수립)**:
+   - `C1_DBPIA_SUFFICIENCY`: 다각도 선행연구 서지 데이터 충분성 (최소 3개 학술 관점 검색 · 실존 논문 8~10편 이상 · 실제 저자·연도·학술지 확보)
+   - `C2_SECTION_STRUCTURE`: 국가유산청 『Ⅳ. 고찰』 또는 석사학위 논문 필수 장·절 및 국·영문 초록 완결성
+   - `C3_ARGUMENT_DEPTH`: 학술 논증 심층성·연구사 비판 및 목표 분량 충족 (학술 종결어미 `~로 파악된다/편년된다` 및 목표 글자수)
+   - `C4_QUANTITATIVE_TABLES`: 고고학 정량 데이터 마크다운 학술 표 2종 이상 (`표 1` 속성 일람표, `표 2` 주변 유적 비교 대비표)
+   - `C5_NATIVE_CHART_DIAGRAM`: WordCraft 네이티브 차트(`wc-chart`) 및 단계별 모식도(`wc-diagram`) JSON 스펙 완비
+   - `C6_FOOTNOTE_RIGOR`: 실전 학술 각주 밀도 및 저자명·연도·학술지 완비 (`'저자미상'`·`'연도미상'` **0건**)
+   - `C7_CROSS_REF_CONSISTENCY`: 본문 인용 `1)`~`N)` ↔ `【각주】` ↔ `【참고문헌】` 1:1 교차검증 일치성 및 표준 인용부호(`「 」`, `『 』`, `쪽`) 준수
+   - `C8_DATA_FIDELITY_COMPLETENESS`: 원자료 정합성(허구 연대·수치 날조 금지) 및 문장 완결성
+2. **Phase 2 (다각도 DBpia AI 선행연구 수집 & 데이터 충분성 검증 루프)**:
+   - `buildMultiFacetedDbpiaQueries()`가 1차 라운드에서 ① 연구사·구조·방법론, ② 유물 형식분류·속성·편년, ③ 주변 비교유적·지역 전개·적용사례의 **3개 학술 각도**로 DBpia AI를 연속 검색합니다.
+   - 1차 수집 후 실제 저자·연도가 검증된 논문 수가 목표치에 미달하면 2차 심화 검색어로 자동 보충 검색을 수행합니다.
+3. **Phase 3 & 4 (원고 집필 ➔ 결정론적 서지 정합성 보정 ➔ `/goal` 8대 기준 교차검증 및 자율 보완 루프)**:
+   - 제미나이 초안 생성 직후 `repairAndEnrichManuscriptWithVerifiedRefs()`가 본문 인용 번호 `1)`~`N)`과 `### 【각주】`, `### 【참고문헌】`을 DBpia 검증 서지(`collectedPapers`)와 1:1로 매핑하고 `'저자미상'`을 원천 제거합니다.
+   - `evaluateArchaeologyManuscriptQuality()`로 8대 기준 충족 여부를 채점하여 미충족 항목이 있으면 `buildCrossVerificationRevisionPrompt()`로 자율 보완 루프를 실행하고, **8/8(100점) 검증 완료 시에만 루프를 멈추고 WordCraft(`.docx`)를 컴파일·실행**합니다.
+   - Studio UI 좌측 Step 6(`진행 기록 · /goal 교차검증`)의 실시간 현황판(`#goal-scorecard-box`)에 8대 항목별 `통과/미충족` 배지와 총점(`100점`)을 실시간 표시합니다.
 
 ---
 

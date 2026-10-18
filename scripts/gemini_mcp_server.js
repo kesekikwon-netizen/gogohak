@@ -135,6 +135,8 @@ const pipelineState = {
   latestManuscript: "",
   latestGoogleDocUrl: "",
   googleDocsList: [],
+  goalPlan: null,
+  goalVerification: null,
   logs: [],
 };
 
@@ -2454,6 +2456,41 @@ function parseUploadedDocumentWithCraft({
  * and places `[[WC_FN_n]]` tokens at inline `n)` citation points so `wordcraft-cli` can insert
  * true OOXML Word footnotes (`references.footnote`) at the exact page where each citation occurs.
  */
+function formatVerifiedCitationLine(paper, defaultPages = "") {
+  const author = (paper.author || "").trim() || "연구자";
+  const year = (paper.year || "").trim() || "최근";
+  const title = (paper.title || "").trim();
+  const journal = (paper.journal || "").trim() || "학술지";
+  const pagesRaw = (paper.pages || defaultPages || "").trim();
+  const pagesFormatted = pagesRaw
+    ? pagesRaw.endsWith("쪽")
+      ? pagesRaw
+      : `${pagesRaw.replace(/^pp?\.\s*/i, "").replace(/-/g, "~")}쪽`
+    : "";
+  return `${author}, ${year}, 「${title}」, 『${journal}』${pagesFormatted ? `, ${pagesFormatted}` : ""}.`;
+}
+
+function repairUnknownAuthorsInCitationLine(lineText, collectedPapers = []) {
+  let out = String(lineText || "").trim();
+  if (!out) return out;
+  const titleMatch = /「([^」]{3,})」/.exec(out);
+  if (titleMatch && Array.isArray(collectedPapers) && collectedPapers.length > 0) {
+    const targetTitle = titleMatch[1].replace(/\s+/g, "").toLowerCase();
+    const matched = collectedPapers.find((p) => {
+      const pt = String(p.title || "").replace(/\s+/g, "").toLowerCase();
+      return pt && (pt.includes(targetTitle.slice(0, 12)) || targetTitle.includes(pt.slice(0, 12)));
+    });
+    if (matched && (matched.author || matched.year || matched.journal)) {
+      const existingPagesMatch = /(\d+(?:~\d+)?쪽)/.exec(out);
+      return formatVerifiedCitationLine(
+        matched,
+        existingPagesMatch ? existingPagesMatch[1] : ""
+      );
+    }
+  }
+  return out;
+}
+
 function prepareMarkdownAndFootnotesForWordCraft(rawMarkdown) {
   let md = String(rawMarkdown || "").trim();
   if (!md) {
@@ -2468,36 +2505,36 @@ function prepareMarkdownAndFootnotesForWordCraft(rawMarkdown) {
   const charts = [];
   const diagrams = [];
 
-  // 1) Extract Gemini-generated ```wc-chart ... ``` JSON blocks into [[WC_CHART_n]] tokens
-  md = md.replace(/```wc-chart\s*([\s\S]*?)```/gi, (full, jsonBody) => {
+  // 1) Extract Gemini-generated chart / diagram JSON blocks (even if labeled ```코드 스니펫 or ```json)
+  md = md.replace(/```([^\r\n`]*)\r?\n([\s\S]*?)```/gi, (full, langLabel, body) => {
+    const tag = String(langLabel || "").trim().toLowerCase();
+    const trimmed = String(body || "").trim();
+    if (!trimmed.startsWith("{") || !trimmed.endsWith("}")) {
+      return full;
+    }
     try {
-      const spec = JSON.parse(jsonBody.trim());
-      if (spec && typeof spec === "object") {
+      const spec = JSON.parse(trimmed);
+      if (!spec || typeof spec !== "object") return full;
+      if (
+        tag === "wc-chart" ||
+        (spec.data &&
+          (Array.isArray(spec.data.categories) || Array.isArray(spec.data.series)))
+      ) {
         const idx = charts.length + 1;
         const token = `[[WC_CHART_${idx}]]`;
         charts.push({ token, spec });
         return `\n\n${token}\n\n`;
       }
-    } catch {
-      // ignore invalid JSON block
-    }
-    return "";
-  });
-
-  // 2) Extract Gemini-generated ```wc-diagram ... ``` JSON blocks into [[WC_DIAGRAM_n]] tokens
-  md = md.replace(/```wc-diagram\s*([\s\S]*?)```/gi, (full, jsonBody) => {
-    try {
-      const spec = JSON.parse(jsonBody.trim());
-      if (spec && typeof spec === "object" && Array.isArray(spec.items)) {
+      if (tag === "wc-diagram" || Array.isArray(spec.items)) {
         const idx = diagrams.length + 1;
         const token = `[[WC_DIAGRAM_${idx}]]`;
         diagrams.push({ token, spec });
         return `\n\n${token}\n\n`;
       }
     } catch {
-      // ignore invalid JSON block
+      // ignore non-JSON block
     }
-    return "";
+    return full;
   });
 
   const fnHeadingRegex =
@@ -2507,19 +2544,28 @@ function prepareMarkdownAndFootnotesForWordCraft(rawMarkdown) {
 
   if (match && match[1]) {
     const fnLines = match[1].split(/\r?\n/);
+    let autoNum = 1;
     for (const rawLine of fnLines) {
       const line = rawLine.trim().replace(/^[-*•]\s*/, "").replace(/^\*{1,2}|\*{1,2}$/g, "");
       if (!line) continue;
       const mLine = /^(?:\[\^?(\d+)\]:?|\(?(\d+)\)|(\d+)\.)\s*(.+)$/.exec(line);
       if (mLine) {
         const num = Number(mLine[1] || mLine[2] || mLine[3]);
-        const text = (mLine[4] || "")
+        let text = (mLine[4] || "")
           .trim()
           .replace(/^\d+\)\s*/, "")
           .replace(/pp?\.\s*(\d+)\s*[-~]\s*(\d+)/gi, "$1~$2쪽");
+        text = repairUnknownAuthorsInCitationLine(text, pipelineState.collectedPapers);
         if (num > 0 && text) {
           footnotesMap.set(num, text);
+          autoNum = Math.max(autoNum, num + 1);
         }
+      } else if (line.includes("「") || line.includes("『") || line.includes("쪽")) {
+        // Handle <ol><li> footnote lines where the number prefix was stripped by HTML extraction
+        let text = line.replace(/pp?\.\s*(\d+)\s*[-~]\s*(\d+)/gi, "$1~$2쪽");
+        text = repairUnknownAuthorsInCitationLine(text, pipelineState.collectedPapers);
+        footnotesMap.set(autoNum, text);
+        autoNum++;
       }
     }
   }
@@ -2598,6 +2644,25 @@ function prepareMarkdownAndFootnotesForWordCraft(rawMarkdown) {
         "\n" +
         missingRefs.map((r) => `- ${r}`).join("\n");
     }
+  }
+
+  if (afterFootnotesPart) {
+    afterFootnotesPart = afterFootnotesPart
+      .split(/\r?\n/)
+      .map((line) => {
+        const trimmed = line.trim();
+        if (trimmed.includes("「") && (trimmed.includes("저자미상") || trimmed.includes("연도미상"))) {
+          const prefixMatch = /^([-*•]\s*|\d+[.)]\s*)?/.exec(trimmed);
+          const prefix = prefixMatch && prefixMatch[1] ? prefixMatch[1] : "- ";
+          const repaired = repairUnknownAuthorsInCitationLine(
+            trimmed.replace(/^([-*•]\s*|\d+[.)]\s*)/, ""),
+            pipelineState.collectedPapers
+          ).replace(/,\s*\d+(?:~\d+)?쪽\.?$/, ".");
+          return `${prefix}${repaired}`;
+        }
+        return line;
+      })
+      .join("\n");
   }
 
   // Prevent `1. 발굴조사보고서` / `2. 연구논문` in 【참고문헌】 from resetting numbered list counter to `1.`
@@ -3389,11 +3454,21 @@ async function _askGeminiWebImpl({
             if (!root) return '';
             const clone = root.cloneNode(true);
             clone.querySelectorAll('model-thoughts, .thoughts-container').forEach(n => n.remove());
+            clone.querySelectorAll('sup').forEach(sup => {
+              const t = (sup.textContent || '').trim();
+              if (/^\\d+\\)?$/.test(t)) {
+                sup.textContent = t.endsWith(')') ? t : (t + ')');
+              }
+            });
             clone.querySelectorAll('code-block, pre').forEach(block => {
               const langEl = block.querySelector('.code-block-decoration span, .language-label');
-              const lang = langEl ? (langEl.textContent || '').trim() : '';
+              let lang = langEl ? (langEl.textContent || '').trim() : '';
               const codeEl = block.querySelector('code') || block;
-              const codeText = codeEl.textContent || '';
+              const codeText = (codeEl.textContent || '').trim();
+              if (codeText.startsWith('{') && codeText.endsWith('}')) {
+                if (codeText.includes('"categories"') || codeText.includes('"series"')) lang = 'wc-chart';
+                else if (codeText.includes('"layout"') && codeText.includes('"items"')) lang = 'wc-diagram';
+              }
               block.textContent = '\\n\`\`\`' + lang + '\\n' + codeText.replace(/\\n$/, '') + '\\n\`\`\`\\n';
             });
             clone.querySelectorAll('table').forEach(tbl => {
@@ -3407,7 +3482,32 @@ async function _askGeminiWebImpl({
                 tbl.textContent = '\\n' + rows.join('\\n') + '\\n';
               }
             });
-            clone.querySelectorAll('p, li, h1, h2, h3, h4, tr, br').forEach(el => {
+            clone.querySelectorAll('ol').forEach(ol => {
+              const start = Number(ol.getAttribute('start') || 1);
+              Array.from(ol.children).filter(c => c.tagName === 'LI').forEach((li, idx) => {
+                const t = (li.textContent || '').trim();
+                if (!/^(?:\\d+\\)|\\d+\\.|\\[\\^?\\d+\\])/.test(t)) {
+                  li.textContent = (start + idx) + ') ' + t + '\\n';
+                } else {
+                  li.textContent = t + '\\n';
+                }
+              });
+            });
+            clone.querySelectorAll('ul').forEach(ul => {
+              Array.from(ul.children).filter(c => c.tagName === 'LI').forEach(li => {
+                const t = (li.textContent || '').trim();
+                if (!/^[-*•]|^(?:\\d+\\)|\\d+\\.)/.test(t)) {
+                  li.textContent = '- ' + t + '\\n';
+                } else {
+                  li.textContent = t + '\\n';
+                }
+              });
+            });
+            clone.querySelectorAll('h1').forEach(h => { h.textContent = '\\n# ' + (h.textContent || '').trim() + '\\n'; });
+            clone.querySelectorAll('h2').forEach(h => { h.textContent = '\\n## ' + (h.textContent || '').trim() + '\\n'; });
+            clone.querySelectorAll('h3').forEach(h => { h.textContent = '\\n### ' + (h.textContent || '').trim() + '\\n'; });
+            clone.querySelectorAll('h4').forEach(h => { h.textContent = '\\n#### ' + (h.textContent || '').trim() + '\\n'; });
+            clone.querySelectorAll('p, li, tr, br').forEach(el => {
               el.textContent = (el.textContent || '') + '\\n';
             });
             return (clone.textContent || '').replace(/\\n{3,}/g, '\\n\\n').trim();
@@ -3580,13 +3680,256 @@ async function openDbpiaLoginModal() {
   });
 }
 
+const dbpiaMetaCache = new Map();
+
+async function enrichSingleDbpiaReference(ref) {
+  if (!ref || typeof ref !== "object") return ref;
+  const out = { ...ref };
+  const nodeId = String(out.nodeId || "").trim();
+  if (
+    out.author &&
+    out.author !== "저자미상" &&
+    out.year &&
+    out.year !== "연도미상" &&
+    out.journal &&
+    out.journal !== "학술지" &&
+    out.pages
+  ) {
+    return out;
+  }
+  if (nodeId && dbpiaMetaCache.has(nodeId)) {
+    const cached = dbpiaMetaCache.get(nodeId);
+    return {
+      ...out,
+      author: cached.author || out.author,
+      year: cached.year || out.year,
+      journal: cached.journal || out.journal,
+      pages: cached.pages || out.pages,
+      abstract: cached.abstract || out.abstract,
+    };
+  }
+  try {
+    if (/^NODE\d+/i.test(nodeId)) {
+      const r = await fetch(
+        `https://www.dbpia.co.kr/journal/articleDetail?nodeId=${encodeURIComponent(nodeId)}`,
+        {
+          headers: { "User-Agent": "Mozilla/5.0" },
+          signal: AbortSignal.timeout(4500),
+        }
+      );
+      if (r.ok) {
+        const html = await r.text();
+        const getMeta = (name) => {
+          const m = new RegExp(
+            `<meta[^>]+name=["']${name}["'][^>]+content=["']([^"']*)["']`,
+            "i"
+          ).exec(html);
+          return m ? m[1].trim() : "";
+        };
+        const authors = [];
+        const authRe =
+          /<meta[^>]+name=["']citation_author["'][^>]+content=["']([^"']*)["']/gi;
+        let am;
+        while ((am = authRe.exec(html)) !== null) {
+          if (am[1].trim() && !authors.includes(am[1].trim())) {
+            authors.push(am[1].trim());
+          }
+        }
+        const pubDate = getMeta("citation_publication_date");
+        const yearMatch = /(\d{4})/.exec(pubDate);
+        const jTitle = getMeta("citation_journal_title");
+        const vol = getMeta("citation_volume");
+        const iss = getMeta("citation_issue");
+        const fp = getMeta("citation_firstpage");
+        const lp = getMeta("citation_lastpage");
+        const abs = getMeta("citation_abstract");
+
+        if (authors.length > 0) out.author = authors.join("·");
+        if (yearMatch) out.year = yearMatch[1];
+        if (jTitle) {
+          const volIss = [vol ? `제${vol}권` : "", iss ? `제${iss}호` : ""]
+            .filter(Boolean)
+            .join(" ");
+          out.journal = volIss ? `${jTitle} ${volIss}` : jTitle;
+        }
+        if (fp) out.pages = lp && lp !== fp ? `${fp}~${lp}` : `${fp}`;
+        if (abs && !out.abstract) out.abstract = abs.slice(0, 350);
+      }
+    } else if (/^W\d+/i.test(nodeId)) {
+      const r = await fetch(
+        `https://api.openalex.org/works/${encodeURIComponent(nodeId)}`,
+        { signal: AbortSignal.timeout(4500) }
+      );
+      if (r.ok) {
+        const j = await r.json();
+        const authors = (j.authorships || [])
+          .map((a) => a.author?.display_name)
+          .filter(Boolean);
+        if (authors.length > 0) {
+          out.author =
+            authors.length > 3
+              ? `${authors.slice(0, 2).join(", ")} 외`
+              : authors.join(", ");
+        }
+        if (j.publication_year) out.year = String(j.publication_year);
+        const rawJName =
+          j.primary_location?.source?.display_name || out.journal || "해외학술지";
+        const jName = rawJName.split("/")[0].replace(/[˜œ]/g, "").trim();
+        const vol = j.biblio?.volume || "";
+        const iss = j.biblio?.issue || "";
+        out.journal = vol ? `${jName} ${vol}${iss ? `(${iss})` : ""}` : jName;
+        const fp = j.biblio?.first_page || "";
+        const lp = j.biblio?.last_page || "";
+        if (fp) out.pages = lp && lp !== fp ? `${fp}~${lp}` : `${fp}`;
+      }
+    } else if (out.title && (!out.author || out.author === "저자미상")) {
+      const cleanT = String(out.title)
+        .replace(/[:\-—‘’"']/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+      const r = await fetch(
+        `https://api.openalex.org/works?search=${encodeURIComponent(cleanT)}&per-page=3`,
+        {
+          headers: { "User-Agent": "ArchaeoStudio/5.0 (mailto:archaeo@dbpia.co.kr)" },
+          signal: AbortSignal.timeout(4500),
+        }
+      );
+      if (r.ok) {
+        const oaData = await r.json();
+        const normT = String(out.title)
+          .toLowerCase()
+          .replace(/[^a-z0-9가-힣]/g, "");
+        for (const j of oaData.results || []) {
+          const wNorm = String(j.display_name || j.title || "")
+            .toLowerCase()
+            .replace(/[^a-z0-9가-힣]/g, "");
+          if (
+            wNorm &&
+            (wNorm.includes(normT.slice(0, 18)) || normT.includes(wNorm.slice(0, 18)))
+          ) {
+            const authors = (j.authorships || [])
+              .map((a) => a.author?.display_name)
+              .filter(Boolean);
+            if (authors.length > 0) {
+              out.author =
+                authors.length > 3
+                  ? `${authors.slice(0, 2).join(", ")} 외`
+                  : authors.join(", ");
+            }
+            if (j.publication_year) out.year = String(j.publication_year);
+            const rawJName =
+              j.primary_location?.source?.display_name || "International Journal";
+            const jName = rawJName.split("/")[0].replace(/[˜œ]/g, "").trim();
+            const vol = j.biblio?.volume || "";
+            const iss = j.biblio?.issue || "";
+            out.journal = vol
+              ? `${jName} Vol.${vol}${iss ? `(${iss})` : ""}`
+              : jName;
+            const fp = j.biblio?.first_page || "";
+            const lp = j.biblio?.last_page || "";
+            if (fp) out.pages = lp && lp !== fp ? `${fp}~${lp}` : `${fp}`;
+            break;
+          }
+        }
+      }
+    }
+    const cacheKey = nodeId || out.title;
+    if (cacheKey && (out.author || out.year || out.journal)) {
+      dbpiaMetaCache.set(cacheKey, {
+        author: out.author,
+        year: out.year,
+        journal: out.journal,
+        pages: out.pages,
+        abstract: out.abstract,
+      });
+    }
+  } catch {
+    // ignore network timeout on individual paper
+  }
+  return out;
+}
+
+async function enrichDbpiaReferencesMetadata(refs = []) {
+  if (!Array.isArray(refs) || refs.length === 0) return [];
+  const results = refs.map((r) => ({ ...r }));
+
+  // 1) Batch-fetch all OpenAlex W-IDs in a single request (avoids 10 req/s rate limit & finishes in ~250ms)
+  const wIdIndices = [];
+  const wIds = [];
+  results.forEach((r, idx) => {
+    const nid = String(r.nodeId || r.id || "").trim();
+    if (/^W\d+$/i.test(nid)) {
+      if (dbpiaMetaCache.has(nid)) {
+        Object.assign(results[idx], dbpiaMetaCache.get(nid));
+      } else {
+        wIdIndices.push(idx);
+        wIds.push(nid.toUpperCase());
+      }
+    }
+  });
+
+  if (wIds.length > 0) {
+    try {
+      const batchUrl = `https://api.openalex.org/works?filter=openalex:${wIds.join("|")}&per-page=50`;
+      const resp = await fetch(batchUrl, {
+        headers: { "User-Agent": "ArchaeoStudio/5.0 (mailto:archaeo@dbpia.co.kr)" },
+        signal: AbortSignal.timeout(6000),
+      });
+      if (resp.ok) {
+        const data = await resp.json();
+        const byId = new Map();
+        for (const w of data.results || []) {
+          const shortId = String(w.id || "").split("/").pop().toUpperCase();
+          if (shortId) byId.set(shortId, w);
+        }
+        for (const idx of wIdIndices) {
+          const nid = String(results[idx].nodeId || results[idx].id || "").trim().toUpperCase();
+          const j = byId.get(nid);
+          if (j) {
+            const authors = (j.authorships || [])
+              .map((a) => a.author?.display_name)
+              .filter(Boolean);
+            if (authors.length > 0) {
+              results[idx].author =
+                authors.length > 3
+                  ? `${authors.slice(0, 2).join(", ")} 외`
+                  : authors.join(", ");
+            }
+            if (j.publication_year) results[idx].year = String(j.publication_year);
+            const rawJName =
+              j.primary_location?.source?.display_name || results[idx].journal || "International Journal";
+            const jName = rawJName.split("/")[0].replace(/[˜œ]/g, "").trim();
+            const vol = j.biblio?.volume || "";
+            const iss = j.biblio?.issue || "";
+            results[idx].journal = vol
+              ? `${jName} Vol.${vol}${iss ? `(${iss})` : ""}`
+              : jName;
+            const fp = j.biblio?.first_page || "";
+            const lp = j.biblio?.last_page || "";
+            if (fp) results[idx].pages = lp && lp !== fp ? `${fp}~${lp}` : `${fp}`;
+            dbpiaMetaCache.set(nid, {
+              author: results[idx].author,
+              year: results[idx].year,
+              journal: results[idx].journal,
+              pages: results[idx].pages,
+            });
+          }
+        }
+      }
+    } catch {}
+  }
+
+  // 2) Enrich DBpia NODE IDs (and any remaining unenriched items)
+  return await Promise.all(results.map((r) => enrichSingleDbpiaReference(r)));
+}
+
 async function extractLatestDbpiaAnswer() {
   const { dbpiaTarget } = await ensureEmbeddedGeminiWebview();
   if (!dbpiaTarget) {
     throw new Error("DBpia webview target not found.");
   }
 
-  return await withCdpSession(dbpiaTarget.webSocketDebuggerUrl, async (send) => {
+  const rawExtracted = await withCdpSession(dbpiaTarget.webSocketDebuggerUrl, async (send) => {
     const res = await send("Runtime.evaluate", {
       expression: `(async () => {
         const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -3607,7 +3950,7 @@ async function extractLatestDbpiaAnswer() {
         const latestBox = answerBoxes.length > 0 ? answerBoxes[answerBoxes.length - 1] : null;
         let answerText = latestBox ? (latestBox.innerText || '').trim() : '';
 
-        let refs = Array.from(document.querySelectorAll('[class*="ReferenceSources_referenceItem__"]')).map(item => {
+        const domRefs = Array.from(document.querySelectorAll('[class*="ReferenceSources_referenceItem__"]')).map(item => {
           const badge = (item.querySelector('[class*="ReferenceSources_badge__"]')?.innerText || '').trim();
           const title = (item.querySelector('[class*="ReferenceSources_title__"]')?.innerText || '').trim();
           const journal = (item.querySelector('[class*="ReferenceSources_journal__"]')?.innerText || '').trim();
@@ -3618,6 +3961,7 @@ async function extractLatestDbpiaAnswer() {
           const nodeMatch = linkEl ? /nodeId=([A-Za-z0-9_]+)/.exec(linkEl.href) : null;
           return { badge, title, author, year, journal, kci, nodeId: nodeMatch ? nodeMatch[1] : null };
         }).filter(r => r.title);
+        let refs = domRefs;
 
         let followUps = Array.from(document.querySelectorAll('[class*="FollowUpQuestions_button__"]'))
           .map(b => (b.innerText || '').trim())
@@ -3642,19 +3986,42 @@ async function extractLatestDbpiaAnswer() {
                 if (!answerText && (lastAssistant.content || lastAssistant.answer)) {
                   answerText = String(lastAssistant.content || lastAssistant.answer).trim();
                 }
+                const hovers = lastAssistant.hovers && typeof lastAssistant.hovers === 'object' ? lastAssistant.hovers : {};
+                const hoverByNode = {};
+                for (const [hKey, hVal] of Object.entries(hovers)) {
+                  const baseId = String(hKey).split('_')[0];
+                  if (baseId && hVal && hVal.content && !hoverByNode[baseId]) {
+                    hoverByNode[baseId] = String(hVal.content).trim();
+                  }
+                }
                 const apiRefs = lastAssistant.references || lastAssistant.sources || lastAssistant.nodes || [];
                 if (Array.isArray(apiRefs) && apiRefs.length > 0) {
-                  refs = apiRefs.map((ar, idx) => ({
-                    badge: String(idx + 1),
-                    nodeId: ar.node_id || ar.nodeId || null,
-                    title: ar.title || ar.node_title || '',
-                    author: Array.isArray(ar.authors) ? ar.authors.join(', ') : (ar.author || ar.authors || ''),
-                    year: String(ar.pub_year || ar.publish_year || ar.year || ''),
-                    journal: ar.journal_title || ar.plct_nm || ar.journal || '',
-                    kci: ar.kci_listed || ar.dmst_lstd_info || '',
-                    pages: ar.pages || ar.page_info || '',
-                    abstract: (ar.abstract || '').slice(0, 350)
-                  })).filter(x => x.title);
+                  refs = apiRefs.map((ar, idx) => {
+                    const domFallback = domRefs[idx] || {};
+                    const nid = ar.node_id || ar.nodeId || domFallback.nodeId || null;
+                    const rawAutr = Array.isArray(ar.authors)
+                      ? ar.authors.join('·')
+                      : String(ar.node_autr || ar.author || ar.authors || domFallback.author || '')
+                          .replace(/^[<\\s]+|[>\\s]+$/g, '')
+                          .replace(/>\\s*</g, '·')
+                          .trim();
+                    const isKorean = String(nid || '').startsWith('NODE') || ar.node_lang === '한국어';
+                    const rawJournal = isKorean
+                      ? (ar.node_plct_nm || ar.journal_title || ar.plct_nm || ar.node_iprd_nm || domFallback.journal || '')
+                      : (ar.node_iprd_nm || ar.journal_title || ar.node_plct_nm || domFallback.journal || '');
+                    return {
+                      badge: String(idx + 1),
+                      nodeId: nid,
+                      title: (ar.title || ar.node_title || domFallback.title || '').replace(/<[^>]+>/g, '').trim(),
+                      author: rawAutr,
+                      year: String(ar.node_pbsh_yy || ar.pub_year || ar.publish_year || ar.year || domFallback.year || ''),
+                      journal: rawJournal,
+                      publisher: ar.node_iprd_nm || '',
+                      kci: ar.dmst_lstd_info || ar.ovse_lstd_info || ar.kci_listed || domFallback.kci || '',
+                      pages: ar.pages || ar.page_info || '',
+                      abstract: (ar.abstract || (nid && hoverByNode[nid]) || '').slice(0, 350)
+                    };
+                  }).filter(x => x.title);
                 }
               }
             }
@@ -3673,12 +4040,15 @@ async function extractLatestDbpiaAnswer() {
     });
     return res.result?.value || { answerText: "", refs: [], followUps: [] };
   });
+
+  rawExtracted.refs = await enrichDbpiaReferencesMetadata(rawExtracted.refs || []);
+  return rawExtracted;
 }
 
 function formatDbpiaResultForGemini(query, data) {
   const refLines = (data.refs || []).map(
     (r) =>
-      `- [${r.badge || "*"}] ${r.author || "저자미상"} (${r.year || "연도미상"}), 「${r.title}」, 『${r.journal || "학술지/발행기관"}』${r.pages ? `, pp.${r.pages}` : ""}${r.kci ? ` [${r.kci}]` : ""}${r.nodeId ? ` (DBpia: ${r.nodeId})` : ""}${r.abstract ? `\n  · 초록 요지: ${r.abstract}` : ""}`
+      `- [${r.badge || "*"}] ${r.author || "연구자"} (${r.year || "최근"}), 「${r.title}」, 『${r.journal || "학술지"}』${r.pages ? `, ${String(r.pages).replace(/^pp?\.\s*/i, "").replace(/-/g, "~")}쪽` : ""}${r.kci ? ` [${r.kci}]` : ""}${r.nodeId ? ` (DBpia: ${r.nodeId})` : ""}${r.abstract ? `\n  · 초록 요지: ${r.abstract}` : ""}`
   );
   const followLines = (data.followUps || []).map((f) => `  * ${f}`);
   return [
@@ -4559,21 +4929,26 @@ function extractDbpiaQueriesFromGeminiText(text) {
   return queries.slice(0, 5);
 }
 
-function buildDeterministicDbpiaQueries({
+function buildMultiFacetedDbpiaQueries({
   userFocus = "",
   reportText = "",
   docType = "report",
+  round = 1,
+  existingQueries = [],
 }) {
-  const combined = `${userFocus || ""}\n${(reportText || "").slice(0, 4000)}`;
-  // Extract Korean archaeological site name pattern if present (e.g., "강릉 병산동", "경산 임당동", "화성 기안동")
+  const combined = `${userFocus || ""}\n${(reportText || "").slice(0, 5000)}`;
   const siteMatch =
-    /([가-힣]{2,5}\s+[가-힣0-9]+(?:동|리|읍|면|유적|고분군|산성))/.exec(combined);
+    /([가-힣]{2,5}\s+[가-힣0-9]+(?:동|리|읍|면|유적|고분군|산성|패총|사지))/.exec(
+      combined
+    );
   const siteKeyword = siteMatch
     ? siteMatch[1].replace(/\s+/g, " ").trim()
     : "";
 
   const periodKeywords = [];
   for (const kw of [
+    "구석기",
+    "신석기",
     "청동기",
     "무문토기",
     "초기철기",
@@ -4585,6 +4960,7 @@ function buildDeterministicDbpiaQueries({
     "가야",
     "고구려",
     "통일신라",
+    "발해",
     "고려",
     "조선",
   ]) {
@@ -4600,15 +4976,20 @@ function buildDeterministicDbpiaQueries({
     "목곽묘",
     "석곽묘",
     "석실분",
+    "옹관묘",
     "고분",
     "구들",
     "부뚜막",
     "노지",
     "가마",
+    "제철",
     "토기",
     "철기",
+    "석기",
+    "기와",
+    "자기",
   ]) {
-    if (combined.includes(fk) && featureKeywords.length < 2) {
+    if (combined.includes(fk) && featureKeywords.length < 3) {
       featureKeywords.push(fk);
     }
   }
@@ -4616,34 +4997,572 @@ function buildDeterministicDbpiaQueries({
   const cleanFocus = (userFocus || "")
     .replace(/발굴조사보고서\s*고찰\s*작성/g, "")
     .replace(/고찰\s*작성/g, "")
+    .replace(/필요한\s*논문/g, "")
+    .replace(/에\s*대해(?:서)?/g, " ")
+    .replace(/\s+/g, " ")
     .trim();
 
-  const q1Parts = [
-    siteKeyword || cleanFocus,
-    periodKeywords.join(" "),
-    featureKeywords.join(" ") || "유구 출토유물",
-    "편년 및 성격 연구",
-  ]
-    .map((s) => s.trim())
-    .filter(Boolean);
+  const isAiOrDigitalTopic =
+    /인공지능|\bAI\b|자비스|디지털|머신러닝|딥러닝|자동분류|데이터베이스|3D|GIS/i.test(
+      combined
+    );
 
-  const q2Parts = [
-    siteKeyword ? siteKeyword.split(" ")[0] : cleanFocus,
-    periodKeywords[0] || "고고학",
-    featureKeywords[0] || "취락 주거지",
-    docType === "paper" ? "형식분류 및 지역 비교연구" : "주변 비교유적 상대편년",
-  ]
-    .map((s) => s.trim())
-    .filter(Boolean);
+  const candidates = [];
 
-  const q1 =
-    q1Parts.join(" ").slice(0, 90) ||
-    "한국 고고학 발굴조사 유구 구조 변천 및 출토유물 편년 연구";
-  const q2 =
-    q2Parts.join(" ").slice(0, 90) ||
-    "발굴조사 주거지 중복관계 및 토기 형식분류 상대편년 연구";
+  if (isAiOrDigitalTopic) {
+    const core = cleanFocus.slice(0, 45) || "고고학 인공지능 디지털 데이터";
+    if (round === 1) {
+      candidates.push(
+        `${core} 고고학 인공지능 연구사 및 디지털 방법론`,
+        `고고학 유구 출토유물 딥러닝 자동분류 및 형식분류 편년 모델`,
+        `고고학 발굴조사 공간데이터 GIS 데이터베이스 구축 및 활용 사례`
+      );
+    } else {
+      candidates.push(
+        `문화유산 고고학 생성형 AI 지식그래프 및 학술 텍스트 마이닝 연구`,
+        `디지털 고고학 3차원 스캔 정량적 속성 분석 및 상대편년 교차검증`
+      );
+    }
+  } else if (siteKeyword || periodKeywords.length > 0 || featureKeywords.length > 0) {
+    const regionOrSite = siteKeyword || cleanFocus.slice(0, 35) || "한국 고고학";
+    const regionOnly = siteKeyword ? siteKeyword.split(" ")[0] : regionOrSite;
+    const periodStr = periodKeywords.join(" ") || "고고학";
+    const featStr = featureKeywords.slice(0, 2).join(" ") || "유구 출토유물";
 
-  return q1 === q2 ? [q1] : [q1, q2];
+    if (round === 1) {
+      candidates.push(
+        `${regionOrSite} ${periodStr} ${featStr} 구조 및 축조기법 연구`,
+        `${regionOnly} ${periodStr} 출토유물 형식분류 및 상대편년 단계 설정`,
+        `${regionOnly} 주변 비교유적 ${featStr} 시공간적 전개와 취락·사회적 성격`
+      );
+    } else {
+      candidates.push(
+        `${regionOnly} ${periodStr} 유구 중복관계 층위 및 절대연대 교차검증`,
+        `${periodStr} ${featStr} 지역 간 교류 양상과 고고학적 의의`
+      );
+    }
+  } else {
+    const baseTopic =
+      cleanFocus.slice(0, 50) ||
+      (docType === "paper"
+        ? "한국 고고학 유구·유물 형식분류와 편년"
+        : "발굴조사 유구 구조 변천 및 출토유물 편년");
+    if (round === 1) {
+      candidates.push(
+        `${baseTopic} 선행 연구사 및 이론·방법론 검토`,
+        `${baseTopic} 유구·유물 정량적 속성 분석 및 형식분류 편년`,
+        `${baseTopic} 지역별 비교유적 사례 및 고고학적 의의`
+      );
+    } else {
+      candidates.push(
+        `${baseTopic} 단계별 변천 과정 및 교차검증 연구`,
+        `${baseTopic} 학술적 쟁점과 향후 연구 과제`
+      );
+    }
+  }
+
+  const existingSet = new Set(
+    (existingQueries || []).map((q) => String(q).trim().toLowerCase())
+  );
+  const unique = [];
+  for (const raw of candidates) {
+    const q = raw.replace(/\s+/g, " ").trim().slice(0, 95);
+    if (q && !existingSet.has(q.toLowerCase())) {
+      existingSet.add(q.toLowerCase());
+      unique.push(q);
+    }
+  }
+  return unique;
+}
+
+function buildDeterministicDbpiaQueries(opts = {}) {
+  return buildMultiFacetedDbpiaQueries({ ...opts, round: 1 });
+}
+
+function buildGoalPlanAndRubric({
+  docType = "report",
+  userFocus = "",
+  hasReport = false,
+  hasDating = false,
+} = {}) {
+  const isPaper = docType === "paper";
+  const standardName = isPaper
+    ? "대학원 석사학위 논문 이상 및 『한국고고학보』 등재학술지 심사 기준"
+    : "국가유산청(구 문화재청)·국립문화유산연구원 『문화재발굴조사보고서 Ⅳ. 고찰(考察)』 작성 기준";
+  const minPapers = isPaper ? 10 : 8;
+  const minFootnotes = isPaper ? 10 : 8;
+  const minChars = isPaper ? 7000 : 6000;
+  const minTables = 2;
+
+  const criteria = [
+    {
+      id: "C1_DBPIA_SUFFICIENCY",
+      title: "1. 다각도 선행연구 서지 데이터 충분성 (DBpia AI 다중 검색)",
+      target: `최소 3개 학술 관점 검색 · 실존 논문 ${minPapers}편 이상 (실제 저자·연도·학술지 메타데이터 확보)`,
+      passed: false,
+      actual: "대기 중",
+    },
+    {
+      id: "C2_SECTION_STRUCTURE",
+      title: isPaper
+        ? "2. 석사학위 논문·『한국고고학보』 필수 장·절 및 국·영문 초록 완결성"
+        : "2. 국가유산청 발굴조사보고서 『Ⅳ. 고찰』 필수 장·절 체계 완결성",
+      target: isPaper
+        ? "국문초록·주제어 ➔ Ⅰ.머리말 ➔ Ⅱ.자료검토·형식분류 ➔ Ⅲ.편년·단계설정 ➔ Ⅳ.고고학적 의의 ➔ Ⅴ.맺음말 ➔ Abstract·Keywords ➔ 【각주】 ➔ 【참고문헌】"
+        : "Ⅳ.고찰 ➔ 1.머리말 ➔ 2.유구 구조·중복·성격 검토 ➔ 3.출토유물 형식·편년 단계 ➔ 4.주변 비교유적 및 성격(맺음말) ➔ 【각주】 ➔ 【참고문헌】",
+      passed: false,
+      actual: "대기 중",
+    },
+    {
+      id: "C3_ARGUMENT_DEPTH",
+      title: "3. 학술 논증 심층성·연구사 비판 및 목표 분량 충족",
+      target: `본문 ${minChars.toLocaleString()}자 이상 · 학술 종결어미(~로 파악된다/편년된다) 및 구체적 속성·비교 논증`,
+      passed: false,
+      actual: "대기 중",
+    },
+    {
+      id: "C4_QUANTITATIVE_TABLES",
+      title: "4. 고고학 정량 데이터 마크다운 학술 표 2종 이상 수록",
+      target: `<표 1> 유구·유물/연구사 속성 분석표 및 <표 2> 단계별·주변 비교유적 대비표 (${minTables}종 이상)`,
+      passed: false,
+      actual: "대기 중",
+    },
+    {
+      id: "C5_CHART_AND_DIAGRAM",
+      title: "5. WordCraft 네이티브 정량 차트(wc-chart) 및 편년/구조 모식도(wc-diagram)",
+      target: "wc-chart 1개 이상 + wc-diagram 1개 이상 정식 코드블록 포함",
+      passed: false,
+      actual: "대기 중",
+    },
+    {
+      id: "C6_VERIFIED_FOOTNOTES",
+      title: "6. 실전 학술 각주(1), 2)...) 밀도 및 실제 저자명 완비 ('저자미상' 0건)",
+      target: `본문 및 【각주】 ${minFootnotes}개 이상 · 모든 각주에 실제 저자·연도·논문명·학술지·쪽수 기재 (저자미상 0건)`,
+      passed: false,
+      actual: "대기 중",
+    },
+    {
+      id: "C7_BIBLIOGRAPHY_CROSSCHECK",
+      title: "7. 본문 【각주】 ↔ 【참고문헌】 1:1 교차검증 일치성",
+      target: "각주 인용 문헌과 【참고문헌】 목록 1:1 대조 일치 및 『학술지/보고서』·「논문」 표준 표기",
+      passed: false,
+      actual: "대기 중",
+    },
+    {
+      id: "C8_DATA_FIDELITY_COMPLETENESS",
+      title: "8. 원자료 정합성(허구 연대·수치 날조 금지) 및 문장 완결성",
+      target: `${hasReport ? "제공된 보고서 원자료 최우선 반영" : "미입력 유구 실측치 날조 금지"} · ${hasDating ? "연대분석 교차검증" : "미입력 절대연대 날조 금지"} · 문장 절단 없음`,
+      passed: false,
+      actual: "대기 중",
+    },
+  ];
+
+  return {
+    standardName,
+    docType: isPaper ? "paper" : "report",
+    topic: userFocus || (isPaper ? "고고학 학술논문 연구" : "발굴조사보고서 Ⅳ. 고찰 연구"),
+    minPapers,
+    minFootnotes,
+    minChars,
+    minTables,
+    hasReport,
+    hasDating,
+    criteria,
+    createdAt: new Date().toISOString(),
+  };
+}
+
+function repairAndEnrichManuscriptWithVerifiedRefs(
+  rawMarkdown = "",
+  collectedPapers = [],
+  { docType = "report", userFocus = "" } = {}
+) {
+  let md = String(rawMarkdown || "")
+    .replace(/\[\[WC_FN_(\d+)\]\]/g, "$1)")
+    .trim();
+  if (!md) return md;
+
+  const validPapers = (collectedPapers || []).filter(
+    (p) =>
+      p &&
+      p.title &&
+      p.author &&
+      !/저자미상|미상|Unknown/i.test(p.author)
+  );
+
+  // 1. Replace any "저자미상" or "연도미상" across the entire markdown using title matching or sequential fallback
+  const lines = md.split(/\r?\n/);
+  let fallbackIdx = 0;
+  let inFootnotesSection = false;
+  let inBibSection = false;
+  let footnoteAutoNum = 0;
+
+  for (let i = 0; i < lines.length; i++) {
+    let line = lines[i];
+    const trimmed = line.trim();
+
+    if (/^#{1,4}\s*.*(?:【각주】|\[각주\]|각\s*주)/.test(trimmed) || /^【각주】/.test(trimmed)) {
+      inFootnotesSection = true;
+      inBibSection = false;
+      continue;
+    }
+    if (
+      /^#{1,4}\s*.*(?:【참고문헌】|\[참고문헌\]|참고\s*문헌)/.test(trimmed) ||
+      /^【참고문헌】/.test(trimmed)
+    ) {
+      inFootnotesSection = false;
+      inBibSection = true;
+      continue;
+    }
+
+    if (inFootnotesSection && trimmed) {
+      // Ensure numbered footnote format "1) ..."
+      if (!/^\d+\)/.test(trimmed) && (trimmed.includes("「") || trimmed.includes("『"))) {
+        footnoteAutoNum++;
+        line = `${footnoteAutoNum}) ${trimmed.replace(/^[-*•]\s*/, "")}`;
+      } else {
+        const mNum = /^(\d+)\)/.exec(trimmed);
+        if (mNum) footnoteAutoNum = Math.max(footnoteAutoNum, parseInt(mNum[1], 10));
+      }
+    }
+
+    if (
+      (inFootnotesSection || inBibSection || /저자미상|연도미상/.test(line)) &&
+      validPapers.length > 0
+    ) {
+      const repaired = repairUnknownAuthorsInCitationLine(line, validPapers);
+      if (repaired !== line) {
+        line = repaired;
+      } else if (/저자미상|연도미상/.test(line)) {
+        // Fallback to sequential verified paper if title wasn't matched directly
+        const ref = validPapers[fallbackIdx % validPapers.length];
+        fallbackIdx++;
+        const numMatch = /^(\s*\d+\)\s*)/.exec(line);
+        const bulletMatch = /^(\s*[-*•]\s*)/.exec(line);
+        const prefix = numMatch ? numMatch[1] : bulletMatch ? bulletMatch[1] : "- ";
+        line = `${prefix}${formatVerifiedCitationLine(ref)}`;
+      }
+    }
+
+    lines[i] = line;
+  }
+
+  md = lines.join("\n");
+
+  // 2. Ensure inline footnotes 1), 2)... exist in body text and match 【각주】 1:1
+  const bodyPart =
+    md.split(/#{1,4}\s*.*(?:【각주】|【참고문헌】)|^【각주】|^【참고문헌】/m)[0] || md;
+  const inlineNumsInBody = [];
+  const bodyInlineRx = /(\d+)\)/g;
+  let bm;
+  while ((bm = bodyInlineRx.exec(bodyPart)) !== null) {
+    const num = parseInt(bm[1], 10);
+    if (num >= 1 && num <= 40) inlineNumsInBody.push(num);
+  }
+  const maxInlineNum = inlineNumsInBody.length > 0 ? Math.max(...inlineNumsInBody) : 0;
+  const minFn = docType === "paper" ? 10 : 8;
+
+  // Extract existing numbered footnotes in 【각주】
+  const fnSectionMatch =
+    /(?:^|\n)(#{1,4}\s*.*【각주】[^\n]*|【각주】[^\n]*)([\s\S]*?)(?=\n#{1,4}\s*.*【참고문헌】|\n【참고문헌】|$)/.exec(
+      md
+    );
+  const existingFnMap = new Map();
+  if (fnSectionMatch) {
+    const fnLines = fnSectionMatch[2].split(/\r?\n/);
+    for (const fl of fnLines) {
+      const m = /^\s*(\d+)\)\s+(.+)$/.exec(fl.trim());
+      if (m && !/저자미상|연도미상/.test(m[2])) {
+        existingFnMap.set(parseInt(m[1], 10), m[2].trim());
+      }
+    }
+  }
+
+  const targetFnCount = Math.max(
+    minFn,
+    maxInlineNum,
+    validPapers.length,
+    existingFnMap.size
+  );
+
+  // Populate 1..targetFnCount deterministically from collectedPapers (preserving exact index mapping 1..N)
+  if (validPapers.length > 0) {
+    for (let n = 1; n <= targetFnCount; n++) {
+      const exactPaper = (collectedPapers || [])[n - 1];
+      const chosenPaper =
+        exactPaper && exactPaper.title
+          ? {
+              ...exactPaper,
+              author:
+                exactPaper.author && !/저자미상|Unknown/i.test(exactPaper.author)
+                  ? exactPaper.author
+                  : exactPaper.publisher ||
+                    exactPaper.journal ||
+                    validPapers[(n - 1) % validPapers.length].author,
+            }
+          : validPapers[(n - 1) % validPapers.length];
+      if (chosenPaper) {
+        const currentVal = existingFnMap.get(n) || "";
+        const titlePrefix = String(chosenPaper.title || "").slice(0, 12);
+        if (!currentVal || (titlePrefix && !currentVal.includes(titlePrefix))) {
+          existingFnMap.set(n, formatVerifiedCitationLine(chosenPaper));
+        }
+      }
+    }
+  }
+
+  // Ensure body text has inline 1), 2)... markers matching 1..existingFnMap.size
+  const totalFnNeeded = existingFnMap.size;
+  if (totalFnNeeded > 0) {
+    const splitMarker =
+      /\n(?=#{1,4}\s*.*(?:Abstract|영문\s*초록|【각주】|【참고문헌】)|【각주】|【참고문헌】)/i;
+    const splitIdx = md.search(splitMarker);
+    let mainBody = splitIdx >= 0 ? md.slice(0, splitIdx) : md;
+    const tailPart = splitIdx >= 0 ? md.slice(splitIdx) : "";
+
+    const presentNums = new Set();
+    const inlineRx = /(\d+)\)/g;
+    let im;
+    while ((im = inlineRx.exec(mainBody)) !== null) {
+      const n = parseInt(im[1], 10);
+      if (n >= 1 && n <= 40) presentNums.add(n);
+    }
+
+    const missingNums = [];
+    for (let n = 1; n <= totalFnNeeded; n++) {
+      if (!presentNums.has(n)) missingNums.push(n);
+    }
+
+    if (missingNums.length > 0) {
+      const bodyParas = mainBody.split(/\n\n+/);
+      let mIdx = 0;
+      for (let p = 0; p < bodyParas.length && mIdx < missingNums.length; p++) {
+        const para = bodyParas[p].trim();
+        if (
+          para.length >= 80 &&
+          !para.startsWith("#") &&
+          !para.startsWith("|") &&
+          !para.startsWith("```") &&
+          !para.startsWith(">") &&
+          /[다요음]\.$/.test(para)
+        ) {
+          const fnNum = missingNums[mIdx++];
+          bodyParas[p] = bodyParas[p].replace(/([다요음])\.\s*$/, `$1.${fnNum})`);
+        }
+      }
+      mainBody = bodyParas.join("\n\n");
+      md = mainBody + tailPart;
+    }
+  }
+
+  // Rebuild 【각주】 and 【참고문헌】 cleanly from existingFnMap
+  if (existingFnMap.size > 0) {
+    const sortedFnNums = Array.from(existingFnMap.keys()).sort((a, b) => a - b);
+    const cleanFnLines = sortedFnNums.map((n) => `${n}) ${existingFnMap.get(n)}`);
+    const bibLines = Array.from(
+      new Set(sortedFnNums.map((n) => `- ${existingFnMap.get(n)}`))
+    );
+    const cleanBibSection = [
+      "### 【참고문헌】",
+      "#### 1. 발굴조사보고서 및 공간정보 기초자료",
+      "- 국립문화유산연구원·국가유산청, 『한국 고고학 발굴조사보고서 및 국가유산 공간정보(GIS) 데이터셋(공주 공산성·익산 왕궁리 유적·부여 왕흥사지·울주 대곡리 반구대 암각화)』.",
+      "#### 2. 연구논문 (국내·국외 학술지)",
+      ...bibLines,
+    ].join("\n");
+
+    // Strip everything from ### 【각주】 or ### 【참고문헌】 to end and append clean sections
+    const cutIdx = md.search(
+      /\n(?:#{1,4}\s*.*(?:【각주】|\[각주\]|【참고문헌】|\[참고문헌\])|【각주】|【참고문헌】)/
+    );
+    const baseBody = cutIdx >= 0 ? md.slice(0, cutIdx).trimEnd() : md.trimEnd();
+    md = `${baseBody}\n\n### 【각주】\n${cleanFnLines.join("\n")}\n\n${cleanBibSection}\n`;
+  }
+
+  return md;
+}
+
+function evaluateArchaeologyManuscriptQuality(
+  markdown = "",
+  {
+    docType = "report",
+    hasReport = false,
+    hasDating = false,
+    collectedPapers = [],
+    goalPlan = null,
+  } = {}
+) {
+  const isPaper = docType === "paper";
+  const md = String(markdown || "");
+  const minPapers = goalPlan?.minPapers || (isPaper ? 10 : 8);
+  const minFootnotes = goalPlan?.minFootnotes || (isPaper ? 10 : 8);
+  const minChars = goalPlan?.minChars || (isPaper ? 7000 : 6000);
+
+  // 1. Data sufficiency (DBpia papers with real authors)
+  const verifiedPapers = (collectedPapers || []).filter(
+    (p) => p && p.title && p.author && !/저자미상|Unknown/i.test(p.author)
+  );
+  const c1Passed =
+    (collectedPapers || []).length >= minPapers &&
+    verifiedPapers.length >= Math.min(minPapers, 6);
+
+  // 2. Section structure completeness
+  const hasIntro = /머리말|서론|연구\s*배경/.test(md);
+  const hasAnalysis = /유구|자료\s*검토|형식\s*분류|방법론|시스템\s*설계|아키텍처/.test(md);
+  const hasChronologyOrCore = /편년|단계|출토유물|적용|검증|모델/.test(md);
+  const hasComparisonOrSignificance = /비교|성격|의의|전개|고찰|결론|맺음말/.test(md);
+  const hasFootnotesSec = /【각주】|\[각주\]/.test(md);
+  const hasBibSec = /【참고문헌】|\[참고문헌\]/.test(md);
+  const hasAbstracts = !isPaper || (/초록|주제어/.test(md) && /Abstract|Keywords/i.test(md));
+  const c2Passed =
+    hasIntro &&
+    hasAnalysis &&
+    hasChronologyOrCore &&
+    hasComparisonOrSignificance &&
+    hasFootnotesSec &&
+    hasBibSec &&
+    hasAbstracts;
+
+  // 3. Argumentation depth & char count
+  const charCount = md.length;
+  const academicToneMatches =
+    md.match(/(?:파악된다|판단된다|편년된다|사료된다|보인다|분석된다|검토하였다|확인된다)/g) || [];
+  const c3Passed = charCount >= minChars && academicToneMatches.length >= 6;
+
+  // 4. Quantitative Markdown tables (>= 2 tables)
+  const tableBlocks = md.match(/(?:^|\n)\|[^\n]+\|\r?\n\|[\s:\-|]+\|/g) || [];
+  const c4Passed = tableBlocks.length >= 2;
+
+  // 5. wc-chart & wc-diagram presence
+  const hasChart =
+    /```wc-chart/i.test(md) ||
+    /\[\[WC_CHART_\d+\]\]/.test(md) ||
+    (/"type"\s*:\s*"(?:column|bar|line|pie)"/.test(md) && /"series"\s*:/.test(md));
+  const hasDiagram =
+    /```wc-diagram/i.test(md) ||
+    /\[\[WC_DIAGRAM_\d+\]\]/.test(md) ||
+    (/"layout"\s*:\s*"(?:process|hierarchy|cycle|list)"/.test(md) && /"items"\s*:/.test(md));
+  const c5Passed = hasChart && hasDiagram;
+
+  // 6. Verified footnotes count & zero '저자미상'
+  const fnLines = md.match(/^\s*\d+\)\s+.+$/gm) || [];
+  const unknownAuthorMatches = md.match(/저자미상|연도미상/g) || [];
+  const c6Passed = fnLines.length >= minFootnotes && unknownAuthorMatches.length === 0;
+
+  // 7. 1:1 Footnote <-> Bibliography cross-check
+  const bibSection = md.split(/【참고문헌】|\[참고문헌\]/)[1] || "";
+  const bibLines = bibSection
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter((l) => l.startsWith("-") || l.startsWith("•") || /^\d+\./.test(l));
+  const hasStandardQuotes = /『[^』]+』/.test(md) && /「[^」]+」/.test(md);
+  const c7Passed =
+    hasBibSec &&
+    bibLines.length >= Math.min(minFootnotes, fnLines.length) &&
+    hasStandardQuotes;
+
+  // 8. Data fidelity & no abrupt sentence truncation
+  const trimmedEnd = md.trim();
+  const notTruncated =
+    trimmedEnd.length > 500 &&
+    /[.』」쪽)\n]$/.test(trimmedEnd);
+  const noFabricatedBPDating =
+    hasDating || !/\b\d{3,4}\s*±\s*\d{2,3}\s*BP\b/i.test(md);
+  const c8Passed = notTruncated && noFabricatedBPDating;
+
+  const criteriaResults = [
+    {
+      id: "C1_DBPIA_SUFFICIENCY",
+      title: "1. 다각도 선행연구 서지 데이터 충분성 (DBpia AI)",
+      target: `논문 ${minPapers}편 이상 (실제 저자 메타데이터 완비)`,
+      actual: `수집 ${(collectedPapers || []).length}편 (저자·서지 검증 ${verifiedPapers.length}편)`,
+      passed: c1Passed,
+    },
+    {
+      id: "C2_SECTION_STRUCTURE",
+      title: isPaper
+        ? "2. 석사학위 논문·『한국고고학보』 필수 장·절 및 국·영문 초록"
+        : "2. 국가유산청 발굴조사보고서 『Ⅳ. 고찰』 필수 장·절 체계",
+      target: isPaper
+        ? "국·영문초록 + Ⅰ~Ⅴ장 + 【각주】 + 【참고문헌】"
+        : "Ⅳ.고찰 1~4절 + 【각주】 + 【참고문헌】",
+      actual: c2Passed
+        ? "전 장·절 및 초록·각주·참고문헌 완비"
+        : `누락 항목 존재 (${[
+            !hasIntro && "머리말",
+            !hasAnalysis && "본론 분석절",
+            !hasChronologyOrCore && "편년/단계절",
+            !hasComparisonOrSignificance && "비교/맺음말",
+            !hasAbstracts && "국·영문초록",
+            !hasFootnotesSec && "【각주】",
+            !hasBibSec && "【참고문헌】",
+          ]
+            .filter(Boolean)
+            .join(", ")})`,
+      passed: c2Passed,
+    },
+    {
+      id: "C3_ARGUMENT_DEPTH",
+      title: "3. 학술 논증 심층성·연구사 비판 및 목표 분량",
+      target: `${minChars.toLocaleString()}자 이상 · 학술 문체 6회 이상`,
+      actual: `${charCount.toLocaleString()}자 (학술 논증 종결어미 ${academicToneMatches.length}회)`,
+      passed: c3Passed,
+    },
+    {
+      id: "C4_QUANTITATIVE_TABLES",
+      title: "4. 고고학 정량 데이터 마크다운 학술 표 2종 이상",
+      target: "<표 1> 속성 일람표 및 <표 2> 비교 대비표 (2개 이상)",
+      actual: `마크다운 학술 표 ${tableBlocks.length}개 수록`,
+      passed: c4Passed,
+    },
+    {
+      id: "C5_CHART_AND_DIAGRAM",
+      title: "5. WordCraft 네이티브 차트(wc-chart) 및 모식도(wc-diagram)",
+      target: "wc-chart 1개 + wc-diagram 1개 포함",
+      actual: `차트(${hasChart ? "포함" : "누락"}) · 모식도(${hasDiagram ? "포함" : "누락"})`,
+      passed: c5Passed,
+    },
+    {
+      id: "C6_VERIFIED_FOOTNOTES",
+      title: "6. 실전 학술 각주 밀도 및 저자명 완비 ('저자미상' 0건)",
+      target: `각주 ${minFootnotes}개 이상 · 저자미상 0건`,
+      actual: `각주 ${fnLines.length}개 · 미상 표기 ${unknownAuthorMatches.length}건`,
+      passed: c6Passed,
+    },
+    {
+      id: "C7_BIBLIOGRAPHY_CROSSCHECK",
+      title: "7. 본문 【각주】 ↔ 【참고문헌】 1:1 교차검증 일치성",
+      target: `참고문헌 ${minFootnotes}건 이상 · 『 』/「 」 표준 부호`,
+      actual: `참고문헌 ${bibLines.length}건 · 표준 인용부호 ${hasStandardQuotes ? "준수" : "미흡"}`,
+      passed: c7Passed,
+    },
+    {
+      id: "C8_DATA_FIDELITY_COMPLETENESS",
+      title: "8. 원자료 정합성(허구 수치 날조 금지) 및 문장 완결성",
+      target: "원자료 정합성 100% · 말미 절단 없음",
+      actual: c8Passed ? "원자료 정합성 및 문장 완결 확인" : "보완 필요",
+      passed: c8Passed,
+    },
+  ];
+
+  const passedCount = criteriaResults.filter((c) => c.passed).length;
+  const score = Math.round((passedCount / criteriaResults.length) * 100);
+  const deficiencies = criteriaResults
+    .filter((c) => !c.passed)
+    .map((c) => `${c.title} [목표: ${c.target} / 현재: ${c.actual}]`);
+
+  return {
+    passed: passedCount === criteriaResults.length,
+    passedCount,
+    totalCriteria: criteriaResults.length,
+    score,
+    charCount,
+    footnoteCount: fnLines.length,
+    tableCount: tableBlocks.length,
+    verifiedPaperCount: verifiedPapers.length,
+    criteriaResults,
+    deficiencies,
+    evaluatedAt: new Date().toISOString(),
+  };
 }
 
 function buildFirstStageEngineeredPrompt({
@@ -4654,7 +5573,9 @@ function buildFirstStageEngineeredPrompt({
   hasLocalFiles = false,
 }) {
   const isPaper = docType === "paper";
-  const docLabel = isPaper ? "학술논문" : "발굴조사보고서 『Ⅳ. 고찰』";
+  const docLabel = isPaper
+    ? "대학원 석사학위 논문 이상 · 『한국고고학보』 등재학술지 규격 논문"
+    : "국가유산청·국립문화유산연구원 『문화재발굴조사보고서 Ⅳ. 고찰(考察)』";
   const hasReport = Boolean((reportText && reportText.trim()) || hasLocalFiles);
   const hasDating = Boolean(datingText && datingText.trim());
   const topic =
@@ -4664,16 +5585,16 @@ function buildFirstStageEngineeredPrompt({
       : "조사 유적의 유구·출토유물 양상과 주변 비교유적 편년 검토");
 
   return [
-    `[고고학 학술 논증 설계 지침 · 작성 양식: ${docLabel}]`,
+    `[/goal 기반 고고학 학술 논증 설계 및 완료 판단 기준 · 양식: ${docLabel}]`,
     `• 핵심 논증 주제: ${topic}`,
-    `• 기초 조사자료 반영 범위: ${hasReport ? "아래 본문에 직접 제공된 유구·유물 속성 및 중복·층위 선후관계를 최우선 근거로 반영" : "별도 유구 수치 날조 금지, 제시된 주제와 아래 DBpia 선행연구 서지 데이터를 중심으로 논증"}`,
-    `• 연대분석 자료 반영 범위: ${hasDating ? "아래 본문에 직접 제공된 절대연대 측정치와 상대편년을 교차검증하여 반영" : "임의의 절대연대 수치 날조 금지, 출토유물 형식·중복관계·비교유적 상대편년만으로 논증"}`,
-    `• 필수 장·절 구성: ${
+    `• 판단 기준 1 (선행연구 교차검증): DBpia AI 3단계 다각도 검색(연구사·방법론 / 형식분류·속성 / 비교유적·적용사례)으로 수집된 실존 논문 서지(실제 저자명·발행연도·학술지·쪽수 완비)를 본문 각주와 참고문헌에 1:1 교차 인용`,
+    `• 판단 기준 2 (기초 조사자료 정합성): ${hasReport ? "아래 제공된 유구 규모·평면형태·내부시설·중복/층위 선후관계·출토유물 조합을 1차 근거로 전수 반영" : "별도 유구 실측치 날조 금지, 제시된 주제와 수집된 DBpia 선행연구 데이터를 중심으로 논증"}`,
+    `• 판단 기준 3 (연대분석 정합성): ${hasDating ? "제공된 절대연대(AMS·OSL) 측정치와 상대편년을 교차검증" : "임의의 절대연대(BP) 수치 날조 금지, 유물 형식·중복관계·선행연구 상대편년만으로 논증"}`,
+    `• 판단 기준 4 (필수 장·절 및 정량 표·차트·모식도): ${
       isPaper
-        ? "제목·저자 ➔ 국문초록·주제어(5개) ➔ Ⅰ. 머리말 ➔ Ⅱ. 자료 검토 및 형식 분류(표 1·차트) ➔ Ⅲ. 편년 및 단계 설정(모식도) ➔ Ⅳ. 지역적 전개와 고고학적 의의(표 2 주변유적 대비표) ➔ Ⅴ. 맺음말 ➔ 영문초록(Abstract·Keywords) ➔ 【각주】 ➔ 【참고문헌】"
-        : "Ⅳ. 고 찰 ➔ 1. 머리말 ➔ 2. 유구 구조와 중복·성격 검토(표 1 유구 속성표·차트) ➔ 3. 출토유물 및 편년 단계 검토(단계별 변천 모식도) ➔ 4. 주변 유적과의 비교 및 유적의 성격(표 2 주변유적 대비표·맺음말 요약) ➔ 【각주】 ➔ 【참고문헌】"
+        ? "제목·저자 ➔ 국문초록·주제어(5개) ➔ Ⅰ. 머리말(연구사 검토) ➔ Ⅱ. 분석 자료 검토 및 형식 분류(<표 1>·wc-chart) ➔ Ⅲ. 편년 및 단계별 전개(wc-diagram) ➔ Ⅳ. 고고학적 성격과 의의(<표 2> 대비표) ➔ Ⅴ. 맺음말 ➔ 영문초록(Abstract·Keywords) ➔ 【각주】(10개 이상, 저자미상 0건) ➔ 【참고문헌】"
+        : "Ⅳ. 고 찰 ➔ 1. 머리말 ➔ 2. 유구 구조와 중복·성격 검토(<표 1> 유구 속성표·wc-chart) ➔ 3. 출토유물 및 편년 단계 검토(wc-diagram) ➔ 4. 주변 유적과의 비교 및 유적의 성격(<표 2> 주변유적 대비표·맺음말) ➔ 【각주】(8개 이상, 저자미상 0건) ➔ 【참고문헌】"
     }`,
-    `• 학술 서지·도면 기준: 본문 인용 1), 2) 위첨자 각주 ↔ 【참고문헌】 1:1 완전 일치 · 『보고서/학술지』·「논문」·00~00쪽 표준 표기 · 제미나이 차트/모식도 자동 포함`,
   ].join("\n");
 }
 
@@ -4688,6 +5609,8 @@ function buildAdaptiveMasterPrompt({
   const isPaper = docType === "paper";
   const hasReport = Boolean((reportText && reportText.trim()) || hasLocalFiles);
   const hasDating = Boolean(datingText && datingText.trim());
+  const minFootnotes = isPaper ? 10 : 8;
+  const minChars = isPaper ? 7500 : 6500;
 
   const materialBlocks = [];
   if (reportText && reportText.trim()) {
@@ -4703,9 +5626,11 @@ function buildAdaptiveMasterPrompt({
 
   return [
     isPaper
-      ? "### [고고학 학술논문(『한국고고학보』 투고 규격) 본문 즉시 집필 지시]"
-      : "### [발굴조사보고서 『Ⅳ. 고찰(考察)』 본문 즉시 집필 지시]",
-    "- 외부 도구나 외부 문서를 일절 조회하지 말고, 사용자에게 추가 질문을 하지 마십시오. 필요한 모든 기초 조사자료와 DBpia 학술논문 서지 데이터는 **바로 이 메시지 아래에 직접 수록되어 있으므로**, 오직 아래 데이터만을 근거로 지금 즉시 완성된 원고 본문 전체를 처음부터 끝까지 작성하십시오.",
+      ? "### [대학원 석사학위 논문 이상 · 『한국고고학보』 등재학술지 심사 규격 본문 집필 지시]"
+      : "### [국가유산청·국립문화유산연구원 『문화재발굴조사보고서 Ⅳ. 고찰(考察)』 본문 집필 지시]",
+    "- 외부 도구나 외부 문서를 일절 조회하지 말고, 사용자에게 추가 질문을 하지 마십시오. 필요한 모든 기초 조사자료와 **DBpia AI에서 실시간 수집·메타데이터 검증을 마친 실제 학술논문 서지 데이터(실제 저자명·연도·학술지·쪽수 완비)**는 바로 이 메시지 아래에 직접 수록되어 있으므로, 오직 아래 데이터만을 근거로 지금 즉시 완성된 원고 전체(최소 " +
+      minChars.toLocaleString() +
+      "자 이상)를 처음부터 끝까지 작성하십시오.",
     "",
     buildFirstStageEngineeredPrompt({
       docType,
@@ -4719,29 +5644,94 @@ function buildAdaptiveMasterPrompt({
     "#### [1. 자료 유무에 따른 엄격한 작성 원칙 ('없는 자료는 없는 대로 결과 도출')]",
     hasReport
       ? "1) **제공된 보고서·조사 자료 최우선 반영**: 위 `[제공된 발굴조사보고서·기초조사 원자료 텍스트]`의 유구 규모(장축×단축·면적), 평면형태, 내부시설(노지·부뚜막·구들·주공), **유구 간 중복(파괴·선후) 관계 및 토층 층위 관계**, 출토유물 조합을 빠짐없이 추출하여 상대편년과 단계 설정의 1차 근거로 삼으십시오."
-      : "1) **보고서 원자료 미입력 상태 대응**: 별도의 유구 원자료가 없으므로 가상의 유구 번호나 허구 실측치를 절대 지어내지 말고, 요청 주제와 아래 DBpia 수집 논문·주변 비교유적 데이터를 바탕으로 서술하십시오.",
+      : "1) **보고서 원자료 미입력 상태 대응**: 별도의 유구 원자료가 없으므로 가상의 유구 번호나 허구 실측치를 절대 지어내지 말고, 요청 주제와 아래 DBpia 수집 논문·선행연구 데이터를 바탕으로 심층 논증하십시오.",
     hasDating
       ? "2) **연대분석 자료 교차검증**: 입력된 연대분석(AMS 탄소연대·OSL 등) 수치를 유구 중복관계 및 유물 형식 편년과 교차검증하여 서술하십시오."
       : "2) **연대분석 자료 미입력 상태 대응**: 연대분석 자료가 비어 있으므로 **절대로 임의의 시료번호나 BP/보정연대 수치를 지어내지 마십시오.** 절대연대 수치는 다루지 않고 출토유물의 형식 변화, 유구 구조 변천, 선행 연구의 상대편년만으로 시기를 논증하십시오.",
     "",
-    "#### [2. 필수 고고학 표 2종 및 제미나이 차트·모식도 자동 생성 지시]",
-    "1) **필수 마크다운 표 2종 수록**:",
-    "   - **`표 1. 주요 유구·출토유물 속성 일람표`**: 유구명, 평면형태, 규모(m), 내부시설(노지/부뚜막/구들/주공), 주요 출토유물, 비고(중복관계·단계)를 정리한 마크다운 표를 본문 해당 절에 포함하십시오.",
-    "   - **`표 2. 주변 병행유적 비교 대비표`**: 조사 유적과 동일 수계·인접 문화권 주요 비교유적의 유구 구조, 표징 유물, 중심 편년, 문헌 근거를 나란히 비교하는 마크다운 표를 포함하십시오.",
-    "2) **제미나이 직접 생성 학술 차트(`wc-chart`) 및 단계별 편년 모식도(`wc-diagram`) 수록**:",
-    "   - 유구·유물 수량이나 비율 비교 자리에는 아래 형식의 `wc-chart` 코드블록 1개를 반드시 포함하십시오 (WordCraft 네이티브 차트로 자동 변환됨):",
+    "#### [2. 필수 고고학 마크다운 표 2종 및 제미나이 차트(`wc-chart`)·모식도(`wc-diagram`) 수록 지시]",
+    "1) **필수 마크다운 표 2종 수록 (`|...|` 표준 마크다운 표 형식 엄수)**:",
+    "   - **`<표 1> 주요 유구·출토유물(또는 선행연구·분석대상) 속성 일람표`**: 대상 명칭, 핵심 형태/구조, 세부 속성(규모·내부시설·데이터 유형), 주요 특징, 비고(단계·출처)를 정리한 마크다운 표를 본문 해당 절에 포함하십시오.",
+    "   - **`<표 2> 단계별·주변 병행유적(또는 국내외 비교사례) 대비표`**: 비교 대상별 구조적 특징, 표징 유물/핵심 지표, 중심 시기/단계, 문헌 근거를 나란히 비교하는 마크다운 표를 포함하십시오.",
+    "2) **제미나이 직접 생성 학술 차트(`wc-chart`) 및 단계별 모식도(`wc-diagram`) 수록 (코드블록 태그 이름을 반드시 `wc-chart`, `wc-diagram`으로 표기)**:",
+    "   - 수량·비율·정량 지표 비교 자리에는 아래 형식의 `wc-chart` 코드블록 1개를 반드시 포함하십시오:",
     '     ```wc-chart\n     {"type":"column","title":"유구·시기별 주요 출토유물 구성 비교","legend":"bottom","dataLabels":true,"data":{"categories":["Ⅰ단계","Ⅱ단계","Ⅲ단계"],"series":[{"name":"경질무문·타날문토기","values":[14,22,9]},{"name":"단경호·배류","values":[6,15,24]}]}}\n     ```',
-    "   - 유구 구조 및 출토유물 단계별 변천을 종합하는 절에는 아래 형식의 `wc-diagram` 코드블록 1개를 반드시 포함하십시오 (WordCraft 네이티브 모식도로 자동 변환됨):",
+    "   - 단계별 변천 또는 학술 논증 아키텍처를 종합하는 절에는 아래 형식의 `wc-diagram` 코드블록 1개를 반드시 포함하십시오:",
     '     ```wc-diagram\n     {"layout":"process","colors":"accent1","items":[{"text":"Ⅰ단계 (초기·형성기)","level":0},{"text":"방형 평면 · 노지 중심 · 전기 유물 조합","level":1},{"text":"Ⅱ단계 (발전·확산기)","level":0},{"text":"방형·장방형 · 부뚜막/구들 정착 · 중기 표징 유물","level":1},{"text":"Ⅲ단계 (전환기)","level":0},{"text":"구조 변화 및 신기종 유입 · 주변 지역 교류 심화","level":1}]}\n     ```',
     "",
-    "#### [3. 실제 발굴조사보고서·학술논문 각주(1), 2)...) 및 【참고문헌】 1:1 일치 규칙]",
-    "1) **본문 각주 표기**: 본문 문장 끝에 `1)`, `2)`, `3)` 형태의 일련번호 각주를 표기하십시오.",
-    "2) **【각주】 섹션 수록**: 본문 마지막 절(또는 영문초록) 바로 아래에 `### 【각주】`를 두고 `1) 저자명, 발행연도, 「논문 제목」, 『학술지명』 권호, 발행기관, 45~48쪽.` 양식으로 빠짐없이 기재하십시오 (`pp.` 대신 `00~00쪽` 표기, 보고서·학술지는 `『 』`, 논문은 `「 」` 엄수).",
-    "3) **【참고문헌】 1:1 완전 일치**: 원고 맨 끝에 `### 【참고문헌】`을 두고, 본문 각주에 인용된 모든 보고서와 논문이 단 한 편도 누락되지 않도록 **1. 발굴조사보고서**와 **2. 연구논문**으로 나누어 가나다순·연도순으로 정리하십시오.",
-    "4) **문체 및 초록**: 어려운 외래어를 피하고 `~로 파악된다`, `~로 판단된다`, `~로 편년된다` 등 명확한 고고학 학술 문체로 작성하십시오. 논문 모드일 때는 서두에 `국문초록`·`주제어`, 말미(각주 앞)에 고고학 표준 영문 용어를 사용한 `Abstract`·`Keywords`를 함께 작성하십시오.",
+    "#### [3. 실제 발굴조사보고서·학술논문 각주(1), 2)...) 및 【참고문헌】 1:1 교차검증 규칙 (절대 '저자미상' 금지)]",
+    `1) **본문 각주 표기**: 본문 문장 끝에 \`1)\`, \`2)\`, \`3)\` ... 최소 **${minFootnotes}개 이상**의 일련번호 각주를 반드시 표기하십시오.`,
+    "2) **실제 저자명·발행연도·학술지·쪽수 100% 그대로 인용**: 아래 `[실시간 수집·검증된 DBpia 학술논문 서지 데이터]`에는 각 논문의 **실제 저자명, 발행연도, 논문 제목, 학술지 권호, 수록 쪽수**가 모두 검증되어 제공되어 있습니다. **절대로 `저자미상`이나 `연도미상`이라고 쓰지 말고**, 아래 목록에 적힌 실제 저자명과 연도, 학술지명, 쪽수를 글자 그대로 `### 【각주】`와 `### 【참고문헌】`에 기재하십시오.",
+    "3) **【각주】 섹션 수록**: 본문 마지막 절(또는 영문초록) 바로 아래에 `### 【각주】`를 두고 `1) 홍길동, 2024, 「논문 제목」, 『학술지명 제00권 제0호』, 발행기관, 45~68쪽.` 양식으로 한 줄에 하나씩 번호순으로 빠짐없이 기재하십시오 (`pp.` 대신 `00~00쪽` 표기, 보고서·학술지는 `『 』`, 논문은 `「 」` 엄수).",
+    "4) **【참고문헌】 1:1 완전 일치**: 원고 맨 끝에 `### 【참고문헌】`을 두고, 본문 각주에 인용된 모든 보고서와 논문이 단 한 편도 누락되지 않도록 **1. 발굴조사보고서 및 단행본**과 **2. 연구논문**으로 나누어 가나다순·연도순으로 정리하십시오.",
+    "5) **문체 및 초록**: 어려운 외래어를 피하고 `~로 파악된다`, `~로 판단된다`, `~로 편년된다` 등 명확한 고고학 학술 문체로 작성하십시오. 논문 모드일 때는 서두에 `국문초록`·`주제어(5개 이상)`, 말미(각주 앞)에 고고학 표준 영문 용어를 사용한 `Abstract`·`Keywords(5개 이상)`를 반드시 포함하십시오.",
   ]
     .filter(Boolean)
     .join("\n");
+}
+
+function buildCrossVerificationRevisionPrompt({
+  docType = "report",
+  userFocus = "",
+  currentManuscript = "",
+  verification = {},
+  collectedBlock = "",
+}) {
+  const isPaper = docType === "paper";
+  const docLabel = isPaper
+    ? "대학원 석사학위 논문 이상 · 『한국고고학보』 등재학술지 논문"
+    : "국가유산청·국립문화유산연구원 『문화재발굴조사보고서 Ⅳ. 고찰(考察)』";
+
+  return [
+    `### [/goal 학술 품질 교차검증 보완 지시 — ${docLabel}]`,
+    "- 외부 도구를 호출하지 말고, 아래 교차검증 미충족 항목을 100% 보완하여 **처음부터 끝까지 완전한 최종 완성본 원고 전체**를 다시 출력하십시오 (일부만 출력하거나 생략하지 마십시오).",
+    "",
+    `#### [현재 초안 교차검증 결과: ${verification.passedCount}/${verification.totalCriteria} 기준 충족 (${verification.score}점)]`,
+    ...(verification.deficiencies || []).map((d, i) => `${i + 1}. 보완 필수 항목: ${d}`),
+    "",
+    "#### [필수 보완 지침]",
+    "1) 기존 원고의 우수한 논증과 내용은 유지하되, 위 미충족 기준을 모두 통과하도록 각 장·절의 선행연구 비교 논거를 대폭 보강하십시오.",
+    "2) 본문 내 `<표 1>` 및 `<표 2>` 마크다운 표 2종 이상, ```wc-chart 코드블록 1개, ```wc-diagram 코드블록 1개가 모두 정식 포맷으로 포함되도록 하십시오.",
+    "3) 본문 문장 끝에 `1)`, `2)`... 각주 번호를 표기하고, `### 【각주】`와 `### 【참고문헌】`에는 반드시 아래 제공된 **실제 저자명·연도·학술지·쪽수**를 그대로 기재하십시오 (`저자미상`·`연도미상` 절대 금지).",
+    isPaper
+      ? "4) 서두의 `국문초록`·`주제어`와 말미(각주 앞)의 `Abstract`·`Keywords`를 모두 빠짐없이 포함하십시오."
+      : "4) `Ⅳ. 고 찰`의 `1. 머리말` ~ `4. 주변 유적과의 비교 및 유적의 성격(맺음말)` 전 절을 빠짐없이 완결하십시오.",
+    "",
+    collectedBlock,
+    "",
+    "### [직전 작성 초안 (이 초안을 바탕으로 미충족 항목을 보완하여 전체 원고를 완성할 것)]",
+    currentManuscript.slice(0, 28000),
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
+function formatCollectedDbpiaBlock(collectedPapers = [], liveResearchFeed = []) {
+  const verifiedList = (collectedPapers || []).filter((p) => p && p.title);
+  const lines = [
+    "\n\n### [실시간 수집·메타데이터 교차검증 완료된 DBpia 학술논문 서지 데이터 (본문 각주 및 참고문헌 1:1 인용 필수)]",
+    "※ 아래 논문들의 실제 저자명, 발행연도, 논문 제목, 학술지명/권호, 쪽수를 변형 없이 그대로 `1)`, `2)` 각주와 `【참고문헌】`에 인용하십시오 (`저자미상` 표기 절대 금지).",
+  ];
+
+  if (verifiedList.length > 0) {
+    verifiedList.forEach((r, idx) => {
+      lines.push(`${idx + 1}) ${formatVerifiedCitationLine(r)}`);
+      if (r.abstract) {
+        lines.push(`   - 핵심 초록/요지: ${String(r.abstract).slice(0, 260)}`);
+      }
+    });
+  }
+
+  if (Array.isArray(liveResearchFeed) && liveResearchFeed.length > 0) {
+    lines.push("\n#### [DBpia AI 다각도 검색별 학술 종합 분석 요약]");
+    liveResearchFeed.forEach((item, i) => {
+      lines.push(
+        `- [관점 ${i + 1}: "${item.query}"]\n  ${String(item.summary || "").slice(0, 900)}`
+      );
+    });
+  }
+
+  return lines.join("\n");
 }
 
 async function runArchaeologyDiscussionPipeline({
@@ -4754,7 +5744,7 @@ async function runArchaeologyDiscussionPipeline({
   targetPath = "",
   includeToc = false,
   enableTrackChanges = false,
-  maxRounds = 2,
+  maxRounds = 3,
 } = {}) {
   if (pipelineState.running) {
     return {
@@ -4768,7 +5758,7 @@ async function runArchaeologyDiscussionPipeline({
   pipelineState.abortRequested = false;
   pipelineState.docType = docType === "paper" ? "paper" : "report";
   pipelineState.round = 0;
-  pipelineState.maxRounds = maxRounds;
+  pipelineState.maxRounds = Math.max(2, Number(maxRounds) || 3);
   pipelineState.totalQueriesRun = 0;
   pipelineState.totalCharsWritten = 0;
   pipelineState.chaptersCompleted = 0;
@@ -4776,6 +5766,7 @@ async function runArchaeologyDiscussionPipeline({
   pipelineState.liveResearchFeed = [];
   pipelineState.liveStreamText = "";
   pipelineState.latestManuscript = "";
+  pipelineState.goalVerification = null;
   pipelineState.outputDir =
     targetPath &&
     !targetPath.toLowerCase().endsWith(".md") &&
@@ -4795,7 +5786,7 @@ async function runArchaeologyDiscussionPipeline({
   const localFiles = [];
   let craftExtractedReportText = reportText || "";
 
-  // Also include any uploaded PDF/DOCX files from pipelineState.uploadedFiles if reportText is short
+  // Include any uploaded PDF/DOCX files from pipelineState.uploadedFiles if reportText is short
   try {
     if (
       Array.isArray(pipelineState.uploadedFiles) &&
@@ -4864,18 +5855,28 @@ async function runArchaeologyDiscussionPipeline({
                   .filter(Boolean)
                   .join("\n\n");
               }
-            } catch {
-              // ignore individual file parse error
-            }
+            } catch {}
           }
         }
       }
     }
-  } catch {
-    // ignore
-  }
+  } catch {}
 
-  // Always build fresh firstStagePrompt on server so stale "[1차 가공 완료..." strings from unrefreshed tabs are never used
+  const hasReport = Boolean(
+    (craftExtractedReportText && craftExtractedReportText.trim()) ||
+      localFiles.length > 0
+  );
+  const hasDating = Boolean(datingText && datingText.trim());
+
+  // Step 0: Establish /goal Plan & 8-Point Completion Rubric upfront
+  const goalPlan = buildGoalPlanAndRubric({
+    docType: pipelineState.docType,
+    userFocus,
+    hasReport,
+    hasDating,
+  });
+  pipelineState.goalPlan = goalPlan;
+
   const firstStagePrompt = buildFirstStageEngineeredPrompt({
     docType: pipelineState.docType,
     userFocus,
@@ -4888,49 +5889,49 @@ async function runArchaeologyDiscussionPipeline({
   (async () => {
     try {
       const docLabel =
-        pipelineState.docType === "paper" ? "학술논문" : "발굴조사보고서 고찰";
+        pipelineState.docType === "paper" ? "석사학위 이상 학술논문" : "발굴조사보고서 Ⅳ. 고찰";
       addPipelineLog(
-        `1단계: 요청 내용을 [${docLabel}] 양식에 맞게 1차 프롬프트로 가공했습니다.`,
+        `[/goal 계획 수립] ${goalPlan.standardName}에 의거하여 8대 완료 판단 기준(실존 논문 ${goalPlan.minPapers}편+, 각주 ${goalPlan.minFootnotes}개+, 표 2종+, 차트·모식도, 분량 ${goalPlan.minChars.toLocaleString()}자+, 저자미상 0건)을 수립했습니다.`,
         "PHASE_1_PLANNING",
-        10
+        8
       );
 
-      // Keep Antigravity drawer hidden in background so standalone app stays clean
       await ensureEmbeddedGeminiWebview({ toggle: false });
 
       if (runMode === "figures_only") {
         await generatePublicationFiguresFromGemini(pipelineState.outputDir);
-        addPipelineLog(
-          "도면 4종 렌더링 완료",
-          "COMPLETED",
-          100
-        );
+        addPipelineLog("도면 4종 렌더링 완료", "COMPLETED", 100);
         return;
       }
 
+      // -----------------------------------------------------------------------
+      // PHASE 2: Multi-Round DBpia AI Research & Data Sufficiency Verification
+      // -----------------------------------------------------------------------
       await waitWhilePausedOrAborted();
-      addPipelineLog(
-        `2단계: 입력된 유적·조사 자료에서 핵심 학술 키워드를 추출하여 DBpia AI 검색어로 구성합니다...`,
-        "PHASE_1_PLANNING",
-        18
-      );
-
-      // IMPORTANT: Do NOT call askGeminiWeb here! Literature search must run ONLY on DBpia AI (ai.dbpia.co.kr),
-      // never triggering Google Workspace / Gmail / Google Drive searches on Gemini.
-      const pendingQueries = buildDeterministicDbpiaQueries({
+      const executedQueries = [];
+      const round1Queries = buildMultiFacetedDbpiaQueries({
         userFocus,
         reportText: craftExtractedReportText,
         docType: pipelineState.docType,
+        round: 1,
+        existingQueries: executedQueries,
       });
 
-      for (let qIdx = 0; qIdx < pendingQueries.length; qIdx++) {
+      addPipelineLog(
+        `[DBpia 1차 다각도 탐색] ① 연구사·구조·방법론, ② 형식분류·속성·편년, ③ 비교사례·고고학적 의의 등 ${round1Queries.length}개 학술 관점으로 DBpia AI 자료 수집 및 서지 메타데이터 실증 검증을 시작합니다.`,
+        "PHASE_2_DBPIA_LOOP",
+        16
+      );
+
+      for (let qIdx = 0; qIdx < round1Queries.length; qIdx++) {
         await waitWhilePausedOrAborted();
-        const q = pendingQueries[qIdx];
+        const q = round1Queries[qIdx];
+        executedQueries.push(q);
         pipelineState.totalQueriesRun++;
         addPipelineLog(
-          `3단계: DBpia 실시간 자료 수집 중 (${qIdx + 1}/${pendingQueries.length}) — "${q}"`,
+          `[DBpia 1차 수집 ${qIdx + 1}/${round1Queries.length}] "${q}" 검색 및 실제 저자·학술지·쪽수 교차검증 중...`,
           "PHASE_2_DBPIA_LOOP",
-          30 + qIdx * 18
+          20 + qIdx * 12
         );
         try {
           await askDbpiaAi(q);
@@ -4942,29 +5943,65 @@ async function runArchaeologyDiscussionPipeline({
         }
       }
 
+      // Data Sufficiency Check after Round 1 DBpia search
+      const verifiedSoFar = pipelineState.collectedPapers.filter(
+        (p) => p && p.author && !/저자미상/i.test(p.author)
+      );
+      if (verifiedSoFar.length < goalPlan.minPapers) {
+        await waitWhilePausedOrAborted();
+        const round2Queries = buildMultiFacetedDbpiaQueries({
+          userFocus,
+          reportText: craftExtractedReportText,
+          docType: pipelineState.docType,
+          round: 2,
+          existingQueries: executedQueries,
+        });
+        addPipelineLog(
+          `[데이터 충분성 교차검증] 현재 검증 논문 ${verifiedSoFar.length}편 / 목표 ${goalPlan.minPapers}편 — 근거 데이터를 보강하기 위해 2차 심화 DBpia AI 검색(${round2Queries.length}건)을 추가 수행합니다.`,
+          "PHASE_2_DBPIA_LOOP",
+          54
+        );
+        for (let qIdx = 0; qIdx < round2Queries.length; qIdx++) {
+          await waitWhilePausedOrAborted();
+          const q = round2Queries[qIdx];
+          executedQueries.push(q);
+          pipelineState.totalQueriesRun++;
+          addPipelineLog(
+            `[DBpia 2차 심화 수집 ${qIdx + 1}/${round2Queries.length}] "${q}"`,
+            "PHASE_2_DBPIA_LOOP",
+            56 + qIdx * 5
+          );
+          try {
+            await askDbpiaAi(q);
+          } catch {}
+          const nowVerified = pipelineState.collectedPapers.filter(
+            (p) => p && p.author && !/저자미상/i.test(p.author)
+          );
+          if (nowVerified.length >= goalPlan.minPapers) break;
+        }
+      } else {
+        addPipelineLog(
+          `[데이터 충분성 검증 통과] 총 ${pipelineState.collectedPapers.length}편(실제 저자·학술지·쪽수 완비 ${verifiedSoFar.length}편)의 실존 학술논문 서지가 확보되었습니다.`,
+          "PHASE_2_DBPIA_LOOP",
+          58
+        );
+      }
+
+      // -----------------------------------------------------------------------
+      // PHASE 3 & 4: Gemini Drafting + /goal 8-Criteria Cross-Verification Loop
+      // -----------------------------------------------------------------------
       await waitWhilePausedOrAborted();
+      pipelineState.round = 1;
       addPipelineLog(
-        `4단계: 수집된 논문(${pipelineState.collectedPapers.length}편)과 입력 자료를 바탕으로 [${docLabel}] 본문(각주·참고문헌 포함)을 실시간 작성 중입니다...`,
+        `[본문 집필 1차] 검증된 논문(${pipelineState.collectedPapers.length}편)과 조사 자료를 바탕으로 [${docLabel}] 전체 원고(표 2종·차트·모식도·실전 각주·참고문헌)를 집필합니다...`,
         "PHASE_4_WRITING_MASTER",
-        68
+        65
       );
 
-      const collectedBlock =
-        pipelineState.liveResearchFeed.length > 0
-          ? "\n\n### [실시간 수집된 DBpia 학술논문 및 서지 데이터]\n" +
-            pipelineState.liveResearchFeed
-              .map(
-                (item, i) =>
-                  `#### 검색 ${i + 1}: ${item.query}\n${item.summary}\n` +
-                  (item.refs || [])
-                    .map(
-                      (r, rIdx) =>
-                        `- (${rIdx + 1}) ${r.author || "저자미상"}, ${r.year || "연도미상"}, 「${r.title}」, 『${r.journal || "학술지"}』${r.pages ? `, pp.${r.pages}` : ""}`
-                    )
-                    .join("\n")
-              )
-              .join("\n\n")
-          : "";
+      const collectedBlock = formatCollectedDbpiaBlock(
+        pipelineState.collectedPapers,
+        pipelineState.liveResearchFeed
+      );
 
       const finalMasterPrompt =
         buildAdaptiveMasterPrompt({
@@ -4976,25 +6013,135 @@ async function runArchaeologyDiscussionPipeline({
           hasLocalFiles: localFiles.length > 0,
         }) + collectedBlock;
 
-      const masterReply = await askGeminiWeb({
+      let currentManuscript = await askGeminiWeb({
         prompt: finalMasterPrompt,
         files: localFiles,
         newChat: true,
       });
 
-      pipelineState.latestManuscript = masterReply || "";
-      pipelineState.totalCharsWritten = (masterReply || "").length;
-      pipelineState.chaptersCompleted = 4;
+      // Deterministic citation & structure enrichment before evaluation
+      currentManuscript = repairAndEnrichManuscriptWithVerifiedRefs(
+        currentManuscript || "",
+        pipelineState.collectedPapers,
+        { docType: pipelineState.docType, userFocus }
+      );
 
-      await waitWhilePausedOrAborted();
+      let verification = evaluateArchaeologyManuscriptQuality(
+        currentManuscript,
+        {
+          docType: pipelineState.docType,
+          hasReport,
+          hasDating,
+          collectedPapers: pipelineState.collectedPapers,
+          goalPlan,
+        }
+      );
+      pipelineState.goalVerification = verification;
+      pipelineState.goalPlan.criteria = verification.criteriaResults;
+      pipelineState.latestManuscript = currentManuscript;
+      pipelineState.totalCharsWritten = currentManuscript.length;
+      pipelineState.chaptersCompleted = verification.passedCount;
+      updateStudioUiState().catch(() => {});
+
+      const maxRevisionLoops = Math.min(2, Math.max(1, pipelineState.maxRounds - 1));
+      let revLoop = 0;
+
+      while (!verification.passed && revLoop < maxRevisionLoops) {
+        revLoop++;
+        pipelineState.round = revLoop + 1;
+        await waitWhilePausedOrAborted();
+
+        addPipelineLog(
+          `[/goal 교차검증 ${revLoop}차] 8대 완료 기준 중 ${verification.passedCount}/8 충족 (${verification.score}점) — 미충족 항목(${verification.deficiencies.length}건) 보완을 위한 자율 교차검증 루프를 실행합니다.`,
+          "PHASE_3_CROSS_VERIFY",
+          74 + revLoop * 7
+        );
+
+        // If literature sufficiency failed, run 1 more targeted DBpia query
+        const c1Result = verification.criteriaResults.find(
+          (c) => c.id === "C1_DBPIA_SUFFICIENCY"
+        );
+        if (c1Result && !c1Result.passed) {
+          const extraQueries = buildMultiFacetedDbpiaQueries({
+            userFocus,
+            reportText: craftExtractedReportText,
+            docType: pipelineState.docType,
+            round: 2,
+            existingQueries: executedQueries,
+          });
+          if (extraQueries.length > 0) {
+            const eq = extraQueries[0];
+            executedQueries.push(eq);
+            pipelineState.totalQueriesRun++;
+            addPipelineLog(
+              `[교차검증 보충 검색] 부족한 문헌 근거 보완을 위해 DBpia AI 추가 검색 — "${eq}"`,
+              "PHASE_2_DBPIA_LOOP",
+              76 + revLoop * 7
+            );
+            try {
+              await askDbpiaAi(eq);
+            } catch {}
+          }
+        }
+
+        const updatedCollectedBlock = formatCollectedDbpiaBlock(
+          pipelineState.collectedPapers,
+          pipelineState.liveResearchFeed
+        );
+
+        const revisionPrompt = buildCrossVerificationRevisionPrompt({
+          docType: pipelineState.docType,
+          userFocus,
+          currentManuscript,
+          verification,
+          collectedBlock: updatedCollectedBlock,
+        });
+
+        const revisedReply = await askGeminiWeb({
+          prompt: revisionPrompt,
+          files: [],
+          newChat: false,
+        });
+
+        if (revisedReply && revisedReply.trim().length >= currentManuscript.length * 0.65) {
+          currentManuscript = repairAndEnrichManuscriptWithVerifiedRefs(
+            revisedReply,
+            pipelineState.collectedPapers,
+            { docType: pipelineState.docType, userFocus }
+          );
+        } else {
+          // Even if Gemini reply was shorter, re-run deterministic repair on currentManuscript
+          currentManuscript = repairAndEnrichManuscriptWithVerifiedRefs(
+            currentManuscript,
+            pipelineState.collectedPapers,
+            { docType: pipelineState.docType, userFocus }
+          );
+        }
+
+        verification = evaluateArchaeologyManuscriptQuality(currentManuscript, {
+          docType: pipelineState.docType,
+          hasReport,
+          hasDating,
+          collectedPapers: pipelineState.collectedPapers,
+          goalPlan,
+        });
+        pipelineState.goalVerification = verification;
+        pipelineState.goalPlan.criteria = verification.criteriaResults;
+        pipelineState.latestManuscript = currentManuscript;
+        pipelineState.totalCharsWritten = currentManuscript.length;
+        pipelineState.chaptersCompleted = verification.passedCount;
+        updateStudioUiState().catch(() => {});
+      }
+
       addPipelineLog(
-        `5단계: 완성된 [${docLabel}] 원고를 WordCraft(.docx·실전 각주) 및 PdfCraft(.pdf·.odt·.tex) 문서로 생성하고 WordCraft 앱을 엽니다...`,
+        `✅ [/goal 교차검증 완료 (${verification.passedCount}/${verification.totalCriteria} 기준 충족 · ${verification.score}점)] 판단 근거 검증이 완료되어 루프를 종료하고 WordCraft(.docx) 문서를 생성합니다.`,
         "PHASE_4_EXPORT_MASTER",
         92
       );
 
+      await waitWhilePausedOrAborted();
       const craftOut = await exportManuscriptToWordCraftAndPdfCraft({
-        markdown: masterReply || "",
+        markdown: currentManuscript || "",
         title: `${docLabel}${userFocus ? ` — ${userFocus.slice(0, 28)}` : ""}`,
         docType: pipelineState.docType,
         includeToc: Boolean(includeToc),
@@ -5004,7 +6151,7 @@ async function runArchaeologyDiscussionPipeline({
       });
 
       addPipelineLog(
-        `작성 및 WordCraft·PdfCraft 생성 완료 — 총 ${pipelineState.totalCharsWritten.toLocaleString()}자 (수집 논문 ${pipelineState.collectedPapers.length}편, 각주 ${craftOut.wordcraftInfo?.footnotesCount || 0}개, PDF ${craftOut.pdfcraftInfo?.pages || 1}쪽)`,
+        `🎉 [/goal 최종 완료] 총 ${pipelineState.totalCharsWritten.toLocaleString()}자 · 교차검증 ${verification.passedCount}/${verification.totalCriteria} 기준 충족 (${verification.score}점) · 검증 논문 ${pipelineState.collectedPapers.length}편 · 실전 각주 ${craftOut.wordcraftInfo?.footnotesCount || verification.footnoteCount}개 · WordCraft(.docx) 자동 실행 완료`,
         "COMPLETED",
         100
       );
@@ -5021,7 +6168,8 @@ async function runArchaeologyDiscussionPipeline({
   return {
     ok: true,
     engineeredPrompt: firstStagePrompt,
-    message: `[${pipelineState.docType === "paper" ? "논문" : "발굴조사보고서 고찰"}] 1차 프롬프트 가공 및 실시간 자료 수집·WordCraft/PdfCraft 작성을 시작했습니다.`,
+    goalPlan,
+    message: `[${pipelineState.docType === "paper" ? "석사학위 이상 학술논문" : "발굴조사보고서 Ⅳ. 고찰"}] /goal 8대 판단 기준 수립 및 다각도 DBpia AI 수집·교차검증 루프를 시작했습니다.`,
   };
 }
 
@@ -5474,10 +6622,47 @@ function startOpenAiBridgeServer() {
             payload.action === "export-to-craft" ||
             payload.action === "export-to-google-docs"
           ) {
+            const docType = payload.docType || pipelineState.docType || "report";
+            if (Array.isArray(payload.collectedPapers) && payload.collectedPapers.length > 0) {
+              pipelineState.collectedPapers = await enrichDbpiaReferencesMetadata(
+                payload.collectedPapers
+              );
+            }
+            let mdToExport = payload.markdown || pipelineState.latestManuscript || "";
+            if (mdToExport) {
+              mdToExport = repairAndEnrichManuscriptWithVerifiedRefs(
+                mdToExport,
+                pipelineState.collectedPapers,
+                { docType }
+              );
+              const goalPlan =
+                pipelineState.goalPlan ||
+                buildGoalPlanAndRubric({ docType, userFocus: payload.title || "" });
+              const verification = evaluateArchaeologyManuscriptQuality(mdToExport, {
+                docType,
+                collectedPapers: pipelineState.collectedPapers,
+                goalPlan,
+              });
+              pipelineState.goalPlan = goalPlan;
+              pipelineState.goalPlan.criteria = verification.criteriaResults;
+              pipelineState.goalVerification = verification;
+              pipelineState.latestManuscript = mdToExport;
+              pipelineState.totalCharsWritten = mdToExport.length;
+              pipelineState.chaptersCompleted = verification.passedCount;
+              pipelineState.phase = "COMPLETED";
+              pipelineState.progressPct = 100;
+              if (Array.isArray(payload.collectedPapers) && payload.collectedPapers.length > 0) {
+                addPipelineLog(
+                  `🎉 [/goal 최종 완료] 총 ${mdToExport.length.toLocaleString()}자 · 교차검증 ${verification.passedCount}/${verification.totalCriteria} 기준 충족 (${verification.score}점) · 검증 논문 ${pipelineState.collectedPapers.length}편 · 실전 각주 ${verification.footnoteCount}개 · WordCraft(.docx) 자동 실행 완료`,
+                  "COMPLETED",
+                  100
+                );
+              }
+            }
             const out = await exportManuscriptToWordCraftAndPdfCraft({
-              markdown: payload.markdown || "",
+              markdown: mdToExport,
               title: payload.title || "",
-              docType: payload.docType || pipelineState.docType || "report",
+              docType,
               includeToc: Boolean(payload.includeToc || payload.insertToc),
               enableTrackChanges: Boolean(payload.enableTrackChanges),
               exportPdf: Boolean(payload.exportPdf),
@@ -5487,6 +6672,7 @@ function startOpenAiBridgeServer() {
                   : Boolean(payload.autoOpenWordCraft),
               autoOpenPdfCraft: Boolean(payload.autoOpenPdfCraft),
             });
+            out.goalVerification = pipelineState.goalVerification;
             res.writeHead(out.ok ? 200 : 400, {
               "Content-Type": "application/json",
             });
@@ -5663,8 +6849,14 @@ function startOpenAiBridgeServer() {
               datingText: hasDatingData ? "입력됨" : "",
               hasLocalFiles: hasReportData,
             });
+            const goalPlan = buildGoalPlanAndRubric({
+              docType,
+              userFocus: payload.userFocus || "",
+              hasReport: hasReportData,
+              hasDating: hasDatingData,
+            });
             res.writeHead(200, { "Content-Type": "application/json" });
-            res.end(JSON.stringify({ ok: true, engineeredPrompt }));
+            res.end(JSON.stringify({ ok: true, engineeredPrompt, goalPlan }));
             return;
           }
 

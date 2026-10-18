@@ -177,6 +177,13 @@ button { font: inherit; color: inherit; }
 .as-log__row.is-error .as-log__kind i { background: var(--bad); }
 .as-log__row.is-error .as-log__text, .as-log__row.is-error .as-log__kind { color: var(--bad); }
 .as-log__empty { margin: 0; padding: var(--space-10); font-size: 11.5px; color: var(--ink-muted); }
+.as-goal-box { border: 1px solid var(--line); border-radius: var(--radius-7); background: var(--input); padding: var(--space-8) var(--space-10); margin-bottom: var(--space-6); }
+.as-goal-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-6); font-size: 11.5px; font-weight: 600; color: var(--ink); margin-bottom: var(--space-6); }
+.as-goal-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 8px; list-style: none; margin: 0; padding: 0; }
+.as-goal-item { display: flex; align-items: center; justify-content: space-between; gap: 4px; font-size: 11px; color: var(--ink-muted); padding: 2px 6px; border-radius: var(--radius-4); background: var(--tab); overflow: hidden; }
+.as-goal-item.is-pass { background: var(--ok-soft); color: var(--ok); font-weight: 500; }
+.as-goal-item__name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.as-goal-item__badge { font: 600 10px var(--font-mono); flex: none; }
 
 /* A4 문서 */
 .as-page { box-sizing: border-box; width: var(--size-a4-w); min-height: var(--size-a4-h); padding: 25mm 20mm 18mm; background: var(--page); color: var(--page-ink); box-shadow: var(--shadow-page); font-family: var(--font-serif); display: flex; flex-direction: column; margin: 0 auto; outline: none; }
@@ -457,17 +464,34 @@ button { font: inherit; color: inherit; }
           </div>
         </section>
 
-        <section class="as-step" aria-label="진행 기록">
+        <section class="as-step" aria-label="진행 기록 및 /goal 교차검증">
           <div class="as-step__head">
             <span class="as-step__n">6</span>
-            <span class="as-step__title">진행 기록</span>
+            <span class="as-step__title">진행 기록 · /goal 교차검증</span>
+            <span class="as-step__aside" id="goal-score-badge"><span class="as-tag">8대 기준</span></span>
           </div>
           <div class="as-step__body">
+            <div class="as-goal-box" id="goal-scorecard-box">
+              <div class="as-goal-head">
+                <span id="goal-standard-title">문화재발굴조사보고서 『Ⅳ. 고찰』 8대 판단 기준</span>
+                <span id="goal-standard-summary" style="font:11px var(--font-mono);color:var(--ink-muted);">계획 수립됨</span>
+              </div>
+              <ul class="as-goal-grid" id="goal-criteria-grid">
+                <li class="as-goal-item"><span class="as-goal-item__name">1. DBpia 다각도 논문</span><span class="as-goal-item__badge">대기</span></li>
+                <li class="as-goal-item"><span class="as-goal-item__name">2. 필수 장·절 완결성</span><span class="as-goal-item__badge">대기</span></li>
+                <li class="as-goal-item"><span class="as-goal-item__name">3. 학술 논증·분량</span><span class="as-goal-item__badge">대기</span></li>
+                <li class="as-goal-item"><span class="as-goal-item__name">4. 정량 학술 표 2종</span><span class="as-goal-item__badge">대기</span></li>
+                <li class="as-goal-item"><span class="as-goal-item__name">5. 차트·모식도 수록</span><span class="as-goal-item__badge">대기</span></li>
+                <li class="as-goal-item"><span class="as-goal-item__name">6. 실전 각주·실저자</span><span class="as-goal-item__badge">대기</span></li>
+                <li class="as-goal-item"><span class="as-goal-item__name">7. 참고문헌 1:1 일치</span><span class="as-goal-item__badge">대기</span></li>
+                <li class="as-goal-item"><span class="as-goal-item__name">8. 원자료 정합·완결</span><span class="as-goal-item__badge">대기</span></li>
+              </ul>
+            </div>
             <div class="as-log">
               <div class="as-log__head" id="log-progress-head" style="display:none;">
                 <div class="as-progress">
                   <div class="as-progress__row">
-                    <span id="log-progress-label">본문 작성</span>
+                    <span id="log-progress-label">본문 작성 및 교차검증</span>
                     <span class="as-progress__pct" id="log-progress-pct">0%</span>
                   </div>
                   <div class="as-progress__track" role="progressbar">
@@ -476,7 +500,7 @@ button { font: inherit; color: inherit; }
                 </div>
               </div>
               <ol class="as-log__list" id="log-list" aria-live="polite">
-                <p class="as-log__empty" id="log-empty">실행하면 진행 기록이 여기에 쌓입니다.</p>
+                <p class="as-log__empty" id="log-empty">실행하면 /goal 계획·DBpia 수집·교차검증 기록이 여기에 쌓입니다.</p>
               </ol>
             </div>
           </div>
@@ -988,51 +1012,49 @@ function renderManuscriptOntoA4Page(rawMd, isRunning) {
 
   let md = String(rawMd);
 
-  // 1) 차트 및 모식도 코드블록을 A4 도면 박스로 변환
+  // 1) 차트 및 모식도 코드블록을 A4 도면 박스로 변환 (wc-chart, wc-diagram, json, 코드 스니펫 모두 지원)
   const chartBlocks = [];
-  md = md.replace(/\`\`\`wc-chart\\s*([\\s\\S]*?)\`\`\`/gi, (_, j) => {
-    try {
-      const spec = JSON.parse(j.trim());
-      const idx = chartBlocks.length;
-      const cats = (spec.data && spec.data.categories) || [];
-      const series = (spec.data && spec.data.series) || [];
-      let rowsHtml = '';
-      cats.forEach((c, cIdx) => {
-        const vals = series.map(s => (s.values && s.values[cIdx] != null ? s.values[cIdx] : '-'));
-        rowsHtml += '<tr><td>' + escapeHtml(c) + '</td>' + vals.map(v => '<td>' + escapeHtml(String(v)) + '</td>').join('') + '</tr>';
-      });
-      chartBlocks.push(
-        '<figure class="as-doc-table"><figcaption>차트. ' + escapeHtml(spec.title || '유구·유물 분포 차트') + '</figcaption>' +
-        '<table><thead><tr><th>구분</th>' + series.map(s => '<th>' + escapeHtml(s.name || '') + '</th>').join('') + '</tr></thead>' +
-        '<tbody>' + rowsHtml + '</tbody></table></figure>'
-      );
-      return '\\n@@AS_CHART_' + idx + '@@\\n';
-    } catch {
-      return '';
-    }
-  });
-
   const diagBlocks = [];
-  md = md.replace(/\`\`\`wc-diagram\\s*([\\s\\S]*?)\`\`\`/gi, (_, j) => {
+  md = md.replace(/\`\`\`([^\\n]*)\\r?\\n([\\s\\S]*?)\`\`\`/gi, (full, langRaw, j) => {
+    const lang = String(langRaw || '').trim().toLowerCase();
+    const body = String(j || '').trim();
+    if (!body.startsWith('{') || !body.endsWith('}')) return full;
     try {
-      const spec = JSON.parse(j.trim());
-      const items = Array.isArray(spec.items) ? spec.items : [];
-      const groups = [];
-      items.forEach(it => {
-        if ((it.level || 0) === 0) groups.push({ title: it.text || '', subs: [] });
-        else if (groups.length > 0) groups[groups.length - 1].subs.push(it.text || '');
-      });
-      const idx = diagBlocks.length;
-      diagBlocks.push(
-        '<div class="as-doc-diagram"><div class="as-doc-diagram__title">모식도. 단계별 유구·출토유물 변천 모식도</div>' +
-        '<div class="as-doc-diagram__steps">' +
-        groups.map(g => '<div class="as-doc-diagram__step"><strong>' + escapeHtml(g.title) + '</strong>' + escapeHtml(g.subs.join(' · ')) + '</div>').join('') +
-        '</div></div>'
-      );
-      return '\\n@@AS_DIAG_' + idx + '@@\\n';
-    } catch {
-      return '';
-    }
+      const spec = JSON.parse(body);
+      if (lang.includes('wc-chart') || (spec.data && Array.isArray(spec.data.series)) || Array.isArray(spec.series)) {
+        const idx = chartBlocks.length;
+        const cats = (spec.data && spec.data.categories) || spec.categories || [];
+        const series = (spec.data && spec.data.series) || spec.series || [];
+        let rowsHtml = '';
+        cats.forEach((c, cIdx) => {
+          const vals = series.map(s => (s.values && s.values[cIdx] != null ? s.values[cIdx] : '-'));
+          rowsHtml += '<tr><td>' + escapeHtml(c) + '</td>' + vals.map(v => '<td>' + escapeHtml(String(v)) + '</td>').join('') + '</tr>';
+        });
+        chartBlocks.push(
+          '<figure class="as-doc-table"><figcaption>차트. ' + escapeHtml(spec.title || '유구·유물 정량 분포 차트') + '</figcaption>' +
+          '<table><thead><tr><th>구분</th>' + series.map(s => '<th>' + escapeHtml(s.name || '') + '</th>').join('') + '</tr></thead>' +
+          '<tbody>' + rowsHtml + '</tbody></table></figure>'
+        );
+        return '\\n@@AS_CHART_' + idx + '@@\\n';
+      }
+      if (lang.includes('wc-diagram') || (spec.layout && Array.isArray(spec.items))) {
+        const items = Array.isArray(spec.items) ? spec.items : [];
+        const groups = [];
+        items.forEach(it => {
+          if ((it.level || 0) === 0) groups.push({ title: it.text || '', subs: [] });
+          else if (groups.length > 0) groups[groups.length - 1].subs.push(it.text || '');
+        });
+        const idx = diagBlocks.length;
+        diagBlocks.push(
+          '<div class="as-doc-diagram"><div class="as-doc-diagram__title">모식도. 단계별 유구·출토유물 및 논증 구조 모식도</div>' +
+          '<div class="as-doc-diagram__steps">' +
+          groups.map(g => '<div class="as-doc-diagram__step"><strong>' + escapeHtml(g.title) + '</strong>' + escapeHtml(g.subs.join(' · ')) + '</div>').join('') +
+          '</div></div>'
+        );
+        return '\\n@@AS_DIAG_' + idx + '@@\\n';
+      }
+    } catch {}
+    return full;
   });
 
   // 2) 【각주】 추출하여 페이지 하단 각주(footnotes)로 분리
@@ -1040,13 +1062,20 @@ function renderManuscriptOntoA4Page(rawMd, isRunning) {
   const fnMatch = fnRegex.exec(md);
   const footnotes = [];
   if (fnMatch && fnMatch[1]) {
+    let autoNum = 0;
     fnMatch[1].split(/\\r?\\n/).forEach(rawLine => {
       const l = rawLine.trim().replace(/^[-*•]\\s*/, '').replace(/^\\*{1,2}|\\*{1,2}$/g, '');
       const m = /^(?:\\[\\^?(\\d+)\\]:?|\\(?(\\d+)\\)|(\\d+)\\.)\\s*(.+)$/.exec(l);
       if (m) {
         const n = Number(m[1] || m[2] || m[3]);
         const txt = (m[4] || '').trim().replace(/^\\d+\\)\\s*/, '');
-        if (n > 0 && txt) footnotes.push({ n, text: txt });
+        if (n > 0 && txt) {
+          autoNum = Math.max(autoNum, n);
+          footnotes.push({ n, text: txt });
+        }
+      } else if (l.length > 10 && (l.includes('「') || l.includes('『'))) {
+        autoNum++;
+        footnotes.push({ n: autoNum, text: l });
       }
     });
     md = md.slice(0, fnMatch.index) + '\\n' + md.slice(fnMatch.index + fnMatch[0].length);
@@ -1167,13 +1196,25 @@ function classifyLogEntry(rawLine) {
   const text = (timeMatch ? timeMatch[2] : s).replace(/^\\[[A-Z_]+\\]\\s*/, '');
   let kind = 'write';
   if (/DBpia|수집|논문|검색/i.test(text)) kind = 'collect';
-  else if (/완료|끝|완성/i.test(text)) kind = 'done';
+  else if (/교차검증|\\\/goal|판단\\s*기준/i.test(text)) kind = 'warn';
+  else if (/완료|끝|완성|통과/i.test(text)) kind = 'done';
   else if (/오류|실패|중단/i.test(text)) kind = 'error';
   else if (/참고|비어|제외/i.test(text)) kind = 'note';
   return { time, kind, text };
 }
 
-const LOG_LABELS = { collect: '수집', write: '작성', note: '알림', warn: '확인', error: '오류', done: '완료' };
+const LOG_LABELS = { collect: '수집', write: '작성', note: '알림', warn: '검증', error: '오류', done: '완료' };
+
+const SHORT_CRITERIA_NAMES = [
+  '1. DBpia 다각도 논문',
+  '2. 필수 장·절 완결성',
+  '3. 학술 논증·분량',
+  '4. 정량 학술 표 2종',
+  '5. 차트·모식도 수록',
+  '6. 실전 각주·실저자',
+  '7. 참고문헌 1:1 일치',
+  '8. 원자료 정합·완결'
+];
 
 async function pollStatus() {
   try {
@@ -1185,6 +1226,46 @@ async function pollStatus() {
     const done = !running && p.phase === 'COMPLETED';
     const pct = Math.min(100, Math.max(0, Number(p.progressPct || 0)));
     const papersCount = Array.isArray(p.collectedPapers) ? p.collectedPapers.length : 0;
+
+    // 0) /goal 8대 판단 기준 및 교차검증 스코어카드 업데이트
+    const gv = p.goalVerification || null;
+    const gp = p.goalPlan || null;
+    const goalTitleEl = document.getElementById('goal-standard-title');
+    const goalSummaryEl = document.getElementById('goal-standard-summary');
+    const goalBadgeEl = document.getElementById('goal-score-badge');
+    const goalGridEl = document.getElementById('goal-criteria-grid');
+
+    if (goalTitleEl) {
+      goalTitleEl.textContent = (currentDocType === 'paper' || (gp && gp.docType === 'paper'))
+        ? '석사학위 논문 이상·『한국고고학보』 8대 판단 기준'
+        : '문화재발굴조사보고서 『Ⅳ. 고찰』 8대 판단 기준';
+    }
+
+    const criteriaList = (gv && Array.isArray(gv.criteriaResults))
+      ? gv.criteriaResults
+      : (gp && Array.isArray(gp.criteria) ? gp.criteria : null);
+
+    if (gv && goalSummaryEl && goalBadgeEl) {
+      goalSummaryEl.textContent = gv.passedCount + '/' + gv.totalCriteria + ' 충족 (' + gv.score + '점)';
+      goalBadgeEl.innerHTML = gv.passed
+        ? '<span class="as-tag as-tag--ok">교차검증 ' + gv.passedCount + '/8 통과</span>'
+        : '<span class="as-tag as-tag--warn">교차검증 ' + gv.passedCount + '/8 (' + gv.score + '점)</span>';
+    } else if (running && goalSummaryEl && goalBadgeEl) {
+      goalSummaryEl.textContent = '실시간 교차검증 진행 중';
+      goalBadgeEl.innerHTML = '<span class="as-tag as-tag--brass">검증 루프 활성</span>';
+    }
+
+    if (goalGridEl && criteriaList && criteriaList.length > 0) {
+      goalGridEl.innerHTML = criteriaList.map((c, idx) => {
+        const shortName = SHORT_CRITERIA_NAMES[idx] || c.title;
+        const isPass = Boolean(c.passed);
+        const badgeTxt = isPass ? '✓ 충족' : (running ? '검증중' : (gv ? '보완' : '대기'));
+        return '<li class="as-goal-item ' + (isPass ? 'is-pass' : '') + '" title="' + escapeHtml((c.title || '') + ' — ' + (c.actual || c.target || '')) + '">' +
+          '<span class="as-goal-item__name">' + escapeHtml(shortName) + '</span>' +
+          '<span class="as-goal-item__badge">' + escapeHtml(badgeTxt) + '</span>' +
+        '</li>';
+      }).join('');
+    }
 
     // 1) 문서 종류 잠금 (작성 중에는 잠김)
     document.getElementById('seg-report').disabled = running;
@@ -1202,9 +1283,9 @@ async function pollStatus() {
     if (running) {
       ctlRow.style.display = 'flex';
       if (currentDocType === 'report') {
-        lblReport.textContent = paused ? '잠시 멈춤' : '작성 중…';
+        lblReport.textContent = paused ? '잠시 멈춤' : '교차검증·작성 중…';
       } else {
-        lblPaper.textContent = paused ? '잠시 멈춤' : '작성 중…';
+        lblPaper.textContent = paused ? '잠시 멈춤' : '교차검증·작성 중…';
       }
       document.getElementById('btn-pause-label').textContent = paused ? '이어서' : '잠시 멈춤';
     } else {
@@ -1218,7 +1299,7 @@ async function pollStatus() {
     const exportBtn = document.getElementById('btn-export-pdf');
     if (done) {
       const nowHm = new Date().toLocaleTimeString('ko-KR', { hour12: false, hour: '2-digit', minute: '2-digit' });
-      doneTagEl.innerHTML = '<span class="as-tag as-tag--ok">작성 끝 · ' + nowHm + '</span>';
+      doneTagEl.innerHTML = '<span class="as-tag as-tag--ok">교차검증 완료 · ' + nowHm + '</span>';
       exportBtn.className = 'as-btn as-btn--default';
     } else if (running) {
       doneTagEl.innerHTML = '';
@@ -1264,22 +1345,23 @@ async function pollStatus() {
     // 5) 수집 띠 (CollectStrip)
     const collectLeft = document.getElementById('collect-left');
     const collectRightTime = document.getElementById('collect-right-time');
+    const scoreBadgeText = gv ? (' · 교차검증 ' + gv.passedCount + '/8 (' + gv.score + '점)') : '';
     if (!running && !done && !liveMd) {
-      collectLeft.innerHTML = '<i class="as-collect__dot is-hollow"></i><span>실행 전</span>';
+      collectLeft.innerHTML = '<i class="as-collect__dot is-hollow"></i><span>실행 전 (/goal 8대 판단 기준 대기)</span>';
     } else if (done) {
       collectLeft.innerHTML =
-        '<span class="as-collect__item"><i class="as-collect__dot is-ok"></i>DBpia 논문 수집 끝</span>' +
-        '<span class="as-collect__num" style="margin-left:8px;">' + papersCount + '건</span>' +
-        '<span class="as-collect__item" style="margin-left:12px;">본문 작성 끝</span>' +
-        '<span class="as-collect__num" style="margin-left:8px;">각주 ' + fnCount + ' · 참고문헌 ' + refCount + '</span>';
+        '<span class="as-collect__item"><i class="as-collect__dot is-ok"></i>DBpia 다각도 수집</span>' +
+        '<span class="as-collect__num" style="margin-left:6px;">' + papersCount + '편</span>' +
+        '<span class="as-collect__item" style="margin-left:10px;">교차검증 완료</span>' +
+        '<span class="as-collect__num" style="margin-left:6px;">각주 ' + fnCount + ' · 참고문헌 ' + refCount + scoreBadgeText + '</span>';
       collectRightTime.textContent = 'WordCraft .docx 자동 저장됨';
     } else {
       collectLeft.innerHTML =
-        '<span class="as-collect__item"><i class="as-collect__dot"></i>DBpia 논문 수집 중</span>' +
-        '<span class="as-collect__num" style="margin-left:8px;">' + papersCount + '건</span>' +
-        '<span class="as-collect__item" style="margin-left:12px;"><span class="as-collect__mini"><span style="width:' + pct + '%"></span></span>' +
-        (paused ? '잠시 멈춤 ' : '본문 작성 ') + pct + '%</span>';
-      collectRightTime.textContent = '실시간 작성 중';
+        '<span class="as-collect__item"><i class="as-collect__dot"></i>DBpia 다각도 수집</span>' +
+        '<span class="as-collect__num" style="margin-left:6px;">' + papersCount + '편</span>' +
+        '<span class="as-collect__item" style="margin-left:10px;"><span class="as-collect__mini"><span style="width:' + pct + '%"></span></span>' +
+        (paused ? '잠시 멈춤 ' : '교차검증·작성 ') + pct + '%' + scoreBadgeText + '</span>';
+      collectRightTime.textContent = '실시간 교차검증 중';
     }
 
     // 6) 상태줄 (StatusBar)
@@ -1287,11 +1369,11 @@ async function pollStatus() {
     if (!document.getElementById('scrim-dbpia').classList.contains('is-open') &&
         !document.getElementById('scrim-export').classList.contains('is-open')) {
       if (running) {
-        hintEl.textContent = '제미나이가 ' + (currentDocType === 'paper' ? '논문' : '『Ⅳ. 고찰』') + ' 본문을 쓰고 있습니다. 쓰는 동안에도 문서를 고칠 수 있습니다.';
+        hintEl.textContent = '[/goal 루프] DBpia 다각도 서지 검증 및 제미나이 8대 기준 교차검증이 진행 중입니다.';
       } else if (done) {
-        hintEl.textContent = '작성이 끝났습니다. 바로 고칠 수 있고, 필요하면 PDF로 내보내세요.';
+        hintEl.textContent = '8대 기준 교차검증 및 WordCraft(.docx) 생성이 완료되었습니다. 바로 편집하거나 PDF로 내보내세요.';
       } else {
-        hintEl.textContent = '요청과 자료를 넣고 실행하세요. 비워 둔 자료는 빼고 씁니다.';
+        hintEl.textContent = '요청과 자료를 넣고 실행하면 8대 기준 계획 수립 ➔ DBpia 다각도 수집 ➔ 교차검증 루프가 실행됩니다.';
       }
     }
 
