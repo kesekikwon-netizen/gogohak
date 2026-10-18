@@ -1,0 +1,16 @@
+<!-- @dsCard group="스튜디오 패널" height=258 -->
+<!doctype html>
+<html lang="ko">
+<head><meta charset="utf-8"><title>PromptField — 미리보기</title></head>
+<body>
+<div id="root"></div>
+<script>
+  var Q = window.ArchaeoStudio, h = React.createElement;
+  ReactDOM.createRoot(document.getElementById('root')).render(
+    h('div', {style:{width:392,background:'var(--bg)'}}, h(Q.StudioStep, {n:2, title:'요청'},
+      h(Q.PromptField, {defaultValue:'기안동 유적 원삼국~백제 한성기 주거지의 구조와 편년을 정리해 줘', showProcessed:true,
+        processed:'[발굴조사보고서 Ⅳ. 고찰] 1. 유구 구조와 편년적 위치 2. 출토유물 검토 3. 유적의 성격 · 서지: 저자, 연도, 「제목」, 『학술지』 권호, 쪽 · 입력되지 않은 분석 자료는 쓰지 않음'})))
+  );
+</script>
+</body>
+</html>

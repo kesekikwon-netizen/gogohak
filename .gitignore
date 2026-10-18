@@ -1,0 +1,5 @@
+output/
+uploads/
+bin/test_out/
+*.tmp
+*.log

@@ -1,0 +1,14 @@
+<!-- @dsCard group="스튜디오 패널" height=96 -->
+<!doctype html>
+<html lang="ko">
+<head><meta charset="utf-8"><title>ProgressBar — 미리보기</title></head>
+<body>
+<div id="root"></div>
+<script>
+  var Q = window.ArchaeoStudio, h = React.createElement;
+  ReactDOM.createRoot(document.getElementById('root')).render(
+    h('div', {className:'as-demo as-demo--col', style:{width:360}}, h(Q.ProgressBar, {value:62, label:'본문 작성'}), h(Q.ProgressBar, {value:100, label:'본문 작성', done:true}))
+  );
+</script>
+</body>
+</html>

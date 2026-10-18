@@ -1,0 +1,17 @@
+<!-- @dsCard group="화면 틀" height=120 width=960 -->
+<!doctype html>
+<html lang="ko">
+<head><meta charset="utf-8"><title>CollectStrip — 미리보기</title></head>
+<body>
+<div id="root"></div>
+<script>
+  var Q = window.ArchaeoStudio, h = React.createElement;
+  ReactDOM.createRoot(document.getElementById('root')).render(
+    h('div', {style:{width:960,display:'flex',flexDirection:'column',gap:8,background:'var(--canvas)',padding:'8px 0'}},
+      h(Q.CollectStrip, {state:'idle', idleText:'실행 전 · 디비피아 로그인 필요', right:'저장됨 14:20'}),
+      h(Q.CollectStrip, {state:'running', found:12, progress:62, right:'자동 저장 14:32'}),
+      h(Q.CollectStrip, {state:'done', found:18, footnotes:14, refs:12, right:'자동 저장 14:40'}))
+  );
+</script>
+</body>
+</html>

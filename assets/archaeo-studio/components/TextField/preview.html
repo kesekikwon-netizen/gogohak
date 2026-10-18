@@ -1,0 +1,17 @@
+<!-- @dsCard group="기본" height=186 -->
+<!doctype html>
+<html lang="ko">
+<head><meta charset="utf-8"><title>TextField — 미리보기</title></head>
+<body>
+<div id="root"></div>
+<script>
+  var Q = window.ArchaeoStudio, h = React.createElement;
+  ReactDOM.createRoot(document.getElementById('root')).render(
+    h('div', {className:'as-demo as-demo--col', style:{width:360}},
+      h(Q.TextField, {defaultValue:'기안동 유적 Ⅳ 고찰.pdf'}),
+      h(Q.TextField, {placeholder:'AMS 연대, 자연과학분석, 실측치 등'}),
+      h(Q.TextField, {multiline:true, rows:3, placeholder:'보고서 초안, 유구·유물 설명, 수치표를 붙여 넣으세요'}))
+  );
+</script>
+</body>
+</html>

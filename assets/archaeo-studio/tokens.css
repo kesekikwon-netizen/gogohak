@@ -1,0 +1,21 @@
+/* ARCHAEO STUDIO — generated from tokens.json */
+:root, [data-theme="light"] { --bg: #FAF9F5; --tab: #F0EEE6; --input: #FFFFFF; --scrim: rgba(20,20,19,.28); --hover: #E8E6DC; --oat: #E3DACC; --canvas: #ECEAE2; --page: #FFFFFF; --line: #DEDCD1; --line-soft: #EEECE5; --line-strong: #C2C0B6; --ink: #141413; --ink-muted: #5E5D59; --ink-faint: #87867F; --ink-disabled: #9A988F; --icon: #30302E; --page-ink: #141413; --page-ink-muted: #5E5D59; --clay: #B5573A; --clay-deep: #9C4A2F; --on-clay: #FFFFFF; --on-ink: #FFFFFF; --ok: #3F6B31; --ok-soft: #E6EDDF; --warn: #7A5A00; --warn-soft: #F7EFD6; --bad: #A33B3B; --bad-soft: #F5E3DF; --brass: #9A7B38; --brass-soft: #F3EDDD; --progress: #2E6B4E; --shadow-page: 0 1px 3px rgba(0,0,0,.18); --shadow-menu: 0 4px 14px rgba(0,0,0,.14); --focus-ring: 0 0 0 2px #FAF9F5, 0 0 0 4px #B5573A; }
+[data-theme="dark"] { --bg: #1E1D1A; --tab: #2D2B27; --input: #262521; --scrim: rgba(0,0,0,.5); --hover: #33312C; --oat: #4A4235; --canvas: #161513; --page: #FFFFFF; --line: #3D3B36; --line-soft: #2F2D29; --line-strong: #55524B; --ink: #EEECE5; --ink-muted: #B4B1A8; --ink-faint: #8D8A82; --ink-disabled: #6F6C65; --icon: #D9D6CE; --page-ink: #141413; --page-ink-muted: #5E5D59; --clay: #E08A6A; --clay-deep: #E8A487; --on-clay: #1E1D1A; --on-ink: #1E1D1A; --ok: #9DC48A; --ok-soft: #27331F; --warn: #E3C26A; --warn-soft: #3A3220; --bad: #E58C80; --bad-soft: #3E2622; --brass: #C9A85E; --brass-soft: #3A3222; --progress: #6FB592; --shadow-page: 0 1px 3px rgba(0,0,0,.6); --shadow-menu: 0 4px 14px rgba(0,0,0,.55); --focus-ring: 0 0 0 2px #1E1D1A, 0 0 0 4px #E08A6A; }
+:root { --space-2: 2px; --space-4: 4px; --space-6: 6px; --space-8: 8px; --space-10: 10px; --space-12: 12px; --space-14: 14px; --space-16: 16px; --radius-4: 4px; --radius-6: 6px; --radius-7: 7px; --radius-8: 8px; --radius-9: 9px; --radius-10: 10px; --radius-full: 999px; --size-title-bar: 32px; --size-ribbon: 86px; --size-status-bar: 28px; --size-panel-header: 36px; --size-control: 28px; --size-search: 32px; --size-tile: 58px; --size-tile-icon-w: 46px; --size-tile-icon-h: 40px; --size-studio-panel-min: 360px; --size-studio-panel: 392px; --size-studio-panel-max: 420px; --size-a4-w: 210mm; --size-a4-h: 297mm; --font-sans: "Noto Sans KR", "Malgun Gothic", "Source Sans 3", system-ui, sans-serif; --font-serif: Batang, "바탕", "Noto Serif KR", "Malgun Gothic", serif; --font-mono: "IBM Plex Mono", ui-monospace, Consolas, monospace; }
+.ui-title { font-family: var(--font-sans); font-size: 13.5px; line-height: 1.3; font-weight: 600; }
+.ui-body { font-family: var(--font-sans); font-size: 13px; line-height: 1.3; font-weight: 400; }
+.ui-row { font-family: var(--font-sans); font-size: 12.5px; line-height: 1.3; font-weight: 400; }
+.ui-control { font-family: var(--font-sans); font-size: 12px; line-height: 1.3; font-weight: 400; }
+.ui-chip { font-family: var(--font-sans); font-size: 11.5px; line-height: 1.3; font-weight: 400; }
+.ui-caption { font-family: var(--font-sans); font-size: 11px; line-height: 1.3; font-weight: 400; }
+.ui-micro { font-family: var(--font-sans); font-size: 10.5px; line-height: 1.3; font-weight: 400; }
+.num-status { font-family: var(--font-mono); font-size: 11.5px; line-height: 1.3; font-weight: 400; }
+.num-small { font-family: var(--font-mono); font-size: 10.5px; line-height: 1.3; font-weight: 400; }
+.doc-title { font-family: var(--font-serif); font-size: 24px; line-height: 1.4; font-weight: 700; }
+.doc-chapter { font-family: var(--font-serif); font-size: 21.33px; line-height: 1.4; font-weight: 700; }
+.doc-section { font-family: var(--font-serif); font-size: 16px; line-height: 1.5; font-weight: 700; }
+.doc-body { font-family: var(--font-serif); font-size: 13.33px; line-height: 1.7; font-weight: 400; }
+.doc-table { font-family: var(--font-serif); font-size: 12px; line-height: 1.4; font-weight: 400; }
+.doc-abstract { font-family: var(--font-serif); font-size: 12px; line-height: 1.6; font-weight: 400; }
+.doc-reference { font-family: var(--font-serif); font-size: 12px; line-height: 1.6; font-weight: 400; }
+.doc-footnote { font-family: var(--font-serif); font-size: 10.67px; line-height: 1.5; font-weight: 400; }

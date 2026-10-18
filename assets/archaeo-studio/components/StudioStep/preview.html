@@ -1,0 +1,14 @@
+<!-- @dsCard group="스튜디오 패널" height=130 -->
+<!doctype html>
+<html lang="ko">
+<head><meta charset="utf-8"><title>StudioStep — 미리보기</title></head>
+<body>
+<div id="root"></div>
+<script>
+  var Q = window.ArchaeoStudio, h = React.createElement;
+  ReactDOM.createRoot(document.getElementById('root')).render(
+    h('div', {style:{width:392,background:'var(--bg)'}}, h(Q.StudioStep, {n:1, title:'문서 종류'}, h(Q.Segmented, {size:'lg', label:'문서 종류', options:[{id:'report',label:'발굴조사보고서 고찰'},{id:'paper',label:'논문'}]})))
+  );
+</script>
+</body>
+</html>

@@ -1,0 +1,14 @@
+<!-- @dsCard group="기본" height=64 -->
+<!doctype html>
+<html lang="ko">
+<head><meta charset="utf-8"><title>Chip — 미리보기</title></head>
+<body>
+<div id="root"></div>
+<script>
+  var Q = window.ArchaeoStudio, h = React.createElement;
+  ReactDOM.createRoot(document.getElementById('root')).render(
+    h('div', {className:'as-demo'}, h(Q.ChipGroup, {label:'내보낸 뒤', options:['PDF 열기','폴더만 열기','아무것도 안 함']}))
+  );
+</script>
+</body>
+</html>

@@ -1,0 +1,54 @@
+<!-- @dsCard height=288 -->
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>ARCHAEO STUDIO</title>
+<style>
+  html, body { margin: 0; height: 100%; }
+  body { background: var(--bg); color: var(--ink); font-family: var(--font-sans); overflow: hidden; }
+  .cover { position: relative; width: 960px; height: 288px; overflow: hidden; }
+  .art { position: absolute; top: 0; left: 480px; width: 480px; height: 288px; overflow: hidden; }
+  .art svg { display: block; width: 480px; height: 288px; }
+  .clay { fill: var(--clay); }
+  .oat { fill: var(--oat); }
+  .ink { fill: var(--ink); }
+  .brass { fill: var(--brass); }
+  .sage { fill: var(--progress); }
+  .blk { rx: var(--radius-9); }
+  .pill { rx: var(--radius-8); }
+  .rule { fill: none; stroke: var(--bg); stroke-width: 1.5; }
+  .words { position: absolute; left: calc(var(--space-16) + var(--space-8)); bottom: calc(var(--space-16) + var(--space-8)); max-width: 440px; }
+  .name { margin: 0; font-size: 92px; line-height: .95; font-weight: 600; letter-spacing: -.01em; color: var(--ink); }
+  .tag { margin: var(--space-12) 0 0 4px; font-size: 14px; line-height: 20px; color: var(--ink-muted); }
+</style>
+</head>
+<body>
+<div class="cover">
+<div class="art" aria-hidden="true">
+<svg viewBox="0 0 480 288" width="480" height="288">
+<!--
+  blocks      clay 136×256 bled off the top (the run button, the one accent) · oat 128×160 (the chosen tint) · ink 184×200 bleeding off the right (page ink) · brass 64×16 pill (DBpia) · progress 48×16 pill (writing) — ≈34% of 960×288
+  arrangement one tall clay slab with satellites, bottoms on one line at y=240, space-16 gutters; the two pills a space-16 step below, side by side
+  pattern     a baseline grid: four ground-coloured hairlines at a space-16 pitch cut across the blocks like ruled manuscript lines, plus one short footnote rule (a third of the ink block) — from the A4 page with its footnote separator and "선이 칸을 나누고, 그림자는 떠 있는 것에만"
+  scales      sides in space-8 multiples; gutters and line pitch space-16; corners radius-9, pills rx radius-8 (half of 16); rules 1.5px
+-->
+<rect class="clay blk" x="16" y="-16" width="136" height="256" rx="9"/>
+<rect class="oat blk" x="168" y="80" width="128" height="160" rx="9"/>
+<rect class="ink blk" x="312" y="40" width="184" height="200" rx="9"/>
+<rect class="brass pill" x="168" y="256" width="64" height="16" rx="8"/>
+<rect class="sage pill" x="248" y="256" width="48" height="16" rx="8"/>
+<path class="rule" d="M0 136 H480"/>
+<path class="rule" d="M0 152 H480"/>
+<path class="rule" d="M0 168 H480"/>
+<path class="rule" d="M0 184 H480"/>
+<path class="rule" d="M328 216 H392"/>
+</svg>
+</div>
+<div class="words">
+<h1 class="name">ARCHAEO<br>STUDIO</h1>
+<p class="tag">고고학 『고찰』과 학술논문을 A4 위에서 바로 쓰는 작업실.</p>
+</div>
+</div>
+</body>
+</html>

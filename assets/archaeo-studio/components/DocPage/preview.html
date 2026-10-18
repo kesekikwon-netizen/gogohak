@@ -1,0 +1,22 @@
+<!-- @dsCard group="A4 문서" height=1180 width=860 -->
+<!doctype html>
+<html lang="ko">
+<head><meta charset="utf-8"><title>DocPage — 미리보기</title></head>
+<body>
+<div id="root"></div>
+<script>
+  var Q = window.ArchaeoStudio, h = React.createElement;
+  ReactDOM.createRoot(document.getElementById('root')).render(
+    h('div', {style:{background:'var(--canvas)',padding:'24px 0'}},
+      h(Q.DocPage, {pageNumber:87, footnotes:[{text:'김고고, 2023, 「경기 남부 원삼국시대 주거지 구조 연구」, 『한국고고학보』 128, 한국고고학회, 45~48쪽.'},{text:'박발굴, 2021, 「한성기 백제 주거지의 부뚜막 구조」, 『고고학』 20-2, 중부고고학회, 112~115쪽.'}]},
+        h(Q.DocChapter, null, 'Ⅳ. 고  찰'),
+        h(Q.DocSection, null, '1. 유구 구조와 편년적 위치'),
+        h(Q.DocPara, null, '기안동 유적에서 확인된 원삼국~백제 한성기 주거지는 평면 방형계를 유지하며 부뚜막과 외줄구들을 갖춘 구조가 중심을 이룬다', h(Q.FootnoteRef,{n:1}), '. 1호 주거지는 장축 4.8m, 단축 4.2m 규모로 경기 남부 일대 같은 시기 주거지의 평균 범위에 든다.'),
+        h(Q.DocPara, null, '부뚜막은 북벽 가운데에 설치되었고 연도부는 벽 밖으로 길게 빠지는데, 이러한 배치는 한성기 백제 주거지에서 널리 확인된다', h(Q.FootnoteRef,{n:2}), '.'),
+        h(Q.DocTable, {caption:'표 1. 기안동 유적 주거지 속성', columns:['유구','평면형태','규모(m)','출토유물'], rows:[['1호','방형','4.8×4.2','타날문단경호'],['2호','방형','5.1×4.6','경질무문토기'],['3호','말각방형','4.4×4.0','시루편']]}),
+        h(Q.DocPara, {live:true}, '출토유물의 구성으로 보아 이들 주거지는 대체로 3세기 후반에서 4세기 전반에 걸쳐 조성된 것으로 판단되며'),
+        h(Q.References, {items:['김고고, 2023, 「경기 남부 원삼국시대 주거지 구조 연구」, 『한국고고학보』 128, 한국고고학회.','박발굴, 2021, 「한성기 백제 주거지의 부뚜막 구조」, 『고고학』 20-2, 중부고고학회.']})))
+  );
+</script>
+</body>
+</html>

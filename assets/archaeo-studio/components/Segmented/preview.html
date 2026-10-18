@@ -1,0 +1,16 @@
+<!-- @dsCard group="기본" height=148 -->
+<!doctype html>
+<html lang="ko">
+<head><meta charset="utf-8"><title>Segmented — 미리보기</title></head>
+<body>
+<div id="root"></div>
+<script>
+  var Q = window.ArchaeoStudio, h = React.createElement;
+  ReactDOM.createRoot(document.getElementById('root')).render(
+    h('div', {className:'as-demo as-demo--col', style:{width:360}},
+      h(Q.Segmented, {size:'lg', label:'문서 종류', options:[{id:'report',label:'발굴조사보고서 고찰'},{id:'paper',label:'논문'}]}),
+      h(Q.Segmented, {size:'lg', label:'문서 종류 (작성 중)', disabled:true, defaultValue:'report', options:[{id:'report',label:'발굴조사보고서 고찰'},{id:'paper',label:'논문'}]}))
+  );
+</script>
+</body>
+</html>

@@ -1,0 +1,14 @@
+<!-- @dsCard group="스튜디오 패널" height=392 -->
+<!doctype html>
+<html lang="ko">
+<head><meta charset="utf-8"><title>DbpiaWindow — 미리보기</title></head>
+<body>
+<div id="root"></div>
+<script>
+  var Q = window.ArchaeoStudio, h = React.createElement;
+  ReactDOM.createRoot(document.getElementById('root')).render(
+    h('div', {className:'as-demo', style:{background:'var(--canvas)'}}, h(Q.DbpiaWindow, {loggedIn:false, address:'DBpia'}))
+  );
+</script>
+</body>
+</html>

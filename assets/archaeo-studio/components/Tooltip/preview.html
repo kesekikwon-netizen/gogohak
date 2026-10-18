@@ -1,0 +1,14 @@
+<!-- @dsCard group="기본" height=64 -->
+<!doctype html>
+<html lang="ko">
+<head><meta charset="utf-8"><title>Tooltip — 미리보기</title></head>
+<body>
+<div id="root"></div>
+<script>
+  var Q = window.ArchaeoStudio, h = React.createElement;
+  ReactDOM.createRoot(document.getElementById('root')).render(
+    h('div', {className:'as-demo'}, h(Q.Tooltip, null, '스튜디오 패널 열고 닫기'), h(Q.Tooltip, null, '각주 1) · 김고고 2023, 45~48쪽'))
+  );
+</script>
+</body>
+</html>

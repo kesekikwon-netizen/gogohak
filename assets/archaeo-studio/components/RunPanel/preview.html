@@ -1,0 +1,17 @@
+<!-- @dsCard group="스튜디오 패널" height=236 width=1200 -->
+<!doctype html>
+<html lang="ko">
+<head><meta charset="utf-8"><title>RunPanel — 미리보기</title></head>
+<body>
+<div id="root"></div>
+<script>
+  var Q = window.ArchaeoStudio, h = React.createElement;
+  ReactDOM.createRoot(document.getElementById('root')).render(
+    h('div', {className:'as-demo', style:{padding:0,gap:0}},
+      h('div', {style:{width:392,background:'var(--bg)'}}, h(Q.StudioStep, {n:5, title:'실행'}, h(Q.RunPanel, {mode:'report'}))),
+      h('div', {style:{width:392,background:'var(--bg)',borderLeft:'1px solid var(--line)'}}, h(Q.StudioStep, {n:5, title:'실행'}, h(Q.RunPanel, {mode:'report', state:'running', loggedIn:true}))),
+      h('div', {style:{width:392,background:'var(--bg)',borderLeft:'1px solid var(--line)'}}, h(Q.StudioStep, {n:5, title:'실행', aside:h(Q.Tag,{tone:'ok'},'작성 끝 · 14:40')}, h(Q.RunPanel, {mode:'report', state:'done', loggedIn:true}))))
+  );
+</script>
+</body>
+</html>

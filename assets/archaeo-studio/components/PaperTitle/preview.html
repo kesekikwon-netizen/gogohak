@@ -1,0 +1,16 @@
+<!-- @dsCard group="A4 문서" height=470 width=860 -->
+<!doctype html>
+<html lang="ko">
+<head><meta charset="utf-8"><title>PaperTitle — 미리보기</title></head>
+<body>
+<div id="root"></div>
+<script>
+  var Q = window.ArchaeoStudio, h = React.createElement;
+  ReactDOM.createRoot(document.getElementById('root')).render(
+    h('div', {style:{background:'var(--canvas)',padding:'24px 0'}}, h('div', {className:'as-page', style:{minHeight:0}},
+      h(Q.PaperTitle, {title:'기안동 유적 원삼국~한성기 주거지의 구조와 편년', author:'홍길동 (○○문화유산연구원)', abstract:'이 글은 기안동 유적에서 조사된 원삼국~백제 한성기 주거지의 평면 형태와 부뚜막 구조를 정리하고, 출토유물과 선행 연구를 바탕으로 그 편년적 위치를 검토하였다. 연대분석 자료가 없어 절대연대는 다루지 않았다.', keywords:['원삼국','한성기','주거지','부뚜막','편년']}),
+      h(Q.DocChapter, null, 'Ⅰ. 머리말')))
+  );
+</script>
+</body>
+</html>

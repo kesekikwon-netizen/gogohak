@@ -1,0 +1,18 @@
+<!-- @dsCard group="기본" height=192 -->
+<!doctype html>
+<html lang="ko">
+<head><meta charset="utf-8"><title>Button — 미리보기</title></head>
+<body>
+<div id="root"></div>
+<script>
+  var Q = window.ArchaeoStudio, h = React.createElement;
+  ReactDOM.createRoot(document.getElementById('root')).render(
+    h('div', {className:'as-demo as-demo--col', style:{width:360}},
+      h('div', {style:{display:'flex',gap:8,flexWrap:'wrap'}},
+        h(Q.Button, {icon:'open'}, '파일 불러오기'), h(Q.Button, {variant:'quiet', icon:'export'}, 'PDF로 내보내기'), h(Q.Button, {variant:'strong'}, '내보내기'), h(Q.Button, {disabled:true}, '누를 수 없음')),
+      h(Q.Button, {variant:'accent', size:'lg', block:true, icon:'run'}, '발굴조사보고서 고찰 실행'),
+      h(Q.Button, {size:'lg', block:true, icon:'run'}, '논문 실행'))
+  );
+</script>
+</body>
+</html>

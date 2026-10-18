@@ -1,0 +1,16 @@
+<!-- @dsCard group="기본" height=64 -->
+<!doctype html>
+<html lang="ko">
+<head><meta charset="utf-8"><title>Tag — 미리보기</title></head>
+<body>
+<div id="root"></div>
+<script>
+  var Q = window.ArchaeoStudio, h = React.createElement;
+  ReactDOM.createRoot(document.getElementById('root')).render(
+    h('div', {className:'as-demo'},
+      h(Q.Tag, {tone:'new'}, '1차 가공'), h(Q.Tag, {tone:'neutral'}, '비워 둠'), h(Q.Tag, {tone:'neutral'}, '선택'), h(Q.Tag, {tone:'brass'}, '로그인됨'),
+      h(Q.Tag, {tone:'brass'}, 'KCI 등재'), h(Q.Tag, {tone:'ok'}, '작성 끝 · 14:40'), h(Q.Tag, {tone:'warn'}, '원문 못 엶'), h(Q.Tag, {tone:'bad'}, '실패'))
+  );
+</script>
+</body>
+</html>

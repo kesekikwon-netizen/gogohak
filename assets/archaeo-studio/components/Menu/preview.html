@@ -1,0 +1,16 @@
+<!-- @dsCard group="기본" height=250 -->
+<!doctype html>
+<html lang="ko">
+<head><meta charset="utf-8"><title>Menu — 미리보기</title></head>
+<body>
+<div id="root"></div>
+<script>
+  var Q = window.ArchaeoStudio, h = React.createElement;
+  ReactDOM.createRoot(document.getElementById('root')).render(
+    h('div', {className:'as-demo'}, h(Q.Menu, {width:260, items:[
+      {label:'각주 1)로 가기'}, {label:'출처 논문 정보 보기', on:true}, {label:'참고문헌에서 찾기'}, {separator:true},
+      {label:'잘라내기', shortcut:'Ctrl X'}, {label:'복사', shortcut:'Ctrl C'}, {label:'붙여넣기', shortcut:'Ctrl V'}]}))
+  );
+</script>
+</body>
+</html>

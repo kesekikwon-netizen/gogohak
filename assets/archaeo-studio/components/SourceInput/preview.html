@@ -1,0 +1,16 @@
+<!-- @dsCard group="스튜디오 패널" height=420 -->
+<!doctype html>
+<html lang="ko">
+<head><meta charset="utf-8"><title>SourceInput — 미리보기</title></head>
+<body>
+<div id="root"></div>
+<script>
+  var Q = window.ArchaeoStudio, h = React.createElement;
+  ReactDOM.createRoot(document.getElementById('root')).render(
+    h('div', {style:{width:392,background:'var(--bg)'}},
+      h(Q.StudioStep, {n:3, title:'내 보고서·조사 자료'}, h(Q.SourceInput, {label:'내 보고서·조사 자료', placeholder:'보고서 초안, 유구·유물 설명, 수치표를 붙여 넣으세요', files:[{name:'기안동_유구설명.docx',size:'84 KB'},{name:'주거지_계측표.csv',size:'6 KB'}]})),
+      h(Q.StudioStep, {n:4, title:'연대분석·보유 자료', aside:h(Q.Tag,{tone:'neutral'},'선택')}, h(Q.SourceInput, {label:'연대분석·보유 자료', optional:true, rows:3, placeholder:'AMS 연대, 자연과학분석, 실측치 등', note:'보유하지 않은 자료는 비워 두세요. 없는 자료는 제외하고 입력된 자료만으로 결과가 작성됩니다.'})))
+  );
+</script>
+</body>
+</html>

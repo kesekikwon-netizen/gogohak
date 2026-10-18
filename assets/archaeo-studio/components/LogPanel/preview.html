@@ -1,0 +1,22 @@
+<!-- @dsCard group="스튜디오 패널" height=360 width=760 -->
+<!doctype html>
+<html lang="ko">
+<head><meta charset="utf-8"><title>LogPanel — 미리보기</title></head>
+<body>
+<div id="root"></div>
+<script>
+  var Q = window.ArchaeoStudio, h = React.createElement;
+  ReactDOM.createRoot(document.getElementById('root')).render(
+    h('div', {className:'as-demo', style:{gap:16}},
+      h('div', {style:{width:360}}, h(Q.LogPanel, {progress:62, entries:[
+        {time:'14:31:02', kind:'collect', text:'DBpia에서 「원삼국 주거지 편년」 관련 논문 12건을 찾았습니다'},
+        {time:'14:31:40', kind:'write', text:'1절 「유구 구조와 편년적 위치」를 쓰고 있습니다'},
+        {time:'14:32:05', kind:'note', text:'연대분석 자료가 비어 있어 연대 수치는 쓰지 않습니다'},
+        {time:'14:38:51', kind:'warn', text:'논문 1건은 원문을 열 수 없어 빼고 썼습니다'},
+        {time:'14:39:02', kind:'error', text:'DBpia 연결이 끊겼습니다. 다시 로그인해 주세요'},
+        {time:'14:40:02', kind:'done', text:'작성이 끝났습니다 · 각주 14개, 참고문헌 12건'}]})),
+      h('div', {style:{width:360}}, h(Q.LogPanel, {entries:[]})))
+  );
+</script>
+</body>
+</html>
