@@ -55,9 +55,11 @@ function toLiteratureCards(dbpiaResult, query = '', startSeq = 1) {
   if (!dbpiaResult || typeof dbpiaResult !== 'object') return [];
   const rawRefs = Array.isArray(dbpiaResult.references)
     ? dbpiaResult.references
-    : Array.isArray(dbpiaResult.papers)
-      ? dbpiaResult.papers
-      : [];
+    : Array.isArray(dbpiaResult.refs)
+      ? dbpiaResult.refs
+      : Array.isArray(dbpiaResult.papers)
+        ? dbpiaResult.papers
+        : [];
   const answerSummary = String(dbpiaResult.answerText || dbpiaResult.summary || dbpiaResult.answer || '').trim();
 
   const cards = [];
@@ -74,8 +76,13 @@ function toLiteratureCards(dbpiaResult, query = '', startSeq = 1) {
     const volume = String(ref.volume || ref.vol || '').trim();
     const issue = String(ref.issue || ref.no || '').trim();
     const pages = String(ref.pages || ref.pageRange || ref.page || '').trim();
-    const quotes = normalizeQuotes(ref.quotes || ref.hoverQuotes || ref.snippets || (ref.quote ? [ref.quote] : []));
-    const summary = String(ref.summary || answerSummary || '').slice(0, 600).trim();
+    const quotes = normalizeQuotes(
+      ref.quotes ||
+        ref.hoverQuotes ||
+        ref.snippets ||
+        (ref.quote ? [ref.quote] : ref.abstract ? [ref.abstract] : [])
+    );
+    const summary = String(ref.summary || ref.abstract || answerSummary || '').slice(0, 600).trim();
 
     const verified = authors.length > 0 && /^\d{4}$/.test(year) && title.length > 0;
     const card = {

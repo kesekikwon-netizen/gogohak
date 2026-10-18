@@ -96,6 +96,27 @@ function loadVerifyMatrix(jobDir, sectionId, round) {
   return readJsonIfExists(vPath, null);
 }
 
+function loadLatestVerifyMatrix(jobDir, sectionId) {
+  const verifyDir = path.join(jobDir, "verify");
+  if (!fs.existsSync(verifyDir)) return null;
+  const prefix = `${sectionId}.r`;
+  const files = fs
+    .readdirSync(verifyDir)
+    .filter((f) => f.startsWith(prefix) && f.endsWith(".json"));
+  if (files.length === 0) return null;
+  let maxRound = -1;
+  let targetFile = files[0];
+  for (const f of files) {
+    const m = /\.r(\d+)\.json$/.exec(f);
+    const r = m ? Number(m[1]) : 0;
+    if (r >= maxRound) {
+      maxRound = r;
+      targetFile = f;
+    }
+  }
+  return readJsonIfExists(path.join(verifyDir, targetFile), null);
+}
+
 function buildCardLookup(facts = [], literature = []) {
   const map = new Map();
   for (const f of facts) {
@@ -105,6 +126,26 @@ function buildCardLookup(facts = [], literature = []) {
     if (l && l.id) map.set(l.id, l);
   }
   return map;
+}
+
+function createEvidenceStore(jobDir) {
+  return {
+    jobDir,
+    savePages: (pages) => savePages(jobDir, pages),
+    loadPages: () => loadPages(jobDir),
+    saveFacts: (facts) => saveFacts(jobDir, facts),
+    loadFacts: () => loadFacts(jobDir),
+    saveLiterature: (cards) => saveLiterature(jobDir, cards),
+    loadLiterature: () => loadLiterature(jobDir),
+    saveOutline: (outline) => saveOutline(jobDir, outline),
+    loadOutline: () => loadOutline(jobDir),
+    saveSectionDraft: (sectionId, round, md) => saveSectionDraft(jobDir, sectionId, round, md),
+    loadSectionDraft: (sectionId, round) => loadSectionDraft(jobDir, sectionId, round),
+    saveVerifyMatrix: (sectionId, round, matrix) => saveVerifyMatrix(jobDir, sectionId, round, matrix),
+    loadVerifyMatrix: (sectionId, round) => loadVerifyMatrix(jobDir, sectionId, round),
+    loadLatestVerifyMatrix: (sectionId) => loadLatestVerifyMatrix(jobDir, sectionId),
+    buildCardLookup: (facts, literature) => buildCardLookup(facts, literature),
+  };
 }
 
 module.exports = {
@@ -122,5 +163,8 @@ module.exports = {
   loadSectionDraft,
   saveVerifyMatrix,
   loadVerifyMatrix,
+  loadLatestVerifyMatrix,
   buildCardLookup,
+  createEvidenceStore,
 };
+

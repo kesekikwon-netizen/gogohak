@@ -442,6 +442,31 @@ button { font: inherit; color: inherit; }
           </div>
           <div class="as-step__body">
             <div class="as-run">
+              <div class="as-run__sub" style="margin-bottom:4px;">
+                <div class="as-seg" role="radiogroup" aria-label="엔진 선택" style="min-width:150px;">
+                  <button type="button" id="seg-engine-v1" class="as-seg__item is-on" onclick="selectEngineMode('v1')">v1 기본</button>
+                  <button type="button" id="seg-engine-v2" class="as-seg__item" onclick="selectEngineMode('v2')">v2 하네스·교차검증</button>
+                </div>
+                <button type="button" class="as-btn" onclick="runV2Selftest()" title="H0 사전 자가진단 실행">자가진단</button>
+                <button type="button" class="as-btn" id="btn-v2-resume" onclick="resumeV2Execution()" title="체크포인트부터 이어서 실행">이어서 실행</button>
+              </div>
+              <div class="as-run__sub" id="v2-extra-controls" style="display:none;margin-bottom:4px;">
+                <label style="font-size:11.5px;color:var(--ink-muted);display:inline-flex;align-items:center;gap:4px;cursor:pointer;">
+                  <input type="checkbox" id="chk-v2-dbpia-review" checked> 최종 DBpia 검수(X4)
+                </label>
+                <button type="button" class="as-btn" onclick="approveV2Outline()">목차 승인</button>
+                <button type="button" class="as-btn" onclick="exportV2Handoff()">2차 다듬기용 내보내기</button>
+                <button type="button" class="as-btn" onclick="importV2Handoff()">2차 원고 불러오기</button>
+              </div>
+              <div id="v2-gate-banner" style="display:none;padding:6px 8px;border:1px solid var(--line-strong);border-radius:var(--radius-6);background:var(--warn-soft);color:var(--warn);font-size:11.5px;">
+                <div id="v2-gate-banner-text" style="margin-bottom:4px;font-weight:600;">게이트 확인 대기 중</div>
+                <div class="as-run__sub">
+                  <button type="button" class="as-btn" onclick="continueV2Gate()">경고 무시하고 계속</button>
+                  <button type="button" class="as-btn" onclick="resolveG7Review('export')">그대로 내보내기(G7)</button>
+                  <button type="button" class="as-btn" onclick="resolveG7Review('rework')">해당 절 재작성(G7)</button>
+                  <button type="button" class="as-btn" onclick="resolveG7Review('abort')">중단</button>
+                </div>
+              </div>
               <div class="as-run__main">
                 <button type="button" id="btn-run-report" class="as-btn as-btn--accent as-btn--lg as-btn--block" onclick="startExecution('report')">
                   <svg class="as-icon" width="16" height="16" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" fill="currentColor" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/></svg>
@@ -895,9 +920,147 @@ async function handleFileUpload(inputEl, targetSlot) {
   inputEl.value = '';
 }
 
+let currentEngineMode = 'v1';
+let currentV2JobId = '';
+let currentV2PendingGate = '';
+
+function selectEngineMode(engine) {
+  currentEngineMode = engine === 'v2' ? 'v2' : 'v1';
+  const v1Btn = document.getElementById('seg-engine-v1');
+  const v2Btn = document.getElementById('seg-engine-v2');
+  const v2Controls = document.getElementById('v2-extra-controls');
+  if (v1Btn) v1Btn.classList.toggle('is-on', currentEngineMode === 'v1');
+  if (v2Btn) v2Btn.classList.toggle('is-on', currentEngineMode === 'v2');
+  if (v2Controls) v2Controls.style.display = currentEngineMode === 'v2' ? 'flex' : 'none';
+}
+
+async function runV2Selftest() {
+  const hintEl = document.getElementById('status-hint');
+  if (hintEl) hintEl.textContent = 'v2 사전 자가진단(H0)을 실행 중입니다…';
+  try {
+    const res = await fetch('/v2/selftest');
+    const data = await res.json();
+    if (hintEl) {
+      hintEl.textContent = data.ok
+        ? 'v2 자가진단 통과 (T1~T12 정상)'
+        : 'v2 자가진단 확인 필요: ' + ((data.items || []).filter(i => !i.ok).map(i => i.id + ':' + i.detail).join(', '));
+    }
+  } catch (e) {
+    if (hintEl) hintEl.textContent = 'v2 자가진단 요청 실패: ' + e.message;
+  }
+}
+
+async function resumeV2Execution() {
+  try {
+    const res = await fetch('/v2/resume', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ jobId: currentV2JobId || undefined })
+    });
+    const data = await res.json();
+    if (data && data.jobId) currentV2JobId = data.jobId;
+    if (data && data.manuscriptMd) renderManuscriptOntoA4Page(data.manuscriptMd, false);
+    pollStatus();
+  } catch (e) {}
+}
+
+async function approveV2Outline() {
+  try {
+    const res = await fetch('/v2/outline/approve', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ jobId: currentV2JobId || undefined })
+    });
+    const data = await res.json();
+    if (data && data.manuscriptMd) renderManuscriptOntoA4Page(data.manuscriptMd, false);
+    pollStatus();
+  } catch (e) {}
+}
+
+async function continueV2Gate() {
+  try {
+    const res = await fetch('/v2/gate/continue', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ jobId: currentV2JobId || undefined, gate: currentV2PendingGate || 'G2' })
+    });
+    const data = await res.json();
+    if (data && data.manuscriptMd) renderManuscriptOntoA4Page(data.manuscriptMd, false);
+    pollStatus();
+  } catch (e) {}
+}
+
+async function exportV2Handoff() {
+  const hintEl = document.getElementById('status-hint');
+  try {
+    const res = await fetch('/v2/handoff/export', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ jobId: currentV2JobId || undefined })
+    });
+    const data = await res.json();
+    if (hintEl) hintEl.textContent = data.ok ? ('2차 다듬기용 인계 묶음 내보내기 완료: ' + (data.handoffDir || '')) : ('인계 내보내기 실패: ' + (data.error || ''));
+  } catch (e) {}
+}
+
+async function importV2Handoff() {
+  const hintEl = document.getElementById('status-hint');
+  try {
+    const res = await fetch('/v2/handoff/import', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ jobId: currentV2JobId || undefined })
+    });
+    const data = await res.json();
+    if (data && data.manuscriptMd) renderManuscriptOntoA4Page(data.manuscriptMd, false);
+    if (hintEl) hintEl.textContent = data.ok ? '2차 원고 수신 및 V1~V8 재검사 통과' : ('2차 원고 수신 검사 실패: ' + (data.error || ''));
+  } catch (e) {}
+}
+
+async function resolveG7Review(action) {
+  try {
+    const res = await fetch('/v2/dbpia-review', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ jobId: currentV2JobId || undefined, action })
+    });
+    const data = await res.json();
+    if (data && data.manuscriptMd) renderManuscriptOntoA4Page(data.manuscriptMd, false);
+    pollStatus();
+  } catch (e) {}
+}
+
 async function startExecution(mode) {
   if (mode) selectDocMode(mode);
   await refreshEngineeredPrompt(false);
+  if (currentEngineMode === 'v2') {
+    const chkReview = document.getElementById('chk-v2-dbpia-review');
+    try {
+      const res = await fetch('/v2/run', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          docType: currentDocType,
+          userFocus: document.getElementById('input-focus').value || '',
+          reportText: document.getElementById('input-report').value || '',
+          datingText: document.getElementById('input-dating').value || '',
+          enableDbpiaReview: chkReview ? Boolean(chkReview.checked) : true
+        })
+      });
+      const data = await res.json();
+      if (data && data.jobId) currentV2JobId = data.jobId;
+      if (data && data.gate && !data.gate.ok) {
+        currentV2PendingGate = data.gate.gate || '';
+        const banner = document.getElementById('v2-gate-banner');
+        const bannerTxt = document.getElementById('v2-gate-banner-text');
+        if (banner) banner.style.display = 'block';
+        if (bannerTxt) bannerTxt.textContent = '[' + (data.gate.gate || 'GATE') + '] ' + (data.gate.reason || '');
+      }
+      if (data && data.manuscriptMd) renderManuscriptOntoA4Page(data.manuscriptMd, false);
+      pollStatus();
+    } catch (e) {}
+    return;
+  }
   try {
     await fetch('/local-action', {
       method: 'POST',
@@ -1226,10 +1389,10 @@ function renderManuscriptOntoA4Page(rawMd, isRunning) {
     md = fixedLines.join('\\n');
   })();
 
-  // 1) 차트 및 모식도 코드블록을 A4 도면 박스로 변환 (SVG 비교차트 + 데이터표 + 시각적 모식도 렌더링)
+  // 1) 차트 및 모식도 코드블록을 A4 도면 박스로 변환 (Nano Banana Pro 고고학 에디토리얼 SVG 비교차트 + 데이터표 + 시각적 모식도 렌더링)
   const chartBlocks = [];
   const diagBlocks = [];
-  const palette = ['#2563eb', '#0d9488', '#d97706', '#7c3aed', '#dc2626'];
+  const palette = ['#8C4A27', '#2C5E4F', '#B45309', '#3B4D6B', '#6B5B4D'];
   md = md.replace(/\`\`\`([^\\n]*)\\r?\\n([\\s\\S]*?)\`\`\`/gi, (full, langRaw, j) => {
     const lang = String(langRaw || '').trim().toLowerCase();
     const body = String(j || '').trim();
@@ -1242,14 +1405,18 @@ function renderManuscriptOntoA4Page(rawMd, isRunning) {
         const series = (spec.data && spec.data.series) || spec.series || [];
         let maxVal = 1;
         series.forEach(s => (s.values || []).forEach(v => { if (Number(v) > maxVal) maxVal = Number(v); }));
-        const svgW = 620, svgH = 215, padL = 44, padR = 18, padT = 24, padB = 46;
+        const svgW = 620, svgH = 225, padL = 48, padR = 22, padT = 32, padB = 48;
         const plotW = svgW - padL - padR, plotH = svgH - padT - padB;
-        let svgParts = ['<svg viewBox="0 0 ' + svgW + ' ' + svgH + '" style="width:100%;height:auto;display:block;margin:6px 0 8px 0;background:#f8fafc;border:1px solid #cbd5e1;border-radius:4px;">'];
+        let svgParts = [
+          '<svg viewBox="0 0 ' + svgW + ' ' + svgH + '" style="width:100%;height:auto;display:block;margin:6px 0 8px 0;background:#FAF7F2;border:1.5px solid #2A2520;border-radius:4px;">',
+          '<rect x="3" y="3" width="' + (svgW - 6) + '" height="' + (svgH - 6) + '" fill="none" stroke="#8C4A27" stroke-width="0.6" stroke-dasharray="3,2"/>',
+          '<text x="' + (svgW - 12) + '" y="16" text-anchor="end" font-size="7.5" font-weight="700" fill="#8C4A27">NANO BANANA PRO · ARCHAEOLOGY</text>'
+        ];
         for (let g = 0; g <= 4; g++) {
           const gy = padT + plotH - (plotH * g / 4);
           const gVal = Math.round((maxVal * g) / 4 * 10) / 10;
-          svgParts.push('<line x1="' + padL + '" y1="' + gy + '" x2="' + (svgW - padR) + '" y2="' + gy + '" stroke="#e2e8f0" stroke-width="1"/>');
-          svgParts.push('<text x="' + (padL - 6) + '" y="' + (gy + 3) + '" text-anchor="end" font-size="9.5" fill="#475569">' + gVal + '</text>');
+          svgParts.push('<line x1="' + padL + '" y1="' + gy + '" x2="' + (svgW - padR) + '" y2="' + gy + '" stroke="' + (g === 0 ? '#2A2520' : '#D8CFC2') + '" stroke-width="' + (g === 0 ? '1.3' : '0.8') + '"' + (g === 0 ? '' : ' stroke-dasharray="3,3"') + '/>');
+          svgParts.push('<text x="' + (padL - 6) + '" y="' + (gy + 3) + '" text-anchor="end" font-size="9.5" fill="#5C5349">' + gVal + '</text>');
         }
         const catCount = Math.max(1, cats.length);
         const sCount = Math.max(1, series.length);
@@ -1263,20 +1430,20 @@ function renderManuscriptOntoA4Page(rawMd, isRunning) {
             const bx = gx + sIdx * barW;
             const by = padT + plotH - bh;
             const col = palette[sIdx % palette.length];
-            svgParts.push('<rect x="' + bx.toFixed(1) + '" y="' + by.toFixed(1) + '" width="' + Math.max(4, barW - 2).toFixed(1) + '" height="' + bh.toFixed(1) + '" fill="' + col + '" rx="2"/>');
+            svgParts.push('<rect x="' + bx.toFixed(1) + '" y="' + by.toFixed(1) + '" width="' + Math.max(4, barW - 2).toFixed(1) + '" height="' + bh.toFixed(1) + '" fill="' + col + '" stroke="#1C1917" stroke-width="0.6" rx="2"/>');
             if (val > 0) {
-              svgParts.push('<text x="' + (bx + (barW - 2) / 2).toFixed(1) + '" y="' + (by - 4).toFixed(1) + '" text-anchor="middle" font-size="8.5" font-weight="700" fill="#1e293b">' + val + '</text>');
+              svgParts.push('<text x="' + (bx + (barW - 2) / 2).toFixed(1) + '" y="' + (by - 4).toFixed(1) + '" text-anchor="middle" font-size="8.5" font-weight="700" fill="#1C1917">' + val + '</text>');
             }
           });
           const labelShort = String(c).length > 14 ? String(c).slice(0, 14) + '…' : String(c);
-          svgParts.push('<text x="' + (padL + cIdx * groupW + groupW / 2).toFixed(1) + '" y="' + (padT + plotH + 15) + '" text-anchor="middle" font-size="9.5" font-weight="600" fill="#1e293b">' + escapeHtml(labelShort) + '</text>');
+          svgParts.push('<text x="' + (padL + cIdx * groupW + groupW / 2).toFixed(1) + '" y="' + (padT + plotH + 15) + '" text-anchor="middle" font-size="9.5" font-weight="600" fill="#1C1917">' + escapeHtml(labelShort) + '</text>');
         });
         series.forEach((s, sIdx) => {
           const lx = padL + sIdx * 145;
           const ly = svgH - 10;
           const col = palette[sIdx % palette.length];
-          svgParts.push('<rect x="' + lx + '" y="' + (ly - 8) + '" width="9" height="9" fill="' + col + '" rx="2"/>');
-          svgParts.push('<text x="' + (lx + 13) + '" y="' + ly + '" font-size="9.5" font-weight="600" fill="#334155">' + escapeHtml(s.name || ('계열 ' + (sIdx + 1))) + '</text>');
+          svgParts.push('<rect x="' + lx + '" y="' + (ly - 8) + '" width="9" height="9" fill="' + col + '" stroke="#1C1917" stroke-width="0.5" rx="2"/>');
+          svgParts.push('<text x="' + (lx + 13) + '" y="' + ly + '" font-size="9.5" font-weight="600" fill="#2A2520">' + escapeHtml(s.name || ('계열 ' + (sIdx + 1))) + '</text>');
         });
         svgParts.push('</svg>');
         let rowsHtml = '';
@@ -1320,14 +1487,15 @@ function renderManuscriptOntoA4Page(rawMd, isRunning) {
         const idx = diagBlocks.length;
         const diagTitle = spec.title || '단계별 유구·출토유물 및 학술 논증 구조 모식도';
         const stepsHtml = groups.map((g, gIdx) => {
+          const accent = palette[gIdx % palette.length];
           const arrowHtml = gIdx < groups.length - 1
-            ? '<div style="text-align:center;color:#2563eb;font-size:13px;font-weight:800;line-height:1;margin:2px 0;">▼</div>'
+            ? '<div style="text-align:center;color:#8C4A27;font-size:13px;font-weight:800;line-height:1;margin:2px 0;">▼</div>'
             : '';
           const subsList = g.subs.length > 0
-            ? '<div style="margin-top:3px;padding-left:8px;border-left:2px solid #93c5fd;color:#334155;font-size:9.2pt;">• ' + g.subs.map(s => escapeHtml(s)).join('<br>• ') + '</div>'
+            ? '<div style="margin-top:3px;padding-left:8px;border-left:2px solid ' + accent + ';color:#332C26;font-size:9.2pt;">• ' + g.subs.map(s => escapeHtml(s)).join('<br>• ') + '</div>'
             : '';
-          return '<div class="as-doc-diagram__step" style="background:#f8fafc;border:1px solid #94a3b8;border-left:4px solid #1d4ed8;padding:7px 11px;border-radius:4px;">' +
-            '<strong style="color:#0f172a;font-size:9.8pt;">[' + (gIdx + 1) + '단계] ' + escapeHtml(g.title) + '</strong>' + subsList + '</div>' + arrowHtml;
+          return '<div class="as-doc-diagram__step" style="background:#FAF7F2;border:1px solid #C8BFA8;border-left:4px solid ' + accent + ';padding:7px 11px;border-radius:4px;">' +
+            '<strong style="color:#1C1917;font-size:9.8pt;">[' + (gIdx + 1) + '단계] ' + escapeHtml(g.title) + '</strong>' + subsList + '</div>' + arrowHtml;
         }).join('');
         diagBlocks.push(
           '<div class="as-doc-diagram"><div class="as-doc-diagram__title">&lt;모식도 ' + (idx + 1) + '&gt; ' + escapeHtml(diagTitle) + '</div>' +
