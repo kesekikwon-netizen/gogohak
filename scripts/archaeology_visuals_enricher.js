@@ -456,7 +456,7 @@ function buildComparativeChartsFromData(
 
   // Chart 2: Only build when actual feature dimensions were parsed from the report/manuscript (zero fake fallback numbers)
   let chart2Spec = null;
-  if (parsedDims.length >= 2) {
+  if (parsedDims.length >= 1) {
     const dimFeatures = parsedDims.slice(0, 6);
     chart2Spec = {
       type: "column",
