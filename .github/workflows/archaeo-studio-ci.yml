@@ -1,0 +1,80 @@
+name: ARCHAEO STUDIO CI
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  pull_request:
+    branches: [ "main", "master" ]
+  workflow_dispatch:
+
+jobs:
+  verify-archaeo-studio:
+    name: Verify ARCHAEO STUDIO Server, UI & Academic Standards
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Check JavaScript syntax (MCP Bridge Server & Studio UI)
+        run: |
+          node --check scripts/gemini_mcp_server.js
+          node --check scripts/standalone_studio_app.js
+
+      - name: Verify Blueprint Documents & Academic Specification Integrity
+        run: |
+          node -e '
+            const fs = require("fs");
+            const requiredDocs = [
+              "1_ARCHAEO_STUDIO_전체개발방법_설계도.md",
+              "2_프롬프트_및_제미나이_결과생성_시스템_명세서.md",
+              "3_ARCHAEO_STUDIO_데이터수집_및_안정화_개선플랜.md",
+              "4_매장유산_발굴조사보고서_고찰과_학술논문_양식비교_및_DBpia_AI_전략.md",
+              "skills/gemini-web/SKILL.md"
+            ];
+            for (const doc of requiredDocs) {
+              if (!fs.existsSync(doc)) {
+                throw new Error("Missing required document: " + doc);
+              }
+              const stat = fs.statSync(doc);
+              if (stat.size < 1000) {
+                throw new Error("Document too small: " + doc);
+              }
+              console.log("[PASS] Document verified:", doc, "(" + stat.size + " bytes)");
+            }
+
+            const serverCode = fs.readFileSync("scripts/gemini_mcp_server.js", "utf8");
+            const uiCode = fs.readFileSync("scripts/standalone_studio_app.js", "utf8");
+
+            const requiredServerPatterns = [
+              "extractStructuredArchaeologyReportFacts",
+              "vetter_conversations",
+              "createDocumentFragment",
+              "매장유산 보호 및 조사에 관한 법률",
+              "사료 세포",
+              "evaluateArchaeologyManuscriptQuality"
+            ];
+            for (const pat of requiredServerPatterns) {
+              if (!serverCode.includes(pat)) {
+                throw new Error("Missing required server pattern: " + pat);
+              }
+              console.log("[PASS] Server pattern verified:", pat);
+            }
+
+            const requiredUiPatterns = [
+              "renderDbpiaLiveBoard",
+              "dbpia-live-board",
+              "doc-pages-wrap",
+              "renderManuscriptOntoA4Page"
+            ];
+            for (const pat of requiredUiPatterns) {
+              if (!uiCode.includes(pat)) {
+                throw new Error("Missing required UI pattern: " + pat);
+              }
+              console.log("[PASS] UI pattern verified:", pat);
+            }
+          '
