@@ -119,3 +119,22 @@ All 8 criteria are verified and deterministically enriched (`repairAndEnrichManu
 - `.docx` theme fonts: `design.themeFonts={"heading":"Malgun Gothic","body":"Malgun Gothic"}`.
 - Desktop Shortcut (`ARCHAEO STUDIO.lnk`): Points to `wscript.exe "$PluginDir\scripts\launch_archaeo_studio.vbs"` with multi-resolution icon `assets\archaeo-studio\archaeo_studio.ico`.
 
+---
+
+## 6. WordCraft (`.docx`) Export Integrity & Portable Setup Guardrails (Learned Fixes)
+1. **100% Universal Site & Topic Agnosticism — Zero Hardcoded Site Branches (`archaeology_visuals_enricher.js` & `gemini_mcp_server.js`)**:
+   - **Never** write site-specific branches (such as `isByeongsan`) or hardcoded site fallback tables/charts/diagrams for any specific excavation report or paper.
+   - The pipeline must operate universally on **any** excavation report or academic paper by dynamically parsing the active manuscript's headings, Markdown tables, quantitative feature dimensions (`m`, `㎡`, `cm`), artifact assemblages, stratigraphy/chronology stages, and live DBpia AI references (`validPapers`) to synthesize or normalize `wc-chart`, `wc-diagram`, and comparative tables.
+2. **Parenthesized-Year-Safe & Table-Safe Footnote Tokenization (`prepareMarkdownAndFootnotesForWordCraft`)**:
+   - Never include digits (`0-9`) or `(` in the character class preceding `${num})` (`(?<![0-9(])`), preventing years like `이준호(2010)` or `심재연(2008)` from being corrupted into `이준호(20[[WC_FN_10]]`.
+   - Never substitute `[[WC_FN_n]]` tokens inside Markdown table rows (`| ... |`), because `wordcraft-cli` `select.text={"story":"body"}` only searches body paragraphs and fails the entire batch if a token is trapped inside a table cell.
+3. **Deterministic `wc-diagram` Schema Normalization (`normalizeWcDiagramSpec`)**:
+   - Gemini 4 Argon frequently outputs `wc-diagram` specs using `{"layout":"hierarchy","nodes":[{"id":"L1","label":"..."}],"edges":[...]}` or `steps`/`stages` inside ````코드 스니펫` or ````json` fences. Always normalize `nodes`/`edges`/`steps`/`stages` into `items: [{ text, level }]` before both Studio A4 preview rendering and `wordcraft-cli` `insert.smartArt` compilation so raw JSON never leaks into `.docx`.
+4. **Collapsed Multi-Round Table Repair (`repairCollapsedMarkdownTables`) & Clean Chart SVG Titles**:
+   - Repair Markdown tables where newlines were stripped during multi-round revisions (e.g., 49 pipe cells collapsed onto a single line repeated 7 times) back into proper `colCount`-column Markdown tables, and keep consecutive `| ... |` table lines intact during `.ql-editor` injection.
+   - When emitting `**<그림 n> ${chartTitle}**` in the body text, pass `title: ""` inside `insert.chart`'s JSON spec so WordCraft's SVG chart renderer does not render a clipped, duplicate header above the chart.
+5. **Zero Legacy `ARCHAEO STUDIO PRO 4.0 (Google Docs)` UI & Strict `'작업'` Mode Lock**:
+   - The embedded Antigravity drawer (`#agy-gemini-desktop-drawer`) must present `ARCHAEO STUDIO 5.0 (WordCraft .docx)` rather than the deprecated `PRO 4.0 / Google Docs` intermediate bar, and must immediately lock Gemini Web to `4 Argon (사고 수준: 최고가)` + `'작업'` mode (`gem-segmented-button[data-value="40"]`, never leaving `'채팅'` selected).
+6. **Windows Batch Script Delayed Expansion & Portable Paths (`새컴퓨터_자동설정.bat`)**:
+   - Always use `setlocal DisableDelayedExpansion` in `.bat` files that invoke `node -e "...!fs.existsSync..."` so `cmd.exe` does not strip characters between `!` operators.
+   - Never hardcode user-specific paths (`C:\Users\kyi25`, `D:\phone`); always use `%USERPROFILE%`, `%~dp0`, `os.homedir()`, or `__dirname`.
