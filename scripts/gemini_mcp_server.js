@@ -1321,6 +1321,7 @@ function repairUnknownAuthorsInCitationLine(lineText, collectedPapers = []) {
 
 function prepareMarkdownAndFootnotesForWordCraft(rawMarkdown) {
   const {
+    compactChartLabel,
     normalizeWcDiagramSpec,
     repairCollapsedMarkdownTables,
     replaceInlineFootnoteSafely,
@@ -1357,9 +1358,12 @@ function prepareMarkdownAndFootnotesForWordCraft(rawMarkdown) {
         const idx = charts.length + 1;
         const token = `[[WC_CHART_${idx}]]`;
         const chartTitle = spec.title || `고고학 정량 데이터 비교 차트 ${idx}`;
+        const cleanCategories = Array.isArray(spec.data && spec.data.categories)
+          ? spec.data.categories.map((c) => compactChartLabel(c, 12))
+          : [];
         const cleanSeries = ((spec.data && spec.data.series) || []).map((s) => ({
           ...s,
-          name: String(s.name || "").slice(0, 16),
+          name: compactChartLabel(s.name || "", 12),
         }));
         const normalizedSpec = {
           width: 450,
@@ -1370,6 +1374,7 @@ function prepareMarkdownAndFootnotesForWordCraft(rawMarkdown) {
           title: "",
           data: {
             ...(spec.data || {}),
+            ...(cleanCategories.length > 0 ? { categories: cleanCategories } : {}),
             series: cleanSeries,
           },
         };
@@ -2343,7 +2348,7 @@ async function _askGeminiWebImpl({
             function htmlToMd(root) {
               if (!root) return '';
               const clone = root.cloneNode(true);
-              clone.querySelectorAll('model-thoughts, .thoughts-container').forEach(n => n.remove());
+              clone.querySelectorAll('model-thoughts, .thoughts-container, .katex-mathml, annotation').forEach(n => n.remove());
               clone.querySelectorAll('sup').forEach(sup => {
                 const t = (sup.textContent || '').trim();
                 if (/^\\d+\\)?$/.test(t)) {
@@ -4888,6 +4893,8 @@ async function runArchaeologyDiscussionPipeline({
   pipelineState.liveResearchFeed = [];
   pipelineState.liveStreamText = "";
   pipelineState.latestManuscript = "";
+  pipelineState.latestDocxPath = "";
+  pipelineState.latestPdfPath = "";
   pipelineState.goalVerification = null;
   pipelineState.outputDir =
     targetPath &&
