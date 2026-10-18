@@ -359,7 +359,7 @@ function ensureRichArchaeologyVisualsAndTables(
   { docType = "report", userFocus = "" } = {}
 ) {
   let md = String(rawMd || "");
-  if (!md || md.length < 400) return md;
+  if (!md || md.length < 100) return md;
 
   const validPapers = (collectedPapers || []).filter(
     (p) => p && p.title && p.author && !/저자미상|Unknown/i.test(p.author)
@@ -419,15 +419,16 @@ function ensureRichArchaeologyVisualsAndTables(
   // Inject missing charts, diagrams, and tables at the appropriate section boundaries
   // Section 3 boundary (`### 3.` or `## Ⅲ.`)
   const sec3Boundary = /\n(?=#{2,4}\s*(?:3\.|Ⅲ\.))/.exec(body);
-  // Section 4 boundary (`### 4.` or `## Ⅳ.`)
-  const sec4Boundary = /\n(?=#{2,4}\s*(?:4\.|Ⅳ\.))/.exec(body);
-  // Conclusion subsection boundary (`#### 3) 맺음말` or `## Ⅴ.`)
-  const conclusionBoundary = /\n(?=#{2,4}\s*(?:3\)\s*맺음말|4\)\s*맺음말|Ⅴ\.))/.exec(
-    body
-  );
 
-  // A) Supplement at end of Section 2 (before Section 3): Chart 2 (Feature dimensions) + Diagram 1 (Stratigraphy & construction process)
+  // A) Supplement at end of Section 2 (before Section 3): Chart 1 (if 0 charts), Chart 2 (Feature dimensions) + Diagram 1 (Stratigraphy & construction process)
   const sec2Additions = [];
+  if (existingCharts.length === 0 && !body.includes(chart1Spec.title)) {
+    sec2Additions.push(
+      "\n\n본 유적에서 확인된 전체 유구와 주변 기조사 유적군의 시대별 유구 분포를 정량 비교하면 아래 차트와 같다.\n\n```wc-chart\n" +
+        JSON.stringify(chart1Spec) +
+        "\n```"
+    );
+  }
   if (existingCharts.length < 2 && !body.includes(chart2Spec.title)) {
     sec2Additions.push(
       "\n\n또한 조사구역 내 확인된 주요 주거지 유구들의 잔존 장축·단축 규모(m)와 평면 면적(㎡)을 정량적으로 비교하면 아래 차트와 같다.\n\n```wc-chart\n" +
@@ -455,7 +456,7 @@ function ensureRichArchaeologyVisualsAndTables(
   // Re-locate Section 4 boundary after Section 2 insertions
   const sec4BoundaryUpdated = /\n(?=#{2,4}\s*(?:4\.|Ⅳ\.))/.exec(body);
 
-  // B) Supplement at end of Section 3 (before Section 4): Table 2 (Artifact attributes & relative chronology) + Chart 3 (DBpia domain distribution)
+  // B) Supplement at end of Section 3 (before Section 4): Table 2 (Artifact attributes & relative chronology) + Diagram 2 (if missing) + Chart 3 (DBpia domain distribution)
   const sec3Additions = [];
   const currentTableCount = (
     body.match(/(?:^|\n)\|[^\n]+\|\r?\n\|[\s:\-|]+\|/g) || []
@@ -464,6 +465,14 @@ function ensureRichArchaeologyVisualsAndTables(
     sec3Additions.push(
       "\n\n본 유적에서 출토된 유물의 기종별·형식별 제작기법 속성과 DBpia 수집 선행연구에 기반한 상대편년 단계를 종합 정리하면 `<표 2>`와 같다.\n\n" +
         table2Md
+    );
+  }
+  const midDiagCount = (body.match(/```wc-diagram[\s\S]*?```/gi) || []).length;
+  if (midDiagCount < 2 && !body.includes(diag2Spec.title)) {
+    sec3Additions.push(
+      "\n\n유구 중복 관계와 출토유물 조합에 기반한 상대편년 단계(Ⅰ~Ⅲ단계)를 모식화하면 아래와 같다.\n\n```wc-diagram\n" +
+        JSON.stringify(diag2Spec) +
+        "\n```"
     );
   }
   const currentChartCount = (body.match(/```wc-chart[\s\S]*?```/gi) || []).length;
