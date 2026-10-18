@@ -11,13 +11,16 @@
 
 function compactSmartArtLabel(raw) {
   let s = String(raw || "").replace(/\s+/g, " ").trim();
-  if (s.length <= 26) return s;
-  // Strip verbose parenthetical details first if string is long
-  const withoutParens = s.replace(/\s*\([^)]{6,}\)/g, "").trim();
+  if (s.length <= 28) return s;
+  // Strip verbose parenthetical details cleanly (including nested parens) if string is long
+  const withoutParens = s
+    .replace(/\s*\([^()]*(?:\([^()]*\)[^()]*)*\)/g, "")
+    .replace(/[()]+$/g, "")
+    .trim();
   if (withoutParens.length >= 6 && withoutParens.length <= 28) {
     return withoutParens;
   }
-  return withoutParens.slice(0, 27).trim();
+  return (withoutParens || s).slice(0, 27).replace(/[()]+$/g, "").trim();
 }
 
 function normalizeWcDiagramSpec(spec) {
