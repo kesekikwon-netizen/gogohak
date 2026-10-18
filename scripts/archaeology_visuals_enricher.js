@@ -257,6 +257,38 @@ function parseFeatureDimensionsFromMarkdown(md) {
       }
     }
   }
+  if (features.length === 0) {
+    const proseChunks = String(md || "").split(/\r?\n|(?:다|음|됨|임)\.\s+|[;；]/);
+    for (const chunk of proseChunks) {
+      const dm =
+        /(\d+(?:\.\d+)?)\s*(?:m|㎝|cm)?\s*(?:[×xX*]|\s*[×xX*]\s*(?:너비|단축|폭)\s*)(\d+(?:\.\d+)?)\s*(?:m|㎝|cm)?/i.exec(
+          chunk
+        );
+      if (!dm) continue;
+      let l = parseFloat(dm[1]);
+      let w = parseFloat(dm[2]);
+      if (l > 50 && w > 50) {
+        l = Math.round((l / 100) * 10) / 10;
+        w = Math.round((w / 100) * 10) / 10;
+      }
+      if (l > 0 && w > 0 && l < 80 && w < 80) {
+        const fm = /([가-힣A-Za-z0-9\-]+\s*(?:호\s*)?(?:주거지|목관묘|목곽묘|석곽묘|석실분|수혈|건물지|요지|유구))/.exec(
+          chunk
+        );
+        const area = Math.round(l * w * 10) / 10;
+        features.push({
+          name: fm ? fm[1].trim().slice(0, 14) : `유구 ${features.length + 1}`,
+          length: l,
+          width: w,
+          area,
+          lengthM: l,
+          widthM: w,
+          areaM2: area,
+        });
+        if (features.length >= 10) break;
+      }
+    }
+  }
   return features;
 }
 
@@ -801,7 +833,7 @@ function replaceInlineFootnoteSafely(bodyText, num, token, supNum) {
     new RegExp(`(\\[\\^${num}\\])`, "g"),
     new RegExp(`(\\[${num}\\])`, "g"),
     new RegExp(`(${supNum}\\))`, "g"),
-    new RegExp(`((?:(?<![0-9])\\.|[다됨함음임”"'\\])]))[ \\t]*(?<![0-9.(])(${num}\\))(?!\\s*[가-힣A-Za-z])`, "g"),
+    new RegExp(`((?:(?<![0-9])\\.|[다됨함음임”"'\\])]))[ \\t]*(?<![0-9(])(${num}\\))(?!\\s*[가-힣A-Za-z])`, "g"),
     new RegExp(`([가-힣a-zA-Z”"'\\])])[ \\t]*(?<![0-9.(])(${num}\\))(?!\\s*[가-힣A-Za-z])`, "g"),
   ];
 
@@ -1097,6 +1129,7 @@ module.exports = {
   repairCollapsedMarkdownTables,
   replaceInlineFootnoteSafely,
   parseFeatureDimensionsFromMarkdown,
+  detectSiteFeatureDomain,
   ensureRichArchaeologyVisualsAndTables,
   buildComparativeChartsFromData,
   buildSchematicDiagramsFromData,

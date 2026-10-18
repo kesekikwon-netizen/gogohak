@@ -3193,7 +3193,7 @@ function parseJsonFromGeminiReply(rawText) {
  */
 function parseRadiocarbonSamplesFromText(sourceText = "") {
   const samples = [];
-  const lines = String(sourceText || "").split(/\r?\n/);
+  const lines = String(sourceText || "").split(/\r?\n|[,;，；]/);
   const bpRx = /(\d{3,5})\s*±\s*(\d{1,3})\s*BP/i;
   for (const line of lines) {
     const m = bpRx.exec(line);
@@ -3203,12 +3203,14 @@ function parseRadiocarbonSamplesFromText(sourceText = "") {
     if (!bpVal || bpVal < 100 || bpVal > 50000) continue;
     const approxMedian = 1950 - bpVal;
     const span = Math.max(30, bpErr * 2);
-    const featMatch = /([가-힣A-Za-z0-9\-]+\s*(?:호|지구|층|유구|주거지|목곽묘|석곽묘|석실분|수혈|요지|건물지)[^:：(|]*)/.exec(line);
+    const featMatch = /([가-힣A-Za-z0-9\-]+\s*(?:호|지구|층|유구|주거지|목관묘|목곽묘|석곽묘|석실분|수혈|요지|건물지)[^:：(|]*)/.exec(line);
     const labMatch = /\b([A-Z]{2,6}\s*-\s*[A-Za-z0-9-]+)\b/.exec(line);
     samples.push({
       labCode: labMatch ? labMatch[1].trim() : `Sample-${samples.length + 1}`,
       feature: featMatch ? featMatch[1].trim().slice(0, 22) : `측정 시료 ${samples.length + 1}`,
       bp: `${bpVal}±${bpErr} BP`,
+      bpNum: bpVal,
+      sigma: bpErr,
       sigma1Start: approxMedian - Math.round(span * 0.5),
       sigma1End: approxMedian + Math.round(span * 0.5),
       sigma2Start: approxMedian - span,
@@ -3225,13 +3227,14 @@ function renderPublicationGradeArchaeologyFigures(rawData = {}) {
   const {
     parseFeatureDimensionsFromMarkdown,
   } = require("./archaeology_visuals_enricher");
-  const sourceText = String(
-    rawData.sourceText ||
-      rawData.reportText ||
-      rawData.datingText ||
-      pipelineState.latestManuscript ||
-      ""
-  );
+  const sourceText = [
+    rawData.sourceText,
+    rawData.reportText,
+    rawData.datingText,
+    pipelineState.latestManuscript,
+  ]
+    .filter((s) => typeof s === "string" && s.trim().length > 0)
+    .join("\n\n");
   const siteName = rawData.siteName || "본 조사 유적";
   const sitePeriod =
     rawData.sitePeriod ||
@@ -3331,12 +3334,18 @@ function renderPublicationGradeArchaeologyFigures(rawData = {}) {
         pts.push(`${px.toFixed(1)},${py.toFixed(1)}`);
       }
       const polyPoints = `${x2a.toFixed(1)},${yBase} ${pts.join(" ")} ${x2b.toFixed(1)},${yBase}`;
+      const bpDisplay =
+        typeof s.bp === "string" && s.bp.includes("BP")
+          ? s.bp
+          : s.bp
+          ? `${s.bp}±${s.sigma || 30} BP`
+          : "-";
 
       sampleRowsSvg += `
         ${idx % 2 === 1 ? `<rect x="${leftColW}" y="${yRowTop}" width="${plotW}" height="${rowH}" fill="#f8fafc" opacity="0.65"/>` : ""}
         <line x1="20" y1="${yRowTop + rowH}" x2="${fig1W - 20}" y2="${yRowTop + rowH}" stroke="#e2e8f0" stroke-width="0.8"/>
         <text x="28" y="${yRowTop + 26}" font-size="11.5" font-weight="700" fill="#0f172a" font-family="'Malgun Gothic',sans-serif">${escXml(s.feature || `시료 ${idx + 1}`)}</text>
-        <text x="28" y="${yRowTop + 44}" font-size="10.5" fill="#475569" font-family="Consolas,'Malgun Gothic',monospace">${escXml(s.labCode || `Lab-${idx + 1}`)} (${escXml(s.bp || "-")})</text>
+        <text x="28" y="${yRowTop + 44}" font-size="10.5" fill="#475569" font-family="Consolas,'Malgun Gothic',monospace">${escXml(s.labCode || `Lab-${idx + 1}`)} (${escXml(bpDisplay)})</text>
         <polygon points="${polyPoints}" fill="url(#oxcalGrad)" stroke="#1e293b" stroke-width="1.25"/>
         <line x1="${x1a.toFixed(1)}" y1="${yBase + 4}" x2="${x1b.toFixed(1)}" y2="${yBase + 4}" stroke="#0f172a" stroke-width="2.2"/>
         <line x1="${x1a.toFixed(1)}" y1="${yBase + 1}" x2="${x1a.toFixed(1)}" y2="${yBase + 7}" stroke="#0f172a" stroke-width="1.5"/>
