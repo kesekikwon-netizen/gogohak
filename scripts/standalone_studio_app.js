@@ -1166,6 +1166,37 @@ function renderManuscriptOntoA4Page(rawMd, isRunning) {
   }
 
   let md = String(rawMd);
+  // 한 줄로 병합된 마크다운 표 자동 복원
+  (function() {
+    const rawLines = md.split(/\\r?\\n/);
+    const fixedLines = [];
+    let k = 0;
+    while (k < rawLines.length) {
+      const trm = rawLines[k].trim();
+      if (trm.startsWith('|') && trm.endsWith('|')) {
+        const nxt = (rawLines[k + 1] || '').trim();
+        const isSep = nxt.startsWith('|') && nxt.endsWith('|') && /^[\\s|:\\-]+$/.test(nxt.slice(1, -1));
+        if (isSep) {
+          const colCnt = nxt.slice(1, -1).split('|').map(c => c.trim()).filter(Boolean).length;
+          const fCells = trm.slice(1, -1).split('|').map(c => c.trim());
+          if (colCnt >= 2 && fCells.length >= colCnt * 2 && fCells.length % colCnt === 0) {
+            const totR = fCells.length / colCnt;
+            fixedLines.push('| ' + fCells.slice(0, colCnt).join(' | ') + ' |');
+            fixedLines.push('| ' + Array(colCnt).fill('---').join(' | ') + ' |');
+            for (let r = 1; r < totR; r++) {
+              fixedLines.push('| ' + fCells.slice(r * colCnt, (r + 1) * colCnt).join(' | ') + ' |');
+            }
+            k += 2;
+            while (k < rawLines.length && rawLines[k].trim() === trm) k++;
+            continue;
+          }
+        }
+      }
+      fixedLines.push(rawLines[k]);
+      k++;
+    }
+    md = fixedLines.join('\\n');
+  })();
 
   // 1) 차트 및 모식도 코드블록을 A4 도면 박스로 변환 (SVG 비교차트 + 데이터표 + 시각적 모식도 렌더링)
   const chartBlocks = [];
@@ -1233,8 +1264,24 @@ function renderManuscriptOntoA4Page(rawMd, isRunning) {
         );
         return '\\n@@AS_CHART_' + idx + '@@\\n';
       }
-      if (lang.includes('wc-diagram') || (spec.layout && Array.isArray(spec.items)) || Array.isArray(spec.items)) {
-        const items = Array.isArray(spec.items) ? spec.items : [];
+      const rawNodes = spec.items || spec.nodes || spec.steps || spec.stages;
+      if (lang.includes('wc-diagram') || Array.isArray(rawNodes)) {
+        const edges = Array.isArray(spec.edges) ? spec.edges : [];
+        const childIds = new Set(edges.map(e => e && (e.to || e.target)).filter(Boolean));
+        const parentIds = new Set(edges.map(e => e && (e.from || e.source)).filter(Boolean));
+        const items = Array.isArray(rawNodes) ? rawNodes.map((n, nIdx) => {
+          if (typeof n === 'string') return { text: n, level: nIdx === 0 ? 0 : 1 };
+          const id = String(n.id || '');
+          const lbl = String(n.text || n.label || n.name || n.title || '').trim();
+          const desc = String(n.description || n.detail || '').trim();
+          const txt = desc && !lbl.includes(desc) ? (lbl + ' — ' + desc) : lbl;
+          let lv = typeof n.level === 'number' ? n.level : 0;
+          if (typeof n.level !== 'number' && edges.length > 0 && id) {
+            if (childIds.has(id) && !parentIds.has(id)) lv = 1;
+            else if (/^P\\d|^S\\d|^sub/i.test(id)) lv = 1;
+          }
+          return { text: txt, level: lv };
+        }) : [];
         const groups = [];
         items.forEach(it => {
           const itemObj = typeof it === 'string' ? { text: it, level: 0 } : it;
@@ -1313,7 +1360,7 @@ function renderManuscriptOntoA4Page(rawMd, isRunning) {
     let out = escapeHtml(s);
     out = out.replace(/\\*\\*(.+?)\\*\\*/g, '<strong>$1</strong>');
     out = out.replace(/\\[\\^(\\d+)\\]/g, '<sup class="as-fnref">$1)</sup>');
-    out = out.replace(/([.다됨함음임”"'\\])])\\s*(\\d+)\\)/g, '$1<sup class="as-fnref">$2)</sup>');
+    out = out.replace(/([.다됨함음임”"'\\])])\\s*(?<![0-9(])(\\d+)\\)/g, '$1<sup class="as-fnref">$2)</sup>');
     return out;
   }
 

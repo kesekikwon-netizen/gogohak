@@ -509,9 +509,21 @@ async function _ensureEmbeddedGeminiWebviewImpl(options = {}) {
   }
 
   const existingGemTarget = targets.find(
-    (t) => t.type === "webview" && t.url.includes("gemini.google.com")
+    (t) =>
+      t.type === "webview" &&
+      (t.url.includes("gemini.google.com") ||
+        t.url.includes("accounts.google.com") ||
+        t.url.includes("myaccount.google.com"))
   );
+  if (existingGemTarget && existingGemTarget.url.includes("myaccount.google.com")) {
+    await withCdpSession(existingGemTarget.webSocketDebuggerUrl, async (send) => {
+      await send("Page.navigate", { url: "https://gemini.google.com/app" });
+    }).catch(() => {});
+  }
   const hasLiveGem = Boolean(existingGemTarget);
+  const defaultReportDir = path
+    .join(require("os").homedir(), "archaeology_reports")
+    .replace(/\\/g, "/");
 
   const toggleArg =
     options.toggle === undefined
@@ -527,12 +539,19 @@ async function _ensureEmbeddedGeminiWebviewImpl(options = {}) {
       expression: `(() => {
         const GEMINI_UA = ${JSON.stringify(GEMINI_UA)};
         const DBPIA_UA = ${JSON.stringify(DBPIA_UA)};
-        const BRIDGE_URL = 'http://127.0.0.1:${BRIDGE_PORT}';
         const hasLiveGem = ${JSON.stringify(hasLiveGem)};
-        const initialFiguresHtml = ${JSON.stringify(pipelineState.figuresHtml || "")};
-        const initialFigureCount = ${JSON.stringify(pipelineState.figureCount || 4)};
-        const initialLatestDocUrl = ${JSON.stringify(pipelineState.latestGoogleDocUrl || "")};
-        const initialGoogleDocsList = ${JSON.stringify(pipelineState.googleDocsList || [])};
+
+        // Remove any legacy PRO 4.0 / Google Docs floating buttons, styles, or panes immediately
+        const oldFab = document.getElementById('agy-gemini-desktop-fab');
+        if (oldFab) oldFab.remove();
+        const oldStyle = document.getElementById('agy-archaeo-studio-v3-styles');
+        if (oldStyle) oldStyle.remove();
+        const oldFigPane = document.getElementById('agy-figures-studio-pane');
+        if (oldFigPane) oldFigPane.remove();
+        const oldGdocsPane = document.getElementById('agy-gdocs-studio-pane');
+        if (oldGdocsPane) oldGdocsPane.remove();
+        const oldSub = document.getElementById('agy-pane-subheaders');
+        if (oldSub) oldSub.remove();
 
         const strayDb = document.getElementById('agy-dbpia-webview');
         let container = document.getElementById('agy-gemini-desktop-drawer');
@@ -542,250 +561,40 @@ async function _ensureEmbeddedGeminiWebviewImpl(options = {}) {
 
         let wvGem = document.getElementById('agy-gemini-desktop-webview');
         let wvDb = document.getElementById('agy-dbpia-webview');
-        let fab = document.getElementById('agy-gemini-desktop-fab');
 
         if (!hasLiveGem) {
           if (wvGem) { wvGem.remove(); wvGem = null; }
           if (container) { container.remove(); container = null; }
         }
 
-        // Pro-Grade Enterprise Obsidian CSS (v4.0 — Linear / Vercel / OxCal Pro Inspired)
-        let styleTag = document.getElementById('agy-archaeo-studio-v3-styles');
-        if (!styleTag) {
-          styleTag = document.createElement('style');
-          styleTag.id = 'agy-archaeo-studio-v3-styles';
-          document.head.appendChild(styleTag);
-        }
-        styleTag.textContent = \`
-          #agy-gemini-desktop-drawer {
-            font-family: 'Pretendard', 'Inter', -apple-system, BlinkMacSystemFont, 'Malgun Gothic', sans-serif;
-            box-sizing: border-box;
-            color: #f4f4f5;
-            letter-spacing: -0.01em;
-          }
-          #agy-gemini-desktop-drawer * {
-            box-sizing: border-box;
-          }
-          .agy-studio-btn {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            gap: 6px;
-            background: #18181b;
-            border: 1px solid rgba(255, 255, 255, 0.09);
-            border-radius: 5px;
-            color: #d4d4d8;
-            font-size: 11.5px;
-            font-weight: 500;
-            padding: 5px 10px;
-            height: 28px;
-            cursor: pointer;
-            transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease;
-            white-space: nowrap;
-            line-height: 1;
-          }
-          .agy-studio-btn:hover {
-            background: #27272a;
-            border-color: rgba(255, 255, 255, 0.18);
-            color: #fafafa;
-          }
-          .agy-studio-btn svg {
-            width: 13px;
-            height: 13px;
-            stroke: currentColor;
-            stroke-width: 1.75;
-            fill: none;
-            flex-shrink: 0;
-          }
-          .agy-studio-btn-primary {
-            background: #fafafa;
-            border: 1px solid #ffffff;
-            color: #09090b;
-            font-weight: 600;
-          }
-          .agy-studio-btn-primary:hover {
-            background: #e4e4e7;
-            border-color: #e4e4e7;
-            color: #09090b;
-          }
-          .agy-studio-btn-gdocs {
-            background: rgba(16, 185, 129, 0.12);
-            border: 1px solid rgba(16, 185, 129, 0.35);
-            color: #6ee7b7;
-            font-weight: 600;
-          }
-          .agy-studio-btn-gdocs:hover {
-            background: rgba(16, 185, 129, 0.22);
-            border-color: rgba(16, 185, 129, 0.55);
-            color: #a7f3d0;
-          }
-          .agy-studio-btn-amber {
-            background: rgba(245, 158, 11, 0.1);
-            border: 1px solid rgba(245, 158, 11, 0.32);
-            color: #fcd34d;
-            font-weight: 500;
-          }
-          .agy-studio-btn-amber:hover {
-            background: rgba(245, 158, 11, 0.2);
-            border-color: rgba(245, 158, 11, 0.5);
-            color: #fef3c7;
-          }
-          .agy-studio-btn-amber.paused-active {
-            background: #f59e0b;
-            border-color: #fbbf24;
-            color: #09090b;
-            font-weight: 700;
-          }
-          .agy-studio-btn-danger {
-            background: rgba(239, 68, 68, 0.1);
-            border: 1px solid rgba(239, 68, 68, 0.32);
-            color: #fca5a5;
-            font-weight: 500;
-          }
-          .agy-studio-btn-danger:hover {
-            background: rgba(239, 68, 68, 0.24);
-            border-color: rgba(239, 68, 68, 0.55);
-            color: #fee2e2;
-          }
-          .agy-seg-group {
-            display: inline-flex;
-            background: #09090b;
-            padding: 2px;
-            border-radius: 6px;
-            border: 1px solid rgba(255, 255, 255, 0.08);
-            gap: 2px;
-          }
-          .agy-seg-btn {
-            background: transparent;
-            border: 1px solid transparent;
-            color: #a1a1aa;
-            font-size: 11.5px;
-            font-weight: 500;
-            padding: 0 10px;
-            height: 24px;
-            border-radius: 4px;
-            cursor: pointer;
-            transition: all 0.12s ease;
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            white-space: nowrap;
-          }
-          .agy-seg-btn:hover {
-            color: #f4f4f5;
-          }
-          .agy-seg-btn.active {
-            background: #18181b;
-            border-color: rgba(255, 255, 255, 0.1);
-            color: #fafafa;
-            font-weight: 600;
-          }
-          .agy-step-pill {
-            display: inline-flex;
-            align-items: center;
-            gap: 5px;
-            padding: 0 8px;
-            height: 22px;
-            border-radius: 4px;
-            font-size: 10.5px;
-            font-weight: 600;
-            font-family: 'JetBrains Mono', Consolas, monospace;
-            background: #09090b;
-            border: 1px solid rgba(255, 255, 255, 0.07);
-            color: #71717a;
-            white-space: nowrap;
-          }
-          .agy-step-pill.active {
-            background: rgba(250, 250, 250, 0.08);
-            border-color: rgba(250, 250, 250, 0.35);
-            color: #fafafa;
-          }
-          .agy-step-pill.done {
-            background: rgba(16, 185, 129, 0.08);
-            border-color: rgba(16, 185, 129, 0.28);
-            color: #6ee7b7;
-          }
-          .agy-studio-input, .agy-studio-select {
-            background: #09090b;
-            border: 1px solid rgba(255, 255, 255, 0.12);
-            border-radius: 5px;
-            color: #f4f4f5;
-            font-size: 11.5px;
-            height: 28px;
-            padding: 0 9px;
-            outline: none;
-            transition: border-color 0.12s ease;
-          }
-          .agy-studio-input:focus, .agy-studio-select:focus {
-            border-color: rgba(255, 255, 255, 0.35);
-          }
-          .agy-gdoc-chip {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            padding: 0 10px;
-            height: 26px;
-            border-radius: 5px;
-            font-size: 11px;
-            font-weight: 500;
-            background: #18181b;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            color: #d4d4d8;
-            cursor: pointer;
-            transition: all 0.12s ease;
-            white-space: nowrap;
-          }
-          .agy-gdoc-chip:hover {
-            background: #27272a;
-            border-color: rgba(255, 255, 255, 0.22);
-            color: #fafafa;
-          }
-          .agy-gdoc-chip.active {
-            background: rgba(16, 185, 129, 0.14);
-            border-color: rgba(16, 185, 129, 0.45);
-            color: #6ee7b7;
-            font-weight: 600;
-          }
-        \`;
-
+        // Headless by default (completely invisible in the background).
+        // Only shown as a minimal login window when the user explicitly clicks [로그인 창 열기] (toggle === true).
         function applyDrawerStyle(el, show) {
           el.dataset.visible = show ? 'true' : 'false';
-          const isWide = el.dataset.wide === 'true';
-          const viewMode = el.dataset.viewMode || 'split';
-          let widthCss = 'width:640px';
-          if (viewMode === 'split' || viewMode === 'figures' || viewMode === 'gdocs') {
-            widthCss = isWide ? 'width:min(1500px, calc(100vw - 20px))' : 'width:min(1200px, calc(100vw - 20px))';
-          } else {
-            widthCss = isWide ? 'width:min(1060px, calc(100vw - 20px))' : 'width:660px';
-          }
           el.style.cssText = [
             'position:fixed',
-            'right:10px',
-            'bottom:48px',
-            widthCss,
-            'height:calc(100vh - 62px)',
+            'right:16px',
+            'bottom:16px',
+            'width:min(1180px, calc(100vw - 32px))',
+            'height:calc(100vh - 48px)',
             'display:flex',
             'flex-direction:column',
-            'border:1px solid rgba(255, 255, 255, 0.12)',
-            'border-radius:8px',
+            'border:1px solid #D6D0C4',
+            'border-radius:10px',
             'overflow:hidden',
-            'box-shadow:0 24px 70px rgba(0, 0, 0, 0.92)',
-            'background:#09090b',
-            'transition:opacity 0.14s ease, width 0.14s ease',
-            show ? 'z-index:999998;opacity:1;pointer-events:auto;' : 'z-index:999997;opacity:0.002;pointer-events:none;'
+            'box-shadow:0 20px 50px rgba(0, 0, 0, 0.35)',
+            'background:#FAF9F5',
+            show
+              ? 'z-index:999998;opacity:1;pointer-events:auto;'
+              : 'z-index:-1;opacity:0.001;pointer-events:none;'
           ].join(';');
         }
 
         function applyViewMode(containerEl, mode) {
-          containerEl.dataset.viewMode = mode;
+          containerEl.dataset.viewMode = mode || 'split';
           const gemEl = document.getElementById('agy-gemini-desktop-webview');
           const dbEl = document.getElementById('agy-dbpia-webview');
           const divider = document.getElementById('agy-split-divider');
-          const figPane = document.getElementById('agy-figures-studio-pane');
-          const gdocsPane = document.getElementById('agy-gdocs-studio-pane');
-          const gemHeader = document.getElementById('agy-pane-header-gemini');
-          const dbHeader = document.getElementById('agy-pane-header-dbpia');
-
           const activeWvCss = 'width:100%;height:100%;border:none;display:flex;opacity:1;pointer-events:auto;';
           const hiddenWvCss = 'flex:0.0001;width:0px;min-width:0px;height:100%;border:none;display:flex;opacity:0;pointer-events:none;overflow:hidden;';
 
@@ -794,58 +603,16 @@ async function _ensureEmbeddedGeminiWebviewImpl(options = {}) {
               gemEl.style.cssText = 'flex:1;' + activeWvCss;
               dbEl.style.cssText = hiddenWvCss;
               if (divider) divider.style.display = 'none';
-              if (figPane) figPane.style.display = 'none';
-              if (gdocsPane) gdocsPane.style.display = 'none';
-              if (gemHeader) gemHeader.style.display = 'flex';
-              if (dbHeader) dbHeader.style.display = 'none';
             } else if (mode === 'dbpia') {
               gemEl.style.cssText = hiddenWvCss;
               dbEl.style.cssText = 'flex:1;' + activeWvCss;
               if (divider) divider.style.display = 'none';
-              if (figPane) figPane.style.display = 'none';
-              if (gdocsPane) gdocsPane.style.display = 'none';
-              if (gemHeader) gemHeader.style.display = 'none';
-              if (dbHeader) dbHeader.style.display = 'flex';
-            } else if (mode === 'figures') {
-              gemEl.style.cssText = hiddenWvCss;
-              dbEl.style.cssText = hiddenWvCss;
-              if (divider) divider.style.display = 'none';
-              if (figPane) figPane.style.display = 'flex';
-              if (gdocsPane) gdocsPane.style.display = 'none';
-              if (gemHeader) gemHeader.style.display = 'none';
-              if (dbHeader) dbHeader.style.display = 'none';
-            } else if (mode === 'gdocs') {
-              gemEl.style.cssText = hiddenWvCss;
-              dbEl.style.cssText = hiddenWvCss;
-              if (divider) divider.style.display = 'none';
-              if (figPane) figPane.style.display = 'none';
-              if (gdocsPane) gdocsPane.style.display = 'flex';
-              if (gemHeader) gemHeader.style.display = 'none';
-              if (dbHeader) dbHeader.style.display = 'none';
-              const gdocWvEl = document.getElementById('agy-gdocs-webview');
-              if (gdocWvEl) {
-                const pending = gdocWvEl.dataset.pendingSrc || initialLatestDocUrl || 'https://docs.google.com/document/u/0/';
-                if (!gdocWvEl.getAttribute('src') || gdocWvEl.getAttribute('src') === 'about:blank') {
-                  gdocWvEl.setAttribute('src', pending);
-                }
-              }
             } else {
-              gemEl.style.cssText = 'flex:1.15;' + activeWvCss;
-              dbEl.style.cssText = 'flex:0.85;' + activeWvCss;
+              gemEl.style.cssText = 'flex:1.1;' + activeWvCss;
+              dbEl.style.cssText = 'flex:0.9;' + activeWvCss;
               if (divider) divider.style.display = 'block';
-              if (figPane) figPane.style.display = 'none';
-              if (gdocsPane) gdocsPane.style.display = 'none';
-              if (gemHeader) gemHeader.style.display = 'flex';
-              if (dbHeader) dbHeader.style.display = 'flex';
             }
           }
-          ['split', 'gemini', 'dbpia', 'figures', 'gdocs'].forEach(m => {
-            const b = document.getElementById('agy-view-btn-' + m);
-            if (b) {
-              if (m === mode) b.classList.add('active');
-              else b.classList.remove('active');
-            }
-          });
           applyDrawerStyle(containerEl, containerEl.dataset.visible === 'true');
         }
 
@@ -854,996 +621,120 @@ async function _ensureEmbeddedGeminiWebviewImpl(options = {}) {
           if (c) applyViewMode(c, m);
         };
 
-        function renderGoogleDocsTabs(docsList, activeUrl) {
-          const bar = document.getElementById('agy-gdocs-tabs-bar');
-          const gdocWv = document.getElementById('agy-gdocs-webview');
-          const urlBadge = document.getElementById('agy-gdocs-active-url');
-          const countBadge = document.getElementById('agy-gdoc-count-badge');
-          const topOpenBtn = document.getElementById('agy-open-latest-gdoc-btn');
-
-          const list = Array.isArray(docsList) ? docsList : [];
-          if (countBadge) {
-            countBadge.textContent = String(list.length);
-            countBadge.style.display = list.length > 0 ? 'inline-block' : 'none';
-          }
-          if (topOpenBtn) {
-            const labelSpan = topOpenBtn.querySelector('.gdoc-btn-label');
-            if (labelSpan) labelSpan.textContent = \`Google Docs (\${list.length})\`;
-          }
-          const targetUrl = activeUrl || (list.length > 0 ? list[list.length - 1].url : '');
-          if (urlBadge && targetUrl) {
-            urlBadge.textContent = targetUrl;
-            urlBadge.href = targetUrl;
-          }
-          if (gdocWv && targetUrl) {
-            gdocWv.dataset.pendingSrc = targetUrl;
-            const curView = container?.dataset?.viewMode || 'split';
-            const curSrc = gdocWv.getAttribute('src') || '';
-            if (curView === 'gdocs' && (!curSrc || curSrc === 'about:blank' || (activeUrl && curSrc !== activeUrl))) {
-              gdocWv.setAttribute('src', targetUrl);
-            }
-          }
-          if (!bar) return;
-          bar.innerHTML = '';
-          list.forEach((doc, idx) => {
-            const chip = document.createElement('button');
-            const isAct = (gdocWv && gdocWv.getAttribute('src') === doc.url) || (!gdocWv?.getAttribute('src') && idx === list.length - 1);
-            chip.className = 'agy-gdoc-chip' + (isAct ? ' active' : '');
-            chip.innerHTML = \`<span>\${doc.title || ('문서 #' + (idx + 1))}</span><span style="font-size:10px;opacity:0.65;">\${doc.createdAt || ''}</span>\`;
-            chip.onclick = () => {
-              if (gdocWv) gdocWv.setAttribute('src', doc.url);
-              if (urlBadge) {
-                urlBadge.textContent = doc.url;
-                urlBadge.href = doc.url;
-              }
-              Array.from(bar.querySelectorAll('.agy-gdoc-chip')).forEach(c => c.classList.remove('active'));
-              chip.classList.add('active');
-            };
-            bar.appendChild(chip);
-          });
-        }
-
-        window.__agyDocsStore = Array.isArray(initialGoogleDocsList) && initialGoogleDocsList.length > 0
-          ? initialGoogleDocsList
-          : (window.__agyDocsStore || []);
-        window.__agyAbortLocal = false;
-        window.__agyPausedLocal = false;
-
-        window.__agyConnectGoogleDoc = (docUrl, title, docsList, autoSwitchView) => {
-          if (Array.isArray(docsList) && docsList.length > 0) {
-            window.__agyDocsStore = docsList;
-          } else if (docUrl) {
-            const m = /https:\\/\\/docs\\.google\\.com\\/document\\/d\\/([A-Za-z0-9_-]+)/.exec(docUrl);
-            const clean = m ? ('https://docs.google.com/document/d/' + m[1] + '/edit') : docUrl;
-            const ex = window.__agyDocsStore.find(d => d.url === clean);
-            if (!ex) {
-              window.__agyDocsStore.push({
-                title: title || ('고찰 문서 #' + (window.__agyDocsStore.length + 1)),
-                url: clean,
-                createdAt: new Date().toLocaleTimeString('ko-KR', { hour12: false, hour: '2-digit', minute: '2-digit' })
-              });
-            }
-          }
-          renderGoogleDocsTabs(window.__agyDocsStore, docUrl);
-          if (autoSwitchView) {
-            const c = document.getElementById('agy-gemini-desktop-drawer');
-            if (c) applyViewMode(c, 'gdocs');
-          }
-        };
-
-        async function exportGemResponseInBrowser(respIdx = -1, customTitle = '', switchView = true) {
-          const wv = document.getElementById('agy-gemini-desktop-webview');
-          if (!wv || typeof wv.executeJavaScript !== 'function') {
-            return { ok: false, error: 'Gemini 웹뷰를 찾을 수 없습니다.' };
-          }
-          const code = \`(async () => {
-            const sleep = ms => new Promise(r => setTimeout(r, ms));
-            const bd0 = document.querySelector('.cdk-overlay-backdrop');
-            if (bd0) { bd0.click(); await sleep(120); }
-            document.querySelectorAll('extended-snackbar, mat-snack-bar-container').forEach(el => el.remove());
-
-            const mrs = Array.from(document.querySelectorAll('model-response'))
-              .filter(el => (el.textContent || '').trim().length > 100);
-            if (mrs.length === 0) return { ok: false, error: '내보낼 답변이 없습니다.' };
-            const idx = (\${Number(respIdx)} >= 0 && \${Number(respIdx)} < mrs.length) ? \${Number(respIdx)} : (mrs.length - 1);
-            const mr = mrs[idx];
-            const targetMc = mr.querySelector('message-content') || mr;
-            const firstH = targetMc.querySelector('h1, h2, h3, strong');
-            const inferredTitle = (firstH ? firstH.textContent : targetMc.textContent || '').replace(/\\\\s+/g, ' ').trim().slice(0, 42);
-
-            window.__agyLastExportedGoogleDocUrl = null;
-            if (!window.__agyOrigWindowOpen) {
-              window.__agyOrigWindowOpen = window.open;
-              window.open = function(url) {
-                if (typeof url === 'string' && url.includes('docs.google.com/document')) {
-                  window.__agyLastExportedGoogleDocUrl = url;
-                  return { closed: false, close() {}, focus() {} };
-                }
-                return window.__agyOrigWindowOpen ? window.__agyOrigWindowOpen.apply(this, arguments) : null;
-              };
-            }
-
-            const moreHost = mr.querySelector('gem-icon-button[data-test-id="more-menu-button"]');
-            const moreBtn = moreHost ? (moreHost.querySelector('button') || moreHost) : Array.from(document.querySelectorAll('gem-icon-button[data-test-id="more-menu-button"] button')).pop();
-            if (!moreBtn) return { ok: false, error: '더보기 버튼을 찾지 못했습니다.' };
-            moreBtn.scrollIntoView({ block: 'center' });
-            await sleep(180);
-            moreBtn.click();
-            await sleep(450);
-
-            const exportItem = document.querySelector('gem-menu-item[data-test-id="export-docs-button"]');
-            const exportClickTarget = exportItem
-              ? (exportItem.querySelector('gem-menu-item-content') || exportItem.querySelector('button') || exportItem)
-              : Array.from(document.querySelectorAll('.cdk-overlay-container [role="menuitem"], .cdk-overlay-container gem-menu-item-content'))
-                  .find(el => (el.textContent || '').includes('Docs로 내보내기'));
-            if (!exportClickTarget) {
-              const bd = document.querySelector('.cdk-overlay-backdrop');
-              if (bd) bd.click();
-              return { ok: false, error: 'Docs로 내보내기 메뉴를 찾지 못했습니다.' };
-            }
-            exportClickTarget.click();
-
-            let capturedUrl = null;
-            for (let i = 0; i < 20; i++) {
-              await sleep(280);
-              if (window.__agyLastExportedGoogleDocUrl) { capturedUrl = window.__agyLastExportedGoogleDocUrl; break; }
-              const snackBtn = document.querySelector('extended-snackbar [data-test-id="action-button"] button, mat-snack-bar-container button');
-              if (snackBtn && (snackBtn.textContent || '').includes('열기')) {
-                snackBtn.click();
-                await sleep(300);
-                if (window.__agyLastExportedGoogleDocUrl) { capturedUrl = window.__agyLastExportedGoogleDocUrl; break; }
-              }
-            }
-            const bdAfter = document.querySelector('.cdk-overlay-backdrop');
-            if (bdAfter) bdAfter.click();
-            return { ok: true, docUrl: capturedUrl, inferredTitle };
-          })()\`;
-
-          const out = await Promise.race([
-            wv.executeJavaScript(code),
-            new Promise(r => setTimeout(() => r({ ok: true, docUrl: initialLatestDocUrl, inferredTitle: customTitle || '발굴조사보고서 고찰' }), 7000))
-          ]).catch(() => ({ ok: true, docUrl: initialLatestDocUrl }));
-
-          if (out && out.ok) {
-            const m = /https:\\/\\/docs\\.google\\.com\\/document\\/d\\/([A-Za-z0-9_-]+)/.exec(out.docUrl || '');
-            const cleanUrl = m ? ('https://docs.google.com/document/d/' + m[1] + '/edit') : (out.docUrl || initialLatestDocUrl);
-            const finalTitle = customTitle || out.inferredTitle || '발굴조사보고서 고찰 (Google Docs)';
-            window.__agyConnectGoogleDoc(cleanUrl, finalTitle, null, switchView);
-            return {
-              ok: true,
-              docUrl: cleanUrl,
-              message: \`Google Docs 문서 생성 및 실시간 연결 완료 (\${finalTitle})\`
-            };
-          }
-          if (switchView) {
-            const c = document.getElementById('agy-gemini-desktop-drawer');
-            if (c) applyViewMode(c, 'gdocs');
-          }
-          return out || { ok: false, error: 'Google Docs 내보내기 실패' };
-        }
-
-        async function sendPromptToGemInBrowser(promptText) {
-          const wv = document.getElementById('agy-gemini-desktop-webview');
-          if (!wv || typeof wv.executeJavaScript !== 'function') throw new Error('Gemini 웹뷰 없음');
-          const baseCount = await wv.executeJavaScript(\`document.querySelectorAll('model-response').length\`);
-          const sendRes = await wv.executeJavaScript(\`(async () => {
-            const sleep = ms => new Promise(r => setTimeout(r, ms));
-            const bd = document.querySelector('.cdk-overlay-backdrop');
-            if (bd) { bd.click(); await sleep(150); }
-            const ed = document.querySelector('.ql-editor, [contenteditable="true"]');
-            if (!ed) return { ok: false, error: '입력창 없음' };
-            ed.focus();
-            document.execCommand('selectAll', false, null);
-            const ok = document.execCommand('insertText', false, \${JSON.stringify(promptText)});
-            if (!ok || !(ed.textContent || '').trim()) ed.textContent = \${JSON.stringify(promptText)};
-            ed.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText' }));
-            await sleep(350);
-            const btn = document.querySelector('button.send-button, button[aria-label="메시지 보내기"], button[aria-label="Send message"]');
-            if (btn) btn.click();
-            else ed.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true }));
-            return { ok: true };
-          })()\`);
-          if (!sendRes?.ok) throw new Error(sendRes?.error || '전송 실패');
-
-          let stableTicks = 0;
-          let lastLen = 0;
-          for (let t = 0; t < 240; t++) {
-            if (window.__agyAbortLocal) throw new Error('즉시 중단됨');
-            while (window.__agyPausedLocal && !window.__agyAbortLocal) {
-              await new Promise(r => setTimeout(r, 400));
-            }
-            if (window.__agyAbortLocal) throw new Error('즉시 중단됨');
-            await new Promise(r => setTimeout(r, 1200));
-            const st = await wv.executeJavaScript(\`(() => {
-              const mrs = Array.from(document.querySelectorAll('model-response'));
-              const stopBtn = document.querySelector('button[aria-label*="중지"], button[aria-label*="Stop"], .blue-circle.stop-icon');
-              const stopVis = Boolean(stopBtn && stopBtn.offsetParent !== null);
-              const lastTxt = mrs.length > \${baseCount} ? (mrs[mrs.length - 1].textContent || '').trim() : '';
-              return { count: mrs.length, stopVis, len: lastTxt.length };
-            })()\`);
-            if (st.count > baseCount && st.len > 100 && !st.stopVis) {
-              if (st.len === lastLen) {
-                stableTicks++;
-                if (stableTicks >= 3) return st.len;
-              } else {
-                lastLen = st.len;
-                stableTicks = 0;
-              }
-            } else {
-              lastLen = st.len;
-              stableTicks = 0;
-            }
-          }
-          return lastLen;
-        }
-
-        async function callStudioAction(payload) {
-          const badge = document.getElementById('agy-gemini-toolbar-status');
-          const showSt = (m) => { if (badge) badge.textContent = m; };
-          try {
-            const ctrl = new AbortController();
-            const timer = setTimeout(() => ctrl.abort(), 3500);
-            const r = await fetch(BRIDGE_URL + '/local-action', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(payload),
-              signal: ctrl.signal
-            });
-            clearTimeout(timer);
-            const d = await r.json();
-            return d;
-          } catch {
-            // Instant Direct Webview Execution Fallback
-            const act = payload.action;
-            if (act === 'export-to-google-docs') {
-              return await exportGemResponseInBrowser(-1, payload.title || '', payload.autoSwitchView !== false);
-            }
-            if (act === 'open-external-gdoc') {
-              const u = payload.url || initialLatestDocUrl;
-              if (u) window.open(u, '_blank');
-              return { ok: true, message: '외부 브라우저 새 탭에서 Google Docs 문서를 열었습니다.' };
-            }
-            if (act === 'dbpia-open-login') {
-              const wvDbEl = document.getElementById('agy-dbpia-webview');
-              if (wvDbEl && typeof wvDbEl.executeJavaScript === 'function') {
-                await wvDbEl.executeJavaScript(\`(() => {
-                  const btn = Array.from(document.querySelectorAll('button, a')).find(el => (el.textContent || '').trim() === '로그인');
-                  if (btn) btn.click();
-                  else location.href = 'https://ai.dbpia.co.kr/ko/search';
-                })()\`).catch(() => {});
-              }
-              return { ok: true, message: '우측 DBpia AI 화면에서 로그인/기관인증을 진행해 주세요.' };
-            }
-            if (act === 'pause-arch-pipeline') {
-              window.__agyPausedLocal = !window.__agyPausedLocal;
-              const pauseBtn = document.getElementById('agy-pause-arch-pipeline-btn');
-              if (pauseBtn) {
-                if (window.__agyPausedLocal) {
-                  pauseBtn.classList.add('paused-active');
-                  pauseBtn.innerHTML = '<svg viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3" fill="currentColor"/></svg><span>재개</span>';
-                } else {
-                  pauseBtn.classList.remove('paused-active');
-                  pauseBtn.innerHTML = '<svg viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg><span>일시멈춤</span>';
-                }
-              }
-              return {
-                ok: true,
-                paused: window.__agyPausedLocal,
-                message: window.__agyPausedLocal
-                  ? '일시멈춤 상태 — [재개] 버튼을 누르면 중단된 지점부터 즉시 재개됩니다.'
-                  : '집필 파이프라인이 재개되었습니다.'
-              };
-            }
-            if (act === 'stop-arch-pipeline') {
-              window.__agyAbortLocal = true;
-              window.__agyPausedLocal = false;
-              const pauseBtn = document.getElementById('agy-pause-arch-pipeline-btn');
-              if (pauseBtn) {
-                pauseBtn.classList.remove('paused-active');
-                pauseBtn.innerHTML = '<svg viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg><span>일시멈춤</span>';
-              }
-              const wv = document.getElementById('agy-gemini-desktop-webview');
-              if (wv && typeof wv.executeJavaScript === 'function') {
-                await wv.executeJavaScript(\`(() => {
-                  const bd = document.querySelector('.cdk-overlay-backdrop');
-                  if (bd) bd.click();
-                  const stopBtn = document.querySelector('button[aria-label*="중지"], button[aria-label*="Stop"], .send-button.stop button, .blue-circle.stop-icon');
-                  if (stopBtn) (stopBtn.closest('button') || stopBtn).click();
-                })()\`).catch(() => {});
-              }
-              return { ok: true, message: '즉시 중단 완료 — 제미나이 생성 및 파이프라인이 정지되었습니다.' };
-            }
-            if (act === 'transfer-dbpia-to-gemini') {
-              const wvDbEl = document.getElementById('agy-dbpia-webview');
-              let dbTxt = '';
-              if (wvDbEl && typeof wvDbEl.executeJavaScript === 'function') {
-                dbTxt = await wvDbEl.executeJavaScript(\`(() => {
-                  const m = document.querySelector('main, article, [class*="answer"], [class*="markdown"]');
-                  return m ? (m.innerText || '').trim().slice(0, 10000) : '';
-                })()\`).catch(() => '');
-              }
-              if (!dbTxt || dbTxt.length < 40) {
-                return await exportGemResponseInBrowser(-1, '발굴조사보고서 Ⅳ. 고찰', true);
-              }
-              (async () => {
-                try {
-                  showSt('DBpia 학술 데이터를 Gemini로 전달하여 박사급 고찰 본문을 집필 중입니다...');
-                  await sendPromptToGemInBrowser(dbTxt + '\\n\\n위 DBpia 학술논문 팩트와 참고문헌을 반영하여 한국 고고학 발굴조사보고서 『Ⅳ. 고찰』 표준 양식(과잉 서술 배제, 핵심 정량 표 수록)에 맞춰 정밀 집필해 주십시오.');
-                  showSt('집필 완료 — Google Docs 문서를 생성하고 실시간 연결합니다...');
-                  const out = await exportGemResponseInBrowser(-1, '발굴조사보고서 Ⅳ. 고찰 (DBpia 실증)', true);
-                  showSt(out.message || 'Google Docs 자동 생성 및 실시간 연결 완료');
-                } catch (err) {
-                  showSt('집필 중단 또는 기존 연결된 Google Docs 문서를 표시합니다.');
-                }
-              })();
-              return { ok: true, message: 'DBpia 데이터를 Gemini에 전달했습니다. 완료 후 단일 Google Docs로 연결됩니다.' };
-            }
-            if (act === 'start-arch-pipeline') {
-              const rm = payload.runMode || 'phd_consolidate';
-              window.__agyAbortLocal = false;
-              window.__agyPausedLocal = false;
-              if (rm === 'figures_only') {
-                const c = document.getElementById('agy-gemini-desktop-drawer');
-                if (c) applyViewMode(c, 'figures');
-                return { ok: true, message: '출판급 학술 도면·모식도 4종 뷰어로 전환했습니다.' };
-              }
-              (async () => {
-                try {
-                  showSt('[박사급 Ⅳ. 고찰 마스터 원고 집필 중] 과잉·중복 서술을 배제하고 핵심 정량 표(<표 1~4>) 중심 단일 완결본을 작성합니다...');
-                  const phdPrompt = [
-                    '### [한국 고고학 발굴조사보고서 『Ⅳ. 고찰(考察)』 박사급 수석연구원 표준 마스터 원고 집필 지시]',
-                    '현재 대화창에서 분석된 발굴조사 데이터(유구 제원·도면·출토유물·AMS/TL 절대연대)와 DBpia 학술논문 비교유적 근거를 총괄하여, **불필요한 미사여구·동어반복·교과서적 사설을 철저히 걷어내고 실제 국립문화유산연구원·한국고고학보 학술 규격에 부합하는 박사급 『Ⅳ. 고찰』 단일 완결 마스터 원고**로 압축·정리하십시오.',
-                    '',
-                    '#### [박사급 고찰 집필 5대 규율 (필수 준수)]',
-                    '1. **과잉 분량 및 중복 서술 절대 금지**: 앞서 개별 장에서 반복 서술되었던 동일 유구 제원이나 일반론적 배경 설명을 과감히 삭제하고, **단 하나의 완결된 마스터 고찰 원고(공백 포함 12,000~15,000자 내외, 학술 보고서 인쇄 기준 약 15~18쪽)** 안에 4개 절(Ⅰ~Ⅳ절)을 일목요연하게 체계화하십시오.',
-                    '2. **정량 데이터 표(<표 1>~<표 4>) 중심 논증**: 수치와 속성은 반드시 학술 표준 표로 먼저 구조화하고, 본문에서는 그 수치가 의미하는 고고학적 인과관계(평면 장단비와 면적 분화, 화시설의 구조적 발전, 중복관계와 탄소연대의 정합성)만 날카롭게 분석하십시오.',
-                    '3. **엄격한 발굴조사보고서 문체**: 「~로 파악된다」, 「~로 판단된다」, 「~로 편년된다」, 「~와 궤를 같이한다」 등 실제 책임조사원·박사급 연구자의 건조하고 치밀한 학술 문체만 사용하십시오.',
-                    '4. **실증 인용 및 참고문헌 완비**: 모든 비교유적과 편년 근거에는 (저자 연도) 형태의 본문 인용을 명기하고, 말미에 한국고고학보 규정에 따른 【참고문헌】을 수록하십시오.',
-                    '',
-                    '#### [단일 마스터 고찰 표준 목차 구성 (Ⅰ~Ⅳ절)]',
-                    '- **Ⅰ. 머리말 — 조사 성과 요약과 고찰의 핵심 쟁점** (입지·층위 핵심 요약 및 3대 연구과제 제시)',
-                    '- **Ⅱ. 유구의 구조적 속성 분석과 축조 단계 변천** (<표 1> 조사 유구 구조 및 계측 속성 일람표 수록: 평면 형태·장단비·규모군·주공·부뚜막/쪽구들/출입구 구조 분석 및 3호→3-1호 중복관계 기반 단계 설정)',
-                    '- **Ⅲ. 출토유물의 형식분류와 자연과학적 절대연대(AMS·TL) 교차검증** (<표 2> 출토유물 기종별 형식분류 및 공반관계표, <표 3> AMS·TL 절대연대 측정치(IntCal20 2σ) 및 상대편년 교차검증표 수록: 경질무문토기·타날문토기·철기 조합상과 보정연대 정밀 대조 및 Ⅰ~Ⅲ단계 중심연대 확정)',
-                    '- **Ⅳ. 주변 동시기 유적과의 비교 검토 및 유적의 역사적 성격·참고문헌** (<표 4> 영동권 동시기 비교유적 종합 대비표 수록: 강릉 병산동·초당동·안인리·방동리·삼척 갈야산 등과의 비교를 통한 영동지역 초기철기~원삼국 거점취락 및 삼국시대 취락의 역사적 성격 규명 + 【참고문헌】)'
-                  ].join('\\n');
-                  await sendPromptToGemInBrowser(phdPrompt);
-                  showSt('박사급 『Ⅳ. 고찰』 마스터 원고 집필 완료 — 단일 Google Docs 문서를 생성하고 연결합니다...');
-                  await exportGemResponseInBrowser(-1, '발굴조사보고서 Ⅳ. 고찰 (박사급 마스터 완결본)', true);
-                  showSt('박사급 『Ⅳ. 고찰』 단일 마스터 원고 집필 및 Google Docs 실시간 연결 완료');
-                } catch (e) {
-                  showSt('집필 중단됨: ' + (e.message || ''));
-                }
-              })();
-              return { ok: true, message: '박사급 『Ⅳ. 고찰』 단일 마스터 원고 집필을 시작했습니다.' };
-            }
-            return { ok: true, message: '실행 완료' };
-          }
-        }
-
-        function createStudioHeader(containerEl) {
-          const wrapper = document.createElement('div');
-          wrapper.id = 'agy-workstation-header-wrapper';
-          wrapper.dataset.version = '4.0';
-          wrapper.style.cssText = 'display:flex;flex-direction:column;background:#09090b;border-bottom:1px solid rgba(255,255,255,0.08);user-select:none;';
-
-          function showStatus(msg) {
-            const badge = document.getElementById('agy-gemini-toolbar-status');
-            if (badge) badge.textContent = msg;
-          }
-
-          // =================================================================
-          // TIER 1: Enterprise Navigation Bar (Brand + Segmented Workspace Tabs + Quick Tools)
-          // =================================================================
-          const topBar = document.createElement('div');
-          topBar.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:6px 12px;background:#09090b;border-bottom:1px solid rgba(255,255,255,0.07);gap:8px;flex-wrap:wrap;min-height:40px;';
-
-          const brandGroup = document.createElement('div');
-          brandGroup.style.cssText = 'display:flex;align-items:center;gap:8px;';
-          brandGroup.innerHTML = \`
-            <div style="display:flex;align-items:center;gap:7px;">
-              <span style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:4px;background:#18181b;border:1px solid rgba(255,255,255,0.14);color:#fafafa;">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
-              </span>
-              <span style="color:#fafafa;font-size:12.5px;font-weight:700;letter-spacing:0.04em;">ARCHAEO STUDIO</span>
-              <span style="background:#18181b;border:1px solid rgba(255,255,255,0.12);color:#a1a1aa;font-family:Consolas,monospace;font-size:10px;font-weight:600;padding:1px 6px;border-radius:3px;">PRO 4.0</span>
+        function createMinimalLoginHeader(containerEl) {
+          const bar = document.createElement('div');
+          bar.id = 'agy-workstation-header-wrapper';
+          bar.dataset.version = '5.0-headless';
+          bar.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:8px 14px;background:#FAF9F5;border-bottom:1px solid #E5E0D5;font-family:Pretendard,sans-serif;color:#1C1917;';
+          bar.innerHTML = \`
+            <div style="display:flex;align-items:center;gap:10px;">
+              <span style="font-weight:700;font-size:13px;color:#B5573A;">ARCHAEO STUDIO 5.0</span>
+              <span style="font-size:12px;color:#57534E;">Google Gemini (4 Argon · 작업 모드) 및 DBpia AI 로그인 확인 창 (평소에는 백그라운드에서 자동 작동합니다)</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <button id="agy-gemini-close-btn" style="background:#B5573A;color:#FFFFFF;border:none;border-radius:6px;padding:5px 14px;font-size:12px;font-weight:600;cursor:pointer;">로그인 완료 · 창 닫기</button>
             </div>
           \`;
-
-          const segGroup = document.createElement('div');
-          segGroup.className = 'agy-seg-group';
-
-          function makeSegBtn(idSuffix, svgIcon, label, mode, badgeHtml = '') {
-            const b = document.createElement('button');
-            b.id = 'agy-view-btn-' + idSuffix;
-            b.className = 'agy-seg-btn';
-            b.innerHTML = svgIcon + '<span>' + label + '</span>' + badgeHtml;
-            b.onclick = () => applyViewMode(containerEl, mode);
-            return b;
+          const closeBtn = bar.querySelector('#agy-gemini-close-btn');
+          if (closeBtn) {
+            closeBtn.onclick = () => applyDrawerStyle(containerEl, false);
           }
+          return bar;
+        }
 
-          segGroup.appendChild(makeSegBtn(
-            'split',
-            '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="12" y1="3" x2="12" y2="21"/></svg>',
-            '듀얼 워크스페이스',
-            'split'
-          ));
-          segGroup.appendChild(makeSegBtn(
-            'gemini',
-            '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2L14.8 9.2L22 12L14.8 14.8L12 22L9.2 14.8L2 12L9.2 9.2L12 2Z"/></svg>',
-            'Gemini (작업)',
-            'gemini'
-          ));
-          segGroup.appendChild(makeSegBtn(
-            'dbpia',
-            '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>',
-            'DBpia AI',
-            'dbpia'
-          ));
-          segGroup.appendChild(makeSegBtn(
-            'figures',
-            '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>',
-            '학술 도면',
-            'figures',
-            \`<span id="agy-fig-count-badge" style="background:#27272a;color:#e4e4e7;font-family:Consolas,monospace;font-size:10px;padding:0 5px;border-radius:3px;">\${initialFigureCount || 4}</span>\`
-          ));
-          segGroup.appendChild(makeSegBtn(
-            'gdocs',
-            '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>',
-            'Google Docs',
-            'gdocs',
-            \`<span id="agy-gdoc-count-badge" style="background:rgba(16,185,129,0.2);color:#6ee7b7;font-family:Consolas,monospace;font-size:10px;padding:0 5px;border-radius:3px;">\${window.__agyDocsStore.length || 3}</span>\`
-          ));
-
-          const rightGroup = document.createElement('div');
-          rightGroup.style.cssText = 'display:flex;align-items:center;gap:5px;flex-wrap:wrap;';
-
-          const openLatestGdocBtn = document.createElement('button');
-          openLatestGdocBtn.id = 'agy-open-latest-gdoc-btn';
-          openLatestGdocBtn.className = 'agy-studio-btn agy-studio-btn-gdocs';
-          openLatestGdocBtn.innerHTML = \`<svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg><span class="gdoc-btn-label">Google Docs (\${window.__agyDocsStore.length || 3})</span>\`;
-          openLatestGdocBtn.title = '연결된 Google Docs 뷰어를 열거나 최신 고찰 본문을 Google Docs로 즉시 내보냅니다';
-          openLatestGdocBtn.onclick = async () => {
-            applyViewMode(containerEl, 'gdocs');
-            showStatus('Google Docs 뷰어를 전환하고 최신 고찰 답변을 동기화합니다...');
-            const d = await callStudioAction({ action: 'export-to-google-docs', autoSwitchView: true });
-            showStatus(d.message || 'Google Docs 연결 완료');
-          };
-
-          const dbpiaLoginBtn = document.createElement('button');
-          dbpiaLoginBtn.id = 'agy-dbpia-login-btn';
-          dbpiaLoginBtn.className = 'agy-studio-btn';
-          dbpiaLoginBtn.innerHTML = '<svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg><span>DBpia 인증</span>';
-          dbpiaLoginBtn.title = '우측 DBpia AI 창에서 로그인 및 기관인증을 수행합니다';
-          dbpiaLoginBtn.onclick = async () => {
-            applyViewMode(containerEl, 'split');
-            showStatus('DBpia 로그인 창을 호출 중입니다...');
-            const d = await callStudioAction({ action: 'dbpia-open-login' });
-            showStatus(d.message || '우측 DBpia 화면에서 로그인해 주세요.');
-          };
-
-          const sendDbpiaToGemBtn = document.createElement('button');
-          sendDbpiaToGemBtn.className = 'agy-studio-btn';
-          sendDbpiaToGemBtn.innerHTML = '<svg viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg><span>DBpia → Gemini</span>';
-          sendDbpiaToGemBtn.title = '우측 DBpia AI 검색 결과를 Gemini에 전달하여 고찰 본문에 반영합니다';
-          sendDbpiaToGemBtn.onclick = async () => {
-            showStatus('DBpia 학술 근거를 Gemini에 전달 중입니다...');
-            const d = await callStudioAction({ action: 'transfer-dbpia-to-gemini', autoExportDocs: true });
-            showStatus(d.message || 'DBpia 전달 완료');
-          };
-
-          const wideBtn = document.createElement('button');
-          wideBtn.className = 'agy-studio-btn';
-          wideBtn.innerHTML = '<svg viewBox="0 0 24 24"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>';
-          wideBtn.title = '워크스테이션 창 너비 전환';
-          wideBtn.onclick = () => {
-            containerEl.dataset.wide = containerEl.dataset.wide === 'true' ? 'false' : 'true';
-            applyDrawerStyle(containerEl, containerEl.dataset.visible === 'true');
-          };
-
-          const reloadBtn = document.createElement('button');
-          reloadBtn.id = 'agy-gemini-reload-btn';
-          reloadBtn.className = 'agy-studio-btn';
-          reloadBtn.title = 'Gemini 새 작업 세션 시작';
-          reloadBtn.innerHTML = '<svg viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>';
-
-          const closeBtn = document.createElement('button');
-          closeBtn.id = 'agy-gemini-close-btn';
-          closeBtn.className = 'agy-studio-btn';
-          closeBtn.style.padding = '0 8px';
-          closeBtn.title = '스튜디오 창 접기 (Ctrl+Shift+G)';
-          closeBtn.innerHTML = '<svg viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/></svg>';
-
-          const powerOffBtn = document.createElement('button');
-          powerOffBtn.id = 'agy-gemini-poweroff-btn';
-          powerOffBtn.className = 'agy-studio-btn agy-studio-btn-danger';
-          powerOffBtn.style.padding = '0 9px';
-          powerOffBtn.title = 'ARCHAEO STUDIO 완전 끄기 (하단 배지 및 백그라운드 웹뷰 완전 종료)';
-          powerOffBtn.innerHTML = '<svg viewBox="0 0 24 24"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/></svg><span>앱 끄기</span>';
-
-          rightGroup.appendChild(openLatestGdocBtn);
-          rightGroup.appendChild(dbpiaLoginBtn);
-          rightGroup.appendChild(sendDbpiaToGemBtn);
-          rightGroup.appendChild(wideBtn);
-          rightGroup.appendChild(reloadBtn);
-          rightGroup.appendChild(closeBtn);
-          rightGroup.appendChild(powerOffBtn);
-
-          topBar.appendChild(brandGroup);
-          topBar.appendChild(segGroup);
-          topBar.appendChild(rightGroup);
-
-          // =================================================================
-          // TIER 2: Pipeline Stage Indicators + Ph.D. Mode Selector + Run / Pause / Stop
-          // =================================================================
-          const cmdBar = document.createElement('div');
-          cmdBar.id = 'agy-archaeology-workstation-bar';
-          cmdBar.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:6px 12px;background:#0e0e11;border-bottom:1px solid rgba(255,255,255,0.07);gap:10px;flex-wrap:wrap;min-height:40px;';
-
-          const stepper = document.createElement('div');
-          stepper.style.cssText = 'display:flex;align-items:center;gap:4px;';
-          stepper.innerHTML = \`
-            <span id="agy-step-pill-1" class="agy-step-pill done" title="Stage 01: 발굴보고서·연대측정·도면 정량 팩트 추출">01 DATA</span>
-            <span style="color:#3f3f46;font-size:10px;">/</span>
-            <span id="agy-step-pill-2" class="agy-step-pill done" title="Stage 02: DBpia AI 선행연구·비교유적 학술논문 실증">02 DBPIA</span>
-            <span style="color:#3f3f46;font-size:10px;">/</span>
-            <span id="agy-step-pill-3" class="agy-step-pill done" title="Stage 03: OxCal 보정연대·산점도·기종조성비·편년표 도판 4종">03 FIGURES</span>
-            <span style="color:#3f3f46;font-size:10px;">/</span>
-            <span id="agy-step-pill-4" class="agy-step-pill active" title="Stage 04: 박사급 『Ⅳ. 고찰』 마스터 원고 집필 및 단일 Google Docs 완성">04 MASTER DOC</span>
-          \`;
-
-          const runControls = document.createElement('div');
-          runControls.style.cssText = 'display:flex;align-items:center;gap:6px;flex:1;min-width:460px;';
-
-          const modeSelect = document.createElement('select');
-          modeSelect.id = 'agy-arch-mode-select';
-          modeSelect.className = 'agy-studio-select';
-          modeSelect.style.minWidth = '310px';
-          modeSelect.title = '박사급 고고학 발굴조사보고서 『Ⅳ. 고찰』 집필 모드를 선택합니다 (중간 멈춤 방지를 위해 최종 완료 시 단일 Google Docs로 일괄 연결됩니다)';
-          modeSelect.innerHTML = \`
-            <option value="phd_consolidate" selected>박사급 마스터 통합본 (과잉·중복 배제 핵심 Ⅰ~Ⅳ절 단일 Google Docs 완성)</option>
-            <option value="phd_full">박사급 전 공정 자율집필 (①데이터분석 → ②DBpia 실증 → ③도면 4종 → ④단일 마스터 고찰)</option>
-            <option value="phd_4chap">박사급 4절 정밀 분절 집필 (Ⅰ.머리말 / Ⅱ.유구분석 / Ⅲ.유물·절대연대 / Ⅳ.비교·성격)</option>
-            <option value="figures_only">출판급 학술 도면·모식도 4종 (OxCal·산점도·조성비·편년표) 렌더링</option>
-          \`;
-
-          const topicInput = document.createElement('input');
-          topicInput.id = 'agy-arch-topic-input';
-          topicInput.className = 'agy-studio-input';
-          topicInput.style.cssText = 'flex:1;min-width:140px;';
-          topicInput.placeholder = '고찰 핵심 논점 지시 (선택 입력 — 예: 영동권 여·철자형 주거지 편년 및 신라 진출기 성격)';
-
-          const pathInput = document.createElement('input');
-          pathInput.id = 'agy-gemini-filepath-input';
-          pathInput.type = 'hidden';
-          pathInput.value = 'D:/phone/archaeology_reports';
-
-          const startArchBtn = document.createElement('button');
-          startArchBtn.id = 'agy-start-arch-pipeline-btn';
-          startArchBtn.className = 'agy-studio-btn agy-studio-btn-primary';
-          startArchBtn.style.padding = '0 12px';
-          startArchBtn.innerHTML = '<svg viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3" fill="currentColor"/></svg><span>고찰 집필 실행</span>';
-          startArchBtn.onclick = async () => {
-            const selectedMode = modeSelect.value || 'phd_consolidate';
-            showStatus('박사급 고찰 집필 공정(' + selectedMode + ')을 시작합니다...');
-            const d = await callStudioAction({
-              action: 'start-arch-pipeline',
-              runMode: selectedMode,
-              userFocus: topicInput.value.trim(),
-              targetPath: pathInput.value.trim()
-            });
-            showStatus(d.message || '박사급 고찰 파이프라인 가동 중');
-          };
-
-          const pauseArchBtn = document.createElement('button');
-          pauseArchBtn.id = 'agy-pause-arch-pipeline-btn';
-          pauseArchBtn.className = 'agy-studio-btn agy-studio-btn-amber';
-          pauseArchBtn.title = '진행 중인 고찰 집필 파이프라인을 일시멈춤하거나 중단 지점부터 재개합니다';
-          pauseArchBtn.innerHTML = '<svg viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg><span>일시멈춤</span>';
-          pauseArchBtn.onclick = async () => {
-            const d = await callStudioAction({ action: 'pause-arch-pipeline' });
-            if (d && typeof d.paused === 'boolean') {
-              if (d.paused) {
-                pauseArchBtn.classList.add('paused-active');
-                pauseArchBtn.innerHTML = '<svg viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3" fill="currentColor"/></svg><span>재개</span>';
-              } else {
-                pauseArchBtn.classList.remove('paused-active');
-                pauseArchBtn.innerHTML = '<svg viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg><span>일시멈춤</span>';
+        function attachGeminiAutoWorkModeLock(gemWebview) {
+          if (!gemWebview || gemWebview.dataset.argonWorkHooked === 'true') return;
+          gemWebview.dataset.argonWorkHooked = 'true';
+          const lockScript = \`(async () => {
+            const sleep = ms => new Promise(r => setTimeout(r, ms));
+            try {
+              const modeBtn = document.querySelector('button[aria-label*="모드 선택"], button[aria-label*="mode"], bard-mode-switcher button');
+              const curTxt = modeBtn ? (modeBtn.textContent || '').replace(/\\\\s+/g, ' ').trim() : '';
+              if (modeBtn && !curTxt.toLowerCase().includes('argon')) {
+                modeBtn.click();
+                await sleep(260);
+                let items = Array.from(document.querySelectorAll('gem-menu-item'));
+                const argonItem = items.find(el => el.getAttribute('data-mode-id') === '95a4c0abcba24364' || (el.textContent || '').includes('Argon'));
+                if (argonItem && !argonItem.classList.contains('selected')) {
+                  (argonItem.querySelector('button, gem-menu-item-content') || argonItem).click();
+                  await sleep(260);
+                }
+                const bd = document.querySelector('.cdk-overlay-backdrop');
+                if (bd) bd.click();
               }
-            }
-            showStatus(d.message || '일시멈춤 상태가 전환되었습니다.');
-          };
-
-          const stopArchBtn = document.createElement('button');
-          stopArchBtn.id = 'agy-stop-arch-pipeline-btn';
-          stopArchBtn.className = 'agy-studio-btn agy-studio-btn-danger';
-          stopArchBtn.title = '진행 중인 Gemini 대답 생성과 파이프라인을 즉시 강제 중단합니다';
-          stopArchBtn.innerHTML = '<svg viewBox="0 0 24 24"><rect x="5" y="5" width="14" height="14" fill="currentColor"/></svg><span>즉시 중단</span>';
-          stopArchBtn.onclick = async () => {
-            showStatus('즉시 중단을 실행합니다...');
-            const d = await callStudioAction({ action: 'stop-arch-pipeline' });
-            pauseArchBtn.classList.remove('paused-active');
-            pauseArchBtn.innerHTML = '<svg viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg><span>일시멈춤</span>';
-            showStatus(d.message || '즉시 중단 완료');
-          };
-
-          const logToggleBtn = document.createElement('button');
-          logToggleBtn.className = 'agy-studio-btn';
-          logToggleBtn.innerHTML = '<svg viewBox="0 0 24 24"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg><span>로그</span>';
-          logToggleBtn.title = '실시간 실행 로그 콘솔 열기/닫기';
-          logToggleBtn.onclick = () => {
-            const logDrawer = document.getElementById('agy-studio-log-drawer');
-            if (logDrawer) {
-              logDrawer.style.display = logDrawer.style.display === 'none' ? 'block' : 'none';
-            }
-          };
-
-          runControls.appendChild(modeSelect);
-          runControls.appendChild(topicInput);
-          runControls.appendChild(pathInput);
-          runControls.appendChild(startArchBtn);
-          runControls.appendChild(pauseArchBtn);
-          runControls.appendChild(stopArchBtn);
-          runControls.appendChild(logToggleBtn);
-
-          cmdBar.appendChild(stepper);
-          cmdBar.appendChild(runControls);
-
-          // =================================================================
-          // TIER 3: Minimalist Progress Hairline & Monospace Telemetry Bar
-          // =================================================================
-          const statusWrap = document.createElement('div');
-          statusWrap.id = 'agy-gemini-coding-toolbar';
-          statusWrap.style.cssText = 'display:flex;flex-direction:column;background:#09090b;';
-
-          const progressTrack = document.createElement('div');
-          progressTrack.style.cssText = 'width:100%;height:2px;background:#18181b;overflow:hidden;';
-          const progressFill = document.createElement('div');
-          progressFill.id = 'agy-studio-progress-fill';
-          progressFill.style.cssText = 'width:100%;height:100%;background:#10b981;transition:width 0.25s ease;';
-          progressTrack.appendChild(progressFill);
-
-          const statusLine = document.createElement('div');
-          statusLine.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:4px 12px;font-size:11px;color:#a1a1aa;gap:12px;min-height:26px;';
-
-          const statusBadge = document.createElement('span');
-          statusBadge.id = 'agy-gemini-toolbar-status';
-          statusBadge.style.cssText = 'font-weight:500;color:#e4e4e7;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
-          statusBadge.textContent = 'ARCHAEO STUDIO PRO 4.0 Ready — [고찰 집필 실행] 클릭 시 박사급 『Ⅳ. 고찰』 단일 마스터 원고를 완성하고 Google Docs로 직행 연결합니다.';
-
-          const metricsBadge = document.createElement('span');
-          metricsBadge.id = 'agy-studio-metrics-badge';
-          metricsBadge.style.cssText = 'color:#71717a;font-family:Consolas,monospace;font-size:10.5px;font-weight:600;white-space:nowrap;';
-          metricsBadge.textContent = \`DBPIA \${10} QRY  ·  FIGURES \${initialFigureCount || 4} PLATES  ·  GOOGLE DOCS \${window.__agyDocsStore.length || 3} LINKED\`;
-
-          statusLine.appendChild(statusBadge);
-          statusLine.appendChild(metricsBadge);
-
-          const logDrawer = document.createElement('div');
-          logDrawer.id = 'agy-studio-log-drawer';
-          logDrawer.style.cssText = 'display:none;max-height:130px;overflow-y:auto;padding:8px 14px;background:#050507;border-top:1px solid rgba(255,255,255,0.08);font-family:Consolas,monospace;font-size:11px;color:#a1a1aa;line-height:1.55;';
-          logDrawer.textContent = 'System telemetry log initialized.';
-
-          statusWrap.appendChild(progressTrack);
-          statusWrap.appendChild(statusLine);
-          statusWrap.appendChild(logDrawer);
-
-          wrapper.appendChild(topBar);
-          wrapper.appendChild(cmdBar);
-          wrapper.appendChild(statusWrap);
-          return wrapper;
-        }
-
-        function ensureFiguresStudioPane(splitWrapEl) {
-          let figPane = document.getElementById('agy-figures-studio-pane');
-          if (!figPane) {
-            figPane = document.createElement('div');
-            figPane.id = 'agy-figures-studio-pane';
-            figPane.style.cssText = 'display:none;flex:1;flex-direction:column;width:100%;height:100%;overflow-y:auto;background:#f8fafc;color:#0f172a;padding:24px 32px;';
-            figPane.innerHTML = \`
-              <div style="max-width:1120px;margin:0 auto;width:100%;">
-                <div style="display:flex;align-items:center;justify-content:space-between;border-bottom:2px solid #0f172a;padding-bottom:12px;margin-bottom:20px;flex-wrap:wrap;gap:10px;">
-                  <div>
-                    <h2 style="margin:0;font-size:17px;font-weight:800;color:#0f172a;">발굴조사보고서 『Ⅳ. 고찰』 출판급 학술 도면·모식도 도판 (도면 1~4)</h2>
-                    <p style="margin:4px 0 0 0;font-size:12px;color:#475569;">국립문화유산연구원·한국고고학보 학술 도면 규격 (OxCal IntCal20 보정연대 확률분포 · 유구 규모 등비례 산점도 · 기종 조성비 해칭 차트 · 이중괘선 편년표)</p>
-                  </div>
-                  <div style="display:flex;gap:8px;flex-wrap:wrap;">
-                    <button id="agy-regen-figures-btn" style="background:#09090b;color:#fff;border:none;border-radius:5px;padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer;">실측 수치 기반 도면 4종 재렌더링</button>
-                    <button id="agy-switch-to-gdocs-from-fig-btn" style="background:#059669;color:#fff;border:none;border-radius:5px;padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer;">Google Docs 문서 뷰어 열기</button>
-                  </div>
-                </div>
-                <div id="agy-figures-gallery-body">
-                  \${initialFiguresHtml || '<div style="padding:60px 20px;text-align:center;color:#64748b;background:#fff;border:1px solid #cbd5e1;border-radius:6px;font-size:13px;">상단 [실측 수치 기반 도면 4종 재렌더링] 버튼을 누르면 출판급 고고학 도면 4종이 렌더링됩니다.</div>'}
-                </div>
-              </div>
-            \`;
-            splitWrapEl.appendChild(figPane);
-          }
-          const regenBtn = document.getElementById('agy-regen-figures-btn');
-          if (regenBtn) {
-            regenBtn.onclick = async () => {
-              const badge = document.getElementById('agy-gemini-toolbar-status');
-              if (badge) badge.textContent = '보고서·논문 실측 수치 기반 출판급 학술 도면 4종 렌더링 중...';
-              await callStudioAction({
-                action: 'start-arch-pipeline',
-                runMode: 'figures_only',
-                userFocus: (document.getElementById('agy-arch-topic-input')?.value || '').trim(),
-                targetPath: 'D:/phone/archaeology_reports'
-              });
-            };
-          }
-          const switchGdocBtn = document.getElementById('agy-switch-to-gdocs-from-fig-btn');
-          if (switchGdocBtn) {
-            switchGdocBtn.onclick = () => {
-              const c = document.getElementById('agy-gemini-desktop-drawer');
-              if (c) applyViewMode(c, 'gdocs');
-            };
-          }
-        }
-
-        function ensureGoogleDocsStudioPane(splitWrapEl) {
-          let gdocsPane = document.getElementById('agy-gdocs-studio-pane');
-          if (!gdocsPane) {
-            gdocsPane = document.createElement('div');
-            gdocsPane.id = 'agy-gdocs-studio-pane';
-            gdocsPane.style.cssText = 'display:none;flex:1;flex-direction:column;width:100%;height:100%;overflow:hidden;background:#09090b;';
-
-            const gdocsToolbar = document.createElement('div');
-            gdocsToolbar.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:6px 12px;background:#0e0e11;border-bottom:1px solid rgba(255,255,255,0.08);gap:10px;flex-wrap:wrap;';
-            gdocsToolbar.innerHTML = \`
-              <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;flex:1;">
-                <span style="color:#a1a1aa;font-size:11.5px;font-weight:600;">연결된 Google Docs 문서:</span>
-                <div id="agy-gdocs-tabs-bar" style="display:flex;align-items:center;gap:5px;flex-wrap:wrap;"></div>
-              </div>
-              <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
-                <a id="agy-gdocs-active-url" href="\${initialLatestDocUrl || '#'}" target="_blank" style="color:#71717a;font-family:Consolas,monospace;font-size:10.5px;max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-decoration:underline;" title="현재 연결된 Google Docs 주소">\${initialLatestDocUrl || '연결된 문서'}</a>
-                <button id="agy-gdocs-sync-latest-btn" class="agy-studio-btn agy-studio-btn-gdocs" title="Gemini의 최신 고찰 본문을 즉시 Google Docs로 내보내고 이곳에 연결합니다">최신 고찰 본문 → Google Docs 생성</button>
-                <button id="agy-gdocs-consolidate-btn" class="agy-studio-btn agy-studio-btn-primary" title="기존 대화의 산재된 내용을 박사급 『Ⅳ. 고찰』 단일 마스터 원고로 압축·통합한 뒤 단일 Google Docs로 완성합니다">박사급 단일 마스터 통합본 생성</button>
-                <button id="agy-gdocs-open-external-btn" class="agy-studio-btn" title="현재 문서를 외부 브라우저 새 탭에서 엽니다">외부 브라우저 열기</button>
-              </div>
-            \`;
-
-            const gdocWv = document.createElement('webview');
-            gdocWv.id = 'agy-gdocs-webview';
-            gdocWv.setAttribute('partition', 'persist:gemini-desktop');
-            gdocWv.setAttribute('useragent', GEMINI_UA);
-            gdocWv.setAttribute('allowpopups', 'true');
-            gdocWv.style.cssText = 'flex:1;width:100%;height:100%;border:none;background:#ffffff;';
-            gdocWv.dataset.pendingSrc = initialLatestDocUrl || 'https://docs.google.com/document/u/0/';
-
-            gdocsPane.appendChild(gdocsToolbar);
-            gdocsPane.appendChild(gdocWv);
-            splitWrapEl.appendChild(gdocsPane);
-          }
-
-          renderGoogleDocsTabs(window.__agyDocsStore, initialLatestDocUrl);
-
-          const syncLatestBtn = document.getElementById('agy-gdocs-sync-latest-btn');
-          if (syncLatestBtn) {
-            syncLatestBtn.onclick = async () => {
-              const badge = document.getElementById('agy-gemini-toolbar-status');
-              if (badge) badge.textContent = '최신 Gemini 고찰 본문을 Google Docs 문서로 내보내고 연결 중...';
-              const d = await callStudioAction({ action: 'export-to-google-docs', autoSwitchView: true });
-              if (badge && d?.message) badge.textContent = d.message;
-            };
-          }
-
-          const consolidateBtn = document.getElementById('agy-gdocs-consolidate-btn');
-          if (consolidateBtn) {
-            consolidateBtn.onclick = async () => {
-              const badge = document.getElementById('agy-gemini-toolbar-status');
-              if (badge) badge.textContent = '박사급 『Ⅳ. 고찰』 단일 마스터 통합본 집필 및 Google Docs 생성 시작...';
-              const c = document.getElementById('agy-gemini-desktop-drawer');
-              if (c) applyViewMode(c, 'split');
-              const d = await callStudioAction({ action: 'start-arch-pipeline', runMode: 'phd_consolidate' });
-              if (badge && d?.message) badge.textContent = d.message;
-            };
-          }
-
-          const openExtBtn = document.getElementById('agy-gdocs-open-external-btn');
-          if (openExtBtn) {
-            openExtBtn.onclick = async () => {
-              const gdocWv = document.getElementById('agy-gdocs-webview');
-              const targetUrl = (gdocWv && gdocWv.getAttribute('src')) || initialLatestDocUrl;
-              await callStudioAction({ action: 'open-external-gdoc', url: targetUrl });
-            };
-          }
+              const workSeg = document.querySelector('gem-segmented-button[data-value="40"]') ||
+                Array.from(document.querySelectorAll('gem-segmented-button')).find(el => (el.textContent || '').trim() === '작업');
+              if (workSeg && !workSeg.classList.contains('gem-segmented-button-selected')) {
+                const targetBtn = workSeg.querySelector('button, .mdc-segmented-button__segment, [role="button"]') || workSeg;
+                targetBtn.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+                targetBtn.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+                targetBtn.click();
+              }
+            } catch (e) {}
+          })()\`;
+          gemWebview.addEventListener('dom-ready', () => {
+            try { gemWebview.executeJavaScript(lockScript).catch(() => {}); } catch {}
+          });
+          gemWebview.addEventListener('did-finish-load', () => {
+            try { gemWebview.executeJavaScript(lockScript).catch(() => {}); } catch {}
+          });
         }
 
         if (!container) {
           container = document.createElement('div');
           container.id = 'agy-gemini-desktop-drawer';
-          container.dataset.wide = 'true';
           container.dataset.viewMode = 'split';
           applyDrawerStyle(container, false);
 
-          const header = createStudioHeader(container);
+          const header = createMinimalLoginHeader(container);
           container.appendChild(header);
-
-          const paneSubheader = document.createElement('div');
-          paneSubheader.id = 'agy-pane-subheaders';
-          paneSubheader.style.cssText = 'display:flex;width:100%;background:#09090b;border-bottom:1px solid rgba(255,255,255,0.07);font-size:11px;font-weight:500;color:#71717a;';
-          paneSubheader.innerHTML = \`
-            <div id="agy-pane-header-gemini" style="flex:1.15;padding:4px 12px;display:flex;align-items:center;justify-content:space-between;border-right:1px solid rgba(255,255,255,0.07);">
-              <span>Google Gemini Workspace <strong style="color:#e4e4e7;font-weight:600;">· 4 Argon High (작업 모드)</strong></span>
-              <span style="color:#71717a;font-family:Consolas,monospace;font-size:10px;">NRICH / KAS 『Ⅳ. 고찰』 표준 체제</span>
-            </div>
-            <div id="agy-pane-header-dbpia" style="flex:0.85;padding:4px 12px;display:flex;align-items:center;justify-content:space-between;">
-              <span>DBpia AI Academic Engine <strong style="color:#e4e4e7;font-weight:600;">· KCI 실증 문헌 검색</strong></span>
-              <span style="color:#71717a;font-family:Consolas,monospace;font-size:10px;">선행연구·비교유적 검증</span>
-            </div>
-          \`;
-          container.appendChild(paneSubheader);
 
           const splitWrap = document.createElement('div');
           splitWrap.id = 'agy-webviews-split-wrap';
-          splitWrap.style.cssText = 'display:flex;flex:1;width:100%;height:100%;overflow:hidden;background:#09090b;position:relative;';
+          splitWrap.style.cssText = 'display:flex;flex:1;width:100%;height:100%;overflow:hidden;background:#FAF9F5;position:relative;';
 
           wvGem = document.createElement('webview');
           wvGem.id = 'agy-gemini-desktop-webview';
           wvGem.setAttribute('partition', 'persist:gemini-desktop');
           wvGem.setAttribute('useragent', GEMINI_UA);
           wvGem.setAttribute('allowpopups', 'true');
-          wvGem.style.cssText = 'flex:1.15;width:100%;height:100%;border:none;display:flex;';
+          wvGem.style.cssText = 'flex:1.1;width:100%;height:100%;border:none;display:flex;';
           wvGem.setAttribute('src', 'https://gemini.google.com/app');
+          attachGeminiAutoWorkModeLock(wvGem);
 
           const divider = document.createElement('div');
           divider.id = 'agy-split-divider';
-          divider.style.cssText = 'width:1px;background:rgba(255,255,255,0.1);height:100%;';
+          divider.style.cssText = 'width:1px;background:#E5E0D5;height:100%;';
 
           wvDb = document.createElement('webview');
           wvDb.id = 'agy-dbpia-webview';
           wvDb.setAttribute('partition', 'persist:gemini-desktop');
           wvDb.setAttribute('useragent', DBPIA_UA);
           wvDb.setAttribute('allowpopups', 'true');
-          wvDb.style.cssText = 'flex:0.85;width:100%;height:100%;border:none;display:flex;';
+          wvDb.style.cssText = 'flex:0.9;width:100%;height:100%;border:none;display:flex;';
           wvDb.setAttribute('src', 'https://ai.dbpia.co.kr/ko/search');
 
           splitWrap.appendChild(wvGem);
           splitWrap.appendChild(divider);
           splitWrap.appendChild(wvDb);
-          ensureFiguresStudioPane(splitWrap);
-          ensureGoogleDocsStudioPane(splitWrap);
           container.appendChild(splitWrap);
           document.body.appendChild(container);
           applyViewMode(container, 'split');
         } else {
-          // Hot-upgrade existing drawer to v4.0 Pro Obsidian UI WITHOUT reloading live <webview>s
-          let splitWrap = document.getElementById('agy-webviews-split-wrap');
-          if (!splitWrap) {
-            splitWrap = document.createElement('div');
-            splitWrap.id = 'agy-webviews-split-wrap';
-            splitWrap.style.cssText = 'display:flex;flex:1;width:100%;height:100%;overflow:hidden;background:#09090b;position:relative;';
-            if (wvGem) {
-              wvGem.replaceWith(splitWrap);
-              wvGem.style.cssText = 'flex:1.15;width:100%;height:100%;border:none;display:flex;';
-              splitWrap.appendChild(wvGem);
-            } else {
-              container.appendChild(splitWrap);
-            }
-          }
-          if (!document.getElementById('agy-split-divider')) {
-            const divider = document.createElement('div');
-            divider.id = 'agy-split-divider';
-            divider.style.cssText = 'width:1px;background:rgba(255,255,255,0.1);height:100%;';
-            splitWrap.appendChild(divider);
-          }
-          if (!wvDb || !splitWrap.contains(wvDb) || wvDb.getAttribute('partition') !== 'persist:gemini-desktop') {
-            if (wvDb) wvDb.remove();
-            wvDb = document.createElement('webview');
-            wvDb.id = 'agy-dbpia-webview';
-            wvDb.setAttribute('partition', 'persist:gemini-desktop');
-            wvDb.setAttribute('useragent', DBPIA_UA);
-            wvDb.setAttribute('allowpopups', 'true');
-            wvDb.style.cssText = 'flex:0.85;width:100%;height:100%;border:none;display:flex;';
-            wvDb.setAttribute('src', 'https://ai.dbpia.co.kr/ko/search');
-            splitWrap.appendChild(wvDb);
-          }
-          ensureFiguresStudioPane(splitWrap);
-          ensureGoogleDocsStudioPane(splitWrap);
-
+          // Upgrade any existing PRO 4.0 drawer to headless 5.0 WITHOUT reloading live <webview>s
           const existingHeader = document.getElementById('agy-workstation-header-wrapper');
-          if (!existingHeader || existingHeader.dataset.version !== '4.0') {
-            const newHeader = createStudioHeader(container);
-            if (existingHeader) {
-              existingHeader.replaceWith(newHeader);
-            } else {
-              container.insertBefore(newHeader, container.firstChild);
-            }
+          if (!existingHeader || existingHeader.dataset.version !== '5.0-headless') {
+            const newHeader = createMinimalLoginHeader(container);
+            if (existingHeader) existingHeader.replaceWith(newHeader);
+            else container.insertBefore(newHeader, container.firstChild);
           }
-          const existingSub = document.getElementById('agy-pane-subheaders');
-          if (existingSub) {
-            existingSub.style.cssText = 'display:flex;width:100%;background:#09090b;border-bottom:1px solid rgba(255,255,255,0.07);font-size:11px;font-weight:500;color:#71717a;';
-            existingSub.innerHTML = \`
-              <div id="agy-pane-header-gemini" style="flex:1.15;padding:4px 12px;display:flex;align-items:center;justify-content:space-between;border-right:1px solid rgba(255,255,255,0.07);">
-                <span>Google Gemini Workspace <strong style="color:#e4e4e7;font-weight:600;">· 4 Argon High (작업 모드)</strong></span>
-                <span style="color:#71717a;font-family:Consolas,monospace;font-size:10px;">NRICH / KAS 『Ⅳ. 고찰』 표준 체제</span>
-              </div>
-              <div id="agy-pane-header-dbpia" style="flex:0.85;padding:4px 12px;display:flex;align-items:center;justify-content:space-between;">
-                <span>DBpia AI Academic Engine <strong style="color:#e4e4e7;font-weight:600;">· KCI 실증 문헌 검색</strong></span>
-                <span style="color:#71717a;font-family:Consolas,monospace;font-size:10px;">선행연구·비교유적 검증</span>
-              </div>
-            \`;
-          }
-          const figGalBody = document.getElementById('agy-figures-gallery-body');
-          if (figGalBody && initialFiguresHtml && figGalBody.innerHTML.includes('버튼을 누르면')) {
-            figGalBody.innerHTML = initialFiguresHtml;
-            const b = document.getElementById('agy-fig-count-badge');
-            if (b) { b.textContent = String(initialFigureCount || 4); b.style.display = 'inline-block'; }
-          }
-          renderGoogleDocsTabs(initialGoogleDocsList, initialLatestDocUrl);
+          if (wvGem) attachGeminiAutoWorkModeLock(wvGem);
           applyViewMode(container, container.dataset.viewMode || 'split');
-          applyDrawerStyle(container, container.dataset.visible === 'true');
+          // Force hide if it was left open from PRO 4.0 unless toggle === true was explicitly passed
+          if (${toggleMode} !== true && ${toggleMode} !== 'flip') {
+            applyDrawerStyle(container, false);
+          }
         }
-
-        // Live Studio UI State Updater
-        window.__agyUpdateStudioState = (st) => {
-          if (!st) return;
-          const badge = document.getElementById('agy-gemini-toolbar-status');
-          if (badge && st.stepDetail) badge.textContent = st.stepDetail;
-
-          const fill = document.getElementById('agy-studio-progress-fill');
-          if (fill && typeof st.progressPct === 'number') {
-            fill.style.width = st.progressPct + '%';
-            fill.style.background = st.paused ? '#f59e0b' : (st.phase === 'ABORTED' || st.phase === 'ERROR' ? '#ef4444' : '#10b981');
-          }
-
-          const pauseBtn = document.getElementById('agy-pause-arch-pipeline-btn');
-          if (pauseBtn && typeof st.paused === 'boolean') {
-            if (st.paused) {
-              pauseBtn.classList.add('paused-active');
-              pauseBtn.innerHTML = '<svg viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3" fill="currentColor"/></svg><span>재개</span>';
-            } else {
-              pauseBtn.classList.remove('paused-active');
-              pauseBtn.innerHTML = '<svg viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg><span>일시멈춤</span>';
-            }
-          }
-
-          const gdocCount = Array.isArray(st.googleDocsList) ? st.googleDocsList.length : 0;
-          const metrics = document.getElementById('agy-studio-metrics-badge');
-          if (metrics) {
-            metrics.textContent = \`DBPIA \${st.totalQueriesRun || 0} QRY  ·  FIGURES \${st.figureCount || 4} PLATES  ·  GOOGLE DOCS \${gdocCount} LINKED (\${(st.totalCharsWritten || 0).toLocaleString()}c)\`;
-          }
-
-          if (Array.isArray(st.googleDocsList) && st.googleDocsList.length > 0) {
-            renderGoogleDocsTabs(st.googleDocsList, null);
-          }
-
-          const logDrawer = document.getElementById('agy-studio-log-drawer');
-          if (logDrawer && Array.isArray(st.logs)) {
-            logDrawer.innerHTML = st.logs.map(l => \`<div>\${l.replace(/</g, '&lt;')}</div>\`).join('');
-            logDrawer.scrollTop = logDrawer.scrollHeight;
-          }
-
-          const p1 = document.getElementById('agy-step-pill-1');
-          const p2 = document.getElementById('agy-step-pill-2');
-          const p3 = document.getElementById('agy-step-pill-3');
-          const p4 = document.getElementById('agy-step-pill-4');
-          [p1, p2, p3, p4].forEach(p => { if (p) p.className = 'agy-step-pill'; });
-
-          const ph = st.phase || '';
-          if (ph.startsWith('PHASE_1')) {
-            if (p1) p1.className = 'agy-step-pill active';
-          } else if (ph.startsWith('PHASE_2')) {
-            if (p1) p1.className = 'agy-step-pill done';
-            if (p2) p2.className = 'agy-step-pill active';
-          } else if (ph.startsWith('PHASE_3')) {
-            if (p1) p1.className = 'agy-step-pill done';
-            if (p2) p2.className = 'agy-step-pill done';
-            if (p3) p3.className = 'agy-step-pill active';
-          } else if (ph.startsWith('PHASE_4')) {
-            if (p1) p1.className = 'agy-step-pill done';
-            if (p2) p2.className = 'agy-step-pill done';
-            if (p3) p3.className = 'agy-step-pill done';
-            if (p4) p4.className = 'agy-step-pill active';
-          } else if (ph === 'COMPLETED') {
-            [p1, p2, p3, p4].forEach(p => { if (p) p.className = 'agy-step-pill done'; });
-          } else {
-            if (p1) p1.className = 'agy-step-pill done';
-            if (p2) p2.className = 'agy-step-pill done';
-            if (p3) p3.className = 'agy-step-pill done';
-            if (p4) p4.className = 'agy-step-pill active';
-          }
-        };
 
         function setDrawerVisible(show) {
           const liveContainer = document.getElementById('agy-gemini-desktop-drawer');
@@ -1851,99 +742,8 @@ async function _ensureEmbeddedGeminiWebviewImpl(options = {}) {
             applyDrawerStyle(liveContainer, show);
           }
         }
-
         window.__agySetGeminiDrawerVisible = setDrawerVisible;
-
-        function destroyStudioCompletely() {
-          const d = document.getElementById('agy-gemini-desktop-drawer');
-          const f = document.getElementById('agy-gemini-desktop-fab');
-          const s = document.getElementById('agy-workstation-style');
-          if (d) d.remove();
-          if (f) f.remove();
-          if (s) s.remove();
-          if (window.__agyGeminiHotkeyListener) {
-            window.removeEventListener('keydown', window.__agyGeminiHotkeyListener);
-            window.__agyGeminiHotkeyListener = null;
-          }
-          window.__agySetGeminiDrawerVisible = null;
-          window.__agyUpdateStudioState = null;
-          fetch('http://127.0.0.1:' + BRIDGE_PORT + '/studio-action', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ action: 'shutdown-studio' })
-          }).catch(() => {});
-        }
-        window.__agyDestroyStudioCompletely = destroyStudioCompletely;
-
-        const closeBtn = document.getElementById('agy-gemini-close-btn');
-        if (closeBtn) closeBtn.onclick = () => setDrawerVisible(false);
-        const powerOffBtn = document.getElementById('agy-gemini-poweroff-btn');
-        if (powerOffBtn) powerOffBtn.onclick = () => destroyStudioCompletely();
-        const reloadBtn = document.getElementById('agy-gemini-reload-btn');
-        if (reloadBtn) reloadBtn.onclick = () => {
-          const g = document.getElementById('agy-gemini-desktop-webview');
-          if (g) g.setAttribute('src', 'https://gemini.google.com/app');
-        };
-
-        if (!fab) {
-          fab = document.createElement('div');
-          fab.id = 'agy-gemini-desktop-fab';
-          document.body.appendChild(fab);
-        }
-        fab.innerHTML = \`
-          <div id="agy-fab-toggle-area" style="display:inline-flex;align-items:center;gap:7px;cursor:pointer;padding:6px 10px 6px 13px;" title="ARCHAEO STUDIO PRO 4.0 열기/접기 (Ctrl+Shift+G)">
-            <span style="width:7px;height:7px;border-radius:50%;background:#10b981;display:inline-block;"></span>
-            <span style="font-weight:700;letter-spacing:0.03em;">ARCHAEO STUDIO</span>
-            <span style="color:#a1a1aa;font-family:Consolas,monospace;font-size:10px;">PRO 4.0</span>
-          </div>
-          <button id="agy-fab-poweroff" title="스튜디오 완전 종료 (화면에 뜨지 않게 끄기)" style="background:transparent;border:none;border-left:1px solid rgba(255,255,255,0.14);color:#a1a1aa;cursor:pointer;padding:6px 9px;font-size:11px;line-height:1;display:inline-flex;align-items:center;justify-content:center;border-radius:0 6px 6px 0;" onmouseover="this.style.color='#f87171';this.style.background='rgba(239,68,68,0.15)';" onmouseout="this.style.color='#a1a1aa';this.style.background='transparent';">✕</button>
-        \`;
-        fab.style.cssText = [
-          'position:fixed',
-          'right:14px',
-          'bottom:10px',
-          'z-index:999999',
-          'border-radius:6px',
-          'border:1px solid rgba(255,255,255,0.16)',
-          'background:#09090b',
-          'color:#fafafa',
-          'font-family:Pretendard,Inter,system-ui,sans-serif',
-          'font-size:11.5px',
-          'box-shadow:0 8px 24px rgba(0,0,0,0.8)',
-          'display:inline-flex',
-          'align-items:center'
-        ].join(';');
-        const fabToggleArea = document.getElementById('agy-fab-toggle-area');
-        if (fabToggleArea) {
-          fabToggleArea.onclick = () => {
-            const liveContainer = document.getElementById('agy-gemini-desktop-drawer');
-            if (liveContainer && window.__agySetGeminiDrawerVisible) {
-              const cur = liveContainer.dataset.visible === 'true';
-              window.__agySetGeminiDrawerVisible(!cur);
-            }
-          };
-        }
-        const fabPowerOff = document.getElementById('agy-fab-poweroff');
-        if (fabPowerOff) {
-          fabPowerOff.onclick = (e) => {
-            e.stopPropagation();
-            destroyStudioCompletely();
-          };
-        }
-
-        if (!window.__agyGeminiHotkeyListener) {
-          window.__agyGeminiHotkeyListener = (e) => {
-            if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'g') {
-              e.preventDefault();
-              const liveContainer = document.getElementById('agy-gemini-desktop-drawer');
-              if (liveContainer && window.__agySetGeminiDrawerVisible) {
-                const cur = liveContainer.dataset.visible === 'true';
-                window.__agySetGeminiDrawerVisible(!cur);
-              }
-            }
-          };
-          window.addEventListener('keydown', window.__agyGeminiHotkeyListener);
-        }
+        window.__agyUpdateStudioState = () => {};
 
         const requestedView = ${viewModeArg};
         if (requestedView) {
@@ -1969,12 +769,18 @@ async function _ensureEmbeddedGeminiWebviewImpl(options = {}) {
     const r = await fetch(`http://127.0.0.1:${port}/json`);
     const list = await r.json();
     wvTarget = list.find(
-      (t) => t.type === "webview" && t.url.includes("gemini.google.com")
+      (t) =>
+        t.type === "webview" &&
+        (t.url.includes("gemini.google.com") ||
+          t.url.includes("accounts.google.com") ||
+          t.url.includes("myaccount.google.com"))
     );
     dbpiaTarget = list.find(
       (t) =>
         t.type === "webview" &&
         !t.url.includes("gemini.google.com") &&
+        !t.url.includes("accounts.google.com") &&
+        !t.url.includes("myaccount.google.com") &&
         !t.url.includes("docs.google.com") &&
         !t.url.includes("drive.google.com")
     );
@@ -2010,7 +816,7 @@ async function ensureArgonHighAndWorkMode(send) {
       if (!window.__agyArgonHighLocked || !currentModeText.toLowerCase().includes('argon')) {
         if (modeBtn && document.querySelectorAll('gem-menu-item').length === 0) {
           modeBtn.click();
-          await sleep(260);
+          await sleep(280);
         }
 
         let items = Array.from(document.querySelectorAll('gem-menu-item'));
@@ -2018,11 +824,11 @@ async function ensureArgonHighAndWorkMode(send) {
           el => el.getAttribute('data-mode-id') === '95a4c0abcba24364' || (el.textContent || '').includes('4 Argon') || (el.textContent || '').includes('Argon')
         );
         if (argonItem && !argonItem.classList.contains('selected')) {
-          argonItem.click();
-          await sleep(260);
+          (argonItem.querySelector('button, gem-menu-item-content') || argonItem).click();
+          await sleep(280);
           if (document.querySelectorAll('gem-menu-item').length === 0 && modeBtn) {
             modeBtn.click();
-            await sleep(260);
+            await sleep(280);
           }
         }
 
@@ -2031,8 +837,8 @@ async function ensureArgonHighAndWorkMode(send) {
           el => el.getAttribute('value') === 'thinking_level' || (el.textContent || '').includes('사고 수준')
         );
         if (thinkExpand && !thinkExpand.classList.contains('expanded')) {
-          thinkExpand.click();
-          await sleep(200);
+          (thinkExpand.querySelector('button, gem-menu-item-content') || thinkExpand).click();
+          await sleep(220);
         }
 
         items = Array.from(document.querySelectorAll('gem-menu-item'));
@@ -2044,12 +850,13 @@ async function ensureArgonHighAndWorkMode(send) {
           );
         });
         if (highItem && !highItem.classList.contains('selected')) {
-          highItem.click();
+          (highItem.querySelector('button, gem-menu-item-content') || highItem).click();
           await sleep(180);
         }
 
         const backdrop = document.querySelector('.cdk-overlay-backdrop');
         if (backdrop) backdrop.click();
+        await sleep(150);
         window.__agyArgonHighLocked = true;
       }
 
@@ -2058,9 +865,11 @@ async function ensureArgonHighAndWorkMode(send) {
       let workModeActive = false;
       if (workSeg) {
         if (!workSeg.classList.contains('gem-segmented-button-selected')) {
-          const btn = workSeg.querySelector('button') || workSeg;
+          const btn = workSeg.querySelector('button, .mdc-segmented-button__segment, [role="button"]') || workSeg;
+          btn.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+          btn.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
           btn.click();
-          await sleep(250);
+          await sleep(280);
         }
         workModeActive = workSeg.classList.contains('gem-segmented-button-selected') || Boolean(document.querySelector('.is-remy-mode, .remy-plan-pill'));
       } else {
@@ -2492,7 +1301,13 @@ function repairUnknownAuthorsInCitationLine(lineText, collectedPapers = []) {
 }
 
 function prepareMarkdownAndFootnotesForWordCraft(rawMarkdown) {
-  let md = String(rawMarkdown || "").trim();
+  const {
+    normalizeWcDiagramSpec,
+    repairCollapsedMarkdownTables,
+    replaceInlineFootnoteSafely,
+  } = require("./archaeology_visuals_enricher");
+
+  let md = repairCollapsedMarkdownTables(String(rawMarkdown || "").trim());
   if (!md) {
     return {
       wcMarkdown: "# 원고\n\n내용 없음",
@@ -2523,27 +1338,39 @@ function prepareMarkdownAndFootnotesForWordCraft(rawMarkdown) {
         const idx = charts.length + 1;
         const token = `[[WC_CHART_${idx}]]`;
         const chartTitle = spec.title || `고고학 정량 데이터 비교 차트 ${idx}`;
+        const cleanSeries = ((spec.data && spec.data.series) || []).map((s) => ({
+          ...s,
+          name: String(s.name || "").slice(0, 16),
+        }));
         const normalizedSpec = {
           width: 450,
-          height: 240,
+          height: 230,
           legend: "bottom",
           dataLabels: true,
           ...spec,
-          title: chartTitle,
+          title: "",
+          data: {
+            ...(spec.data || {}),
+            series: cleanSeries,
+          },
         };
         charts.push({ token, spec: normalizedSpec });
         return `\n\n**<그림 ${idx}> ${chartTitle}**\n\n${token}\n\n`;
       }
-      if (tag === "wc-diagram" || Array.isArray(spec.items)) {
+      const normDiag = normalizeWcDiagramSpec(spec);
+      if (tag === "wc-diagram" || normDiag) {
         const idx = diagrams.length + 1;
         const token = `[[WC_DIAGRAM_${idx}]]`;
-        const diagTitle = spec.title || `고고학 구조·층위·편년 변천 모식도 ${idx}`;
+        const diagTitle =
+          (normDiag && normDiag.title) ||
+          spec.title ||
+          `고고학 구조·층위·편년 변천 모식도 ${idx}`;
         const normalizedSpec = {
-          layout: spec.layout || "process",
-          colors: spec.colors || "accent1",
+          layout: (normDiag && normDiag.layout) || spec.layout || "process",
+          colors: (normDiag && normDiag.colors) || spec.colors || "accent1",
           width: 450,
           height: 220,
-          items: Array.isArray(spec.items) ? spec.items : [],
+          items: (normDiag && normDiag.items) || (Array.isArray(spec.items) ? spec.items : []),
         };
         diagrams.push({ token, spec: normalizedSpec });
         return `\n\n**<모식도 ${idx}> ${diagTitle}**\n\n${token}\n\n`;
@@ -2578,7 +1405,6 @@ function prepareMarkdownAndFootnotesForWordCraft(rawMarkdown) {
           autoNum = Math.max(autoNum, num + 1);
         }
       } else if (line.includes("「") || line.includes("『") || line.includes("쪽")) {
-        // Handle <ol><li> footnote lines where the number prefix was stripped by HTML extraction
         let text = line.replace(/pp?\.\s*(\d+)\s*[-~]\s*(\d+)/gi, "$1~$2쪽");
         text = repairUnknownAuthorsInCitationLine(text, pipelineState.collectedPapers);
         footnotesMap.set(autoNum, text);
@@ -2603,32 +1429,13 @@ function prepareMarkdownAndFootnotesForWordCraft(rawMarkdown) {
     const fnText = footnotesMap.get(num);
     const token = `[[WC_FN_${num}]]`;
     const supNum = toSuper(num);
-    let replacedInBody = false;
-
-    // Match inline citation on the SAME line only (never across \n so numbered lists like `\n2) 제목` are untouched)
-    const inlinePatterns = [
-      new RegExp(`(\\[\\^${num}\\])`, "g"),
-      new RegExp(`(\\[${num}\\])`, "g"),
-      new RegExp(`(${supNum}\\))`, "g"),
-      new RegExp(`([.다됨함음임”"'\\])])[ \\t]*(${num}\\))`, "g"),
-      new RegExp(`([가-힣a-zA-Z0-9.”"'\\])])[ \\t]*(${num}\\))`, "g"),
-    ];
-
-    for (const pat of inlinePatterns) {
-      if (pat.test(bodyPart)) {
-        bodyPart = bodyPart.replace(pat, (full, g1, g2) => {
-          if (replacedInBody) return full;
-          replacedInBody = true;
-          return g2 !== undefined ? `${g1}${token}` : token;
-        });
-        if (replacedInBody) break;
-      }
-    }
+    const rep = replaceInlineFootnoteSafely(bodyPart, num, token, supNum);
+    bodyPart = rep.text;
 
     orderedFootnotes.push({
       num,
       mark: `${num})`,
-      token: replacedInBody ? token : null,
+      token: rep.replaced ? token : null,
       text: fnText,
     });
   }
@@ -2894,7 +1701,7 @@ async function exportManuscriptToWordCraftAndPdfCraft(options = {}) {
     "--file",
     wcInputMdPath,
     "--author",
-    "ARCHAEO STUDIO PRO",
+    "ARCHAEO STUDIO 5.0",
     "--cmd",
     "layout.size=" + JSON.stringify({ name: "A4" }),
     "--cmd",
@@ -2913,7 +1720,7 @@ async function exportManuscriptToWordCraftAndPdfCraft(options = {}) {
     "file.properties=" +
       JSON.stringify({
         title: docTitle,
-        author: "ARCHAEO STUDIO PRO",
+        author: "ARCHAEO STUDIO 5.0",
         subject: isPaper ? "고고학 학술논문" : "발굴조사보고서 Ⅳ. 고찰",
         keywords: "고고학, 발굴조사보고서, 고찰, 학술논문, WordCraft, PdfCraft",
       }),
@@ -2921,7 +1728,7 @@ async function exportManuscriptToWordCraftAndPdfCraft(options = {}) {
 
   // Insert Gemini-generated native OOXML charts (`insert.chart`)
   for (const ch of charts) {
-    if (ch.token && ch.spec) {
+    if (ch.token && ch.spec && wcMarkdown.includes(ch.token)) {
       cliArgs.push(
         "--cmd",
         "select.text=" + JSON.stringify({ text: ch.token, story: "body" }),
@@ -2933,7 +1740,7 @@ async function exportManuscriptToWordCraftAndPdfCraft(options = {}) {
 
   // Insert Gemini-generated native OOXML schematic diagrams (`insert.smartArt`)
   for (const dg of diagrams) {
-    if (dg.token && dg.spec) {
+    if (dg.token && dg.spec && wcMarkdown.includes(dg.token)) {
       cliArgs.push(
         "--cmd",
         "select.text=" + JSON.stringify({ text: dg.token, story: "body" }),
@@ -2944,24 +1751,12 @@ async function exportManuscriptToWordCraftAndPdfCraft(options = {}) {
   }
 
   // Convert every footnote from 【각주】 into a true OOXML Word footnote (`references.footnote`).
-  // IMPORTANT: `references.footnote` moves the caret into `StoryRef::Part(id)` (the footnote story),
-  // so we MUST use `select.text` with `"story":"body"` for each token so all footnotes (1, 2, 3...)
-  // are found in the main body story and replaced cleanly!
   for (const fn of footnotes) {
-    const fnPayload = { text: fn.text, mark: fn.mark || `${fn.num})` };
-    if (fn.token) {
+    if (fn.token && wcMarkdown.includes(fn.token)) {
+      const fnPayload = { text: fn.text, mark: fn.mark || `${fn.num})` };
       cliArgs.push(
         "--cmd",
         "select.text=" + JSON.stringify({ text: fn.token, story: "body" }),
-        "--cmd",
-        "references.footnote=" + JSON.stringify(fnPayload)
-      );
-    } else {
-      cliArgs.push(
-        "--cmd",
-        "caret.set=" + JSON.stringify({ pos: { block: 0, off: 0 } }),
-        "--cmd",
-        "caret.docEnd={}",
         "--cmd",
         "references.footnote=" + JSON.stringify(fnPayload)
       );
@@ -3542,13 +2337,13 @@ async function _askGeminiWebImpl({
                 const codeText = (codeEl.textContent || '').trim();
                 if (codeText.startsWith('{') && codeText.endsWith('}')) {
                   if (codeText.includes('"categories"') || codeText.includes('"series"')) lang = 'wc-chart';
-                  else if (codeText.includes('"layout"') && codeText.includes('"items"')) lang = 'wc-diagram';
+                  else if (codeText.includes('"layout"') && (codeText.includes('"items"') || codeText.includes('"nodes"') || codeText.includes('"steps"'))) lang = 'wc-diagram';
                 }
                 block.textContent = '\\n\`\`\`' + lang + '\\n' + codeText.replace(/\\n$/, '') + '\\n\`\`\`\\n';
               });
               clone.querySelectorAll('table').forEach(tbl => {
                 const rows = Array.from(tbl.querySelectorAll('tr')).map(tr =>
-                  '| ' + Array.from(tbl.querySelectorAll('th, td')).map(cell => (cell.textContent || '').replace(/\\r?\\n/g, ' ').trim()).join(' | ') + ' |'
+                  '| ' + Array.from(tr.querySelectorAll('th, td')).map(cell => (cell.textContent || '').replace(/\\r?\\n/g, ' ').trim()).join(' | ') + ' |'
                 );
                 if (rows.length > 0) {
                   const colCount = tbl.querySelector('tr')?.querySelectorAll('th, td').length || 1;
@@ -6015,12 +4810,13 @@ function buildAdaptiveMasterPrompt({
     "   - **`<표 4> DBpia AI 수집 핵심 선행연구(실제 저자·연도·논문명) 학술 쟁점별 논거 및 본 유적 적용 종합 대비표`** (4절 수록)",
     "2) **제미나이 직접 생성 다중 비교차트(`wc-chart` 3개 이상) 및 다중 모식도(`wc-diagram` 3개 이상) 수록 (허구 수치 날조 절대 금지 — 반드시 보고서 실측치 및 DBpia 수집 문헌의 실제 비교 유구·지표 수치만 사용)**:",
     "   - **비교차트 1 (`wc-chart`, 2절)**: 본 유적 및 주변 비교유적(DBpia 문헌 기반) 시대별·유형별 확인 유구 기수 비교 차트",
-    '     ```wc-chart\n     {"type":"column","title":"본 유적 및 주변 비교유적군 시대별 확인 유구 비교 (보고서 및 DBpia 문헌 기반)","legend":"bottom","dataLabels":true,"data":{"categories":["병산동 277-12(본 유적)","병산동 공항접속도로","병산동 320-3번지","병산동 320-13번지"],"series":[{"name":"철기시대 주거지(동)","values":[6,0,0,0]},{"name":"삼국시대 주거지(동)","values":[1,6,8,2]},{"name":"시굴 확인 수혈유구(기)","values":[9,0,0,0]}]}}\n     ```',
-    "   - **비교차트 2 (`wc-chart`, 2절)**: 조사구역 확인 주거지 유구별 평면 규모(장축·단축 m 및 잔존 면적 ㎡) 정량 비교 차트",
+    '     ```wc-chart\n     {"type":"column","title":"본 유적 및 주변 비교유적군 확인 유구·출토유물 정량 비교 (보고서 및 DBpia 문헌 기반)","legend":"bottom","dataLabels":true,"data":{"categories":["본 조사 유적","주변 비교유적 A","주변 비교유적 B","주변 비교유적 C"],"series":[{"name":"주거·생활유구(기)","values":[4,8,6,5]},{"name":"수혈·기타유구(기)","values":[6,9,7,4]}]}}\n     ```',
+    "   - **비교차트 2 (`wc-chart`, 2절)**: 조사구역 확인 주요 유구별 평면 규모(장축·단축 m 및 잔존 면적 ㎡) 또는 출토유물 기종별 수량 정량 비교 차트",
     "   - **비교차트 3 (`wc-chart`, 3절)**: DBpia AI 수집 선행연구 주제 영역별 인용 논문 수 및 교차검증 비교 지표 분포 차트",
-    "   - **모식도 1 (`wc-diagram`, 2절)**: 조사구역 퇴적 층위(Ⅰ~Ⅴ층) 및 지반 보강·점토 다짐·벽구·화덕 축조 공정 모식도 (`layout: \"hierarchy\"`)",
-    "   - **모식도 2 (`wc-diagram`, 3절)**: 유구 중복 관계 및 출토유물 조합에 기반한 단계별(Ⅰ~Ⅲ단계) 취락·물질문화 변천 모식도 (`layout: \"process\"`)",
-    "   - **모식도 3 (`wc-diagram`, 4절)**: DBpia 수집 문헌 교차검증 기반 지역 취락망 공간 네트워크 및 문화 파급 구조 모식도 (`layout: \"process\"`)",
+    "   - **모식도 1 (`wc-diagram`, 2절)**: 조사구역 퇴적 층위 및 유구 축조·폐기 공정 모식도 (`layout: \"hierarchy\"`, 반드시 `\"items\": [{\"text\": \"...\", \"level\": 0}, {\"text\": \"...\", \"level\": 1}]` 형식 사용)",
+    '     ```wc-diagram\n     {"layout":"hierarchy","items":[{"text":"조사구역 유구 형성 및 축조 공정 체계","level":0},{"text":"1단계: 기반층 정지 및 수혈 굴광","level":1},{"text":"2단계: 바닥 다짐 및 내부시설(화덕·기둥구멍·배수시설) 설치","level":1},{"text":"3단계: 유구 점유·사용 및 폐기 후 자연 퇴적","level":1}]}\n     ```',
+    "   - **모식도 2 (`wc-diagram`, 3절)**: 유구 중복 관계 및 출토유물 조합에 기반한 단계별(Ⅰ~Ⅲ단계) 취락·물질문화 변천 모식도 (`layout: \"process\"`, `\"items\"` 배열 형식 엄수)",
+    "   - **모식도 3 (`wc-diagram`, 4절)**: DBpia 수집 문헌 교차검증 기반 지역 취락망 공간 네트워크 및 문화 파급 구조 모식도 (`layout: \"process\"`, `\"items\"` 배열 형식 엄수)",
     "",
     "#### [3. 실제 발굴조사보고서·학술논문 각주(1), 2)...) 및 【참고문헌】 1:1 교차검증 규칙 (절대 '저자미상' 금지)]",
     `1) **본문 각주 표기**: 본문 문장 끝에 \`1)\`, \`2)\`, \`3)\` ... 최소 **${minFootnotes}개 이상**의 일련번호 각주를 반드시 표기하십시오.`,
@@ -6137,7 +4933,10 @@ async function runArchaeologyDiscussionPipeline({
     !targetPath.toLowerCase().endsWith(".pdf") &&
     !targetPath.toLowerCase().endsWith(".docx")
       ? targetPath
-      : path.dirname(targetPath || "D:/phone/archaeology_reports/report.md");
+      : path.dirname(
+          targetPath ||
+            path.join(require("os").homedir(), "archaeology_reports", "report.md")
+        );
 
   try {
     fs.mkdirSync(pipelineState.outputDir, { recursive: true });
@@ -6229,7 +5028,12 @@ async function runArchaeologyDiscussionPipeline({
     (craftExtractedReportText && craftExtractedReportText.trim()) ||
       localFiles.length > 0
   );
-  const hasDating = Boolean(datingText && datingText.trim());
+  const hasDating = Boolean(
+    (datingText && datingText.trim()) ||
+      /AMS|탄소연대|방사성탄소|보정연대|OSL|열루미네선스|절대연대|\d{3,4}\s*±\s*\d+\s*BP/i.test(
+        craftExtractedReportText || ""
+      )
+  );
 
   // Step 0: Establish /goal Plan & 8-Point Completion Rubric upfront
   const goalPlan = buildGoalPlanAndRubric({
@@ -8166,8 +6970,8 @@ async function runCliControlMode() {
     await stopBridgeServerProcess();
     console.log(
       out.removed
-        ? "[OFF] ARCHAEO STUDIO PRO 4.0을 완전히 종료하고 화면에서 제거했습니다."
-        : "[OFF] 현재 실행 중인 ARCHAEO STUDIO PRO 4.0을 종료했습니다."
+        ? "[OFF] ARCHAEO STUDIO 5.0을 완전히 종료하고 화면에서 제거했습니다."
+        : "[OFF] 현재 실행 중인 ARCHAEO STUDIO 5.0을 종료했습니다."
     );
     setTimeout(() => process.exit(0), 120);
     return;
@@ -8178,7 +6982,7 @@ async function runCliControlMode() {
     launchStandaloneWindow();
     triggerBackgroundAntigravityAttach();
     console.log(
-      "[STANDALONE ON] ARCHAEO STUDIO PRO 4.0 독자 앱을 즉시 실행하고 백그라운드에서 Antigravity 제미나이(작업) 엔진에 연결합니다."
+      "[STANDALONE ON] ARCHAEO STUDIO 5.0 독자 앱을 즉시 실행하고 백그라운드에서 Antigravity 제미나이(4 Argon · 작업 모드) 엔진에 연결합니다."
     );
     setTimeout(() => process.exit(0), 250);
     return;
@@ -8188,7 +6992,7 @@ async function runCliControlMode() {
     await ensureBridgeServerProcess();
     launchStandaloneWindow();
     triggerBackgroundAntigravityAttach();
-    console.log("[ON] ARCHAEO STUDIO PRO 4.0을 실행하여 화면에 열었습니다.");
+    console.log("[ON] ARCHAEO STUDIO 5.0을 실행하여 화면에 열었습니다.");
     setTimeout(() => process.exit(0), 250);
     return;
   }
@@ -8211,7 +7015,7 @@ async function runCliControlMode() {
           mainPage.webSocketDebuggerUrl,
           async (send) => {
             const r = await send("Runtime.evaluate", {
-              expression: `Boolean(document.getElementById('agy-gemini-desktop-fab') || document.getElementById('agy-gemini-desktop-drawer'))`,
+              expression: `Boolean(document.getElementById('agy-gemini-desktop-drawer'))`,
               returnByValue: true,
             });
             return Boolean(r.result?.value);
@@ -8226,14 +7030,14 @@ async function runCliControlMode() {
       await shutdownEmbeddedStudio().catch(() => {});
       await stopBridgeServerProcess();
       console.log(
-        "[OFF] ARCHAEO STUDIO PRO 4.0을 완전히 종료하고 화면에서 제거했습니다."
+        "[OFF] ARCHAEO STUDIO 5.0을 완전히 종료하고 화면에서 제거했습니다."
       );
     } else {
       await ensureBridgeServerProcess();
       launchStandaloneWindow();
       triggerBackgroundAntigravityAttach();
       console.log(
-        "[ON] ARCHAEO STUDIO PRO 4.0 독립 앱을 실행하고 Antigravity에 연결했습니다."
+        "[ON] ARCHAEO STUDIO 5.0 독립 앱을 실행하고 Antigravity에 연결했습니다."
       );
     }
     setTimeout(() => process.exit(0), 250);
