@@ -223,7 +223,10 @@ function parseFeatureDimensionsFromMarkdown(md) {
       .map((c) => c.trim())
       .filter(Boolean);
     if (cells.length < 3) continue;
-    const nameCell = cells[0].replace(/\*\*/g, "").trim();
+    const rawFirst = cells[0].replace(/\*\*/g, "").trim();
+    const nameCell = /^\d+$/.test(rawFirst) && cells[1]
+      ? cells[1].replace(/\*\*/g, "").trim()
+      : rawFirst;
     if (/구분|유구명|비교|단계|기종|연번/.test(nameCell) || /^[-:]+$/.test(nameCell)) continue;
     const rowText = cells.join(" ");
     const dimMatch =
@@ -237,7 +240,7 @@ function parseFeatureDimensionsFromMarkdown(md) {
         l = Math.round((l / 100) * 10) / 10;
         w = Math.round((w / 100) * 10) / 10;
       }
-      if (l > 0 && w > 0 && l < 35 && w < 35) {
+      if (l > 0 && w > 0 && l < 80 && w < 80) {
         const areaMatch = /(\d+(?:\.\d+)?)\s*㎡/.exec(rowText);
         const area = areaMatch
           ? parseFloat(areaMatch[1])
@@ -247,6 +250,9 @@ function parseFeatureDimensionsFromMarkdown(md) {
           length: l,
           width: w,
           area,
+          lengthM: l,
+          widthM: w,
+          areaM2: area,
         });
       }
     }
@@ -256,29 +262,103 @@ function parseFeatureDimensionsFromMarkdown(md) {
 
 function categorizeCollectedPapers(validPapers = []) {
   const buckets = {
-    dwelling: { label: "주거 구조·축조기법", papers: [], indicators: 0 },
-    pottery: { label: "토기 편년·제작기법", papers: [], indicators: 0 },
-    settlement: { label: "취락 입지·공간구조", papers: [], indicators: 0 },
-    exchange: { label: "지역 교류·분묘·성격", papers: [], indicators: 0 },
+    structure: { label: "유구 구조·축조기법", papers: [], indicators: 0 },
+    typology: { label: "출토유물 형식·편년", papers: [], indicators: 0 },
+    spatial: { label: "입지·공간구조·계통", papers: [], indicators: 0 },
+    context: { label: "지역 교류·역사적 성격", papers: [], indicators: 0 },
   };
 
   for (const p of validPapers) {
     const t = `${p.title || ""} ${p.journal || ""} ${p.abstract || ""}`;
-    if (/주거|가옥|기초|벽구|부뚜막|구들|노지|건축|축조|수혈/.test(t)) {
-      buckets.dwelling.papers.push(p);
-      buckets.dwelling.indicators += 2;
-    } else if (/토기|무문|타날|편년|상한|하한|유물|철기|송국리/.test(t)) {
-      buckets.pottery.papers.push(p);
-      buckets.pottery.indicators += 2;
-    } else if (/취락|공간|변천|입지|사구|마을|집자리/.test(t)) {
-      buckets.settlement.papers.push(p);
-      buckets.settlement.indicators += 2;
+    if (/구조|평면|축조|묘제|목곽|석곽|석실|성벽|기단|요지|주거|가옥|기초|벽구|부뚜막|구들|노지|건축|수혈/.test(t)) {
+      buckets.structure.papers.push(p);
+      buckets.structure.indicators += 1;
+    } else if (/토기|자기|기와|금속|무문|타날|편년|상한|하한|유물|연대|형식|속성/.test(t)) {
+      buckets.typology.papers.push(p);
+      buckets.typology.indicators += 1;
+    } else if (/입지|공간|배치|분포|취락|계통|변천|사구|마을/.test(t)) {
+      buckets.spatial.papers.push(p);
+      buckets.spatial.indicators += 1;
     } else {
-      buckets.exchange.papers.push(p);
-      buckets.exchange.indicators += 2;
+      buckets.context.papers.push(p);
+      buckets.context.indicators += 1;
     }
   }
   return buckets;
+}
+
+function detectSiteFeatureDomain(md, siteTitle = "") {
+  const src = `${siteTitle}\n${String(md || "").slice(0, 8000)}`;
+  if (/고분|목곽묘|석곽묘|석실분|옹관묘|분구묘|지석묘|무덤|고분군/.test(src)) {
+    return {
+      domain: "burial",
+      featureLabel: "분묘·매장유구",
+      structureLabel: "묘광·곽실·봉토 및 매장주체부 구조",
+      artifactLabel: "부장 토기·금속기·장신구류",
+      processSteps: [
+        { text: "1공정: 입지 선정 및 정지·묘광(墓壙) 굴착", level: 0 },
+        { text: "구릉·대지 지형 조건에 맞춘 묘역 구획 및 매장주체부 굴광", level: 1 },
+        { text: "2공정: 곽실(목곽·석곽·석실) 축조 및 시상(屍床) 설치", level: 0 },
+        { text: "벽석·목구조 조영 및 주곽·부곽 공간 분할·시상면 정지", level: 1 },
+        { text: "3공정: 피장자 안치 및 부장유물(토기·위세품) 매납", level: 0 },
+        { text: "의례 행위 수행 및 기종별 부장용기·장신구·무기류 부장", level: 1 },
+        { text: "4공정: 개석·밀봉 및 봉토(封土)·주구 조영", level: 0 },
+        { text: "매장주체부 폐쇄 후 봉분 성토 및 후대 분묘와의 층위적 중첩", level: 1 },
+      ],
+    };
+  }
+  if (/성곽|산성|읍성|성벽|체성|치성|문지|성지|보루/.test(src)) {
+    return {
+      domain: "fortress",
+      featureLabel: "성벽·방어·내부 건물유구",
+      structureLabel: "기초부·내외벽 축성기법 및 부속시설",
+      artifactLabel: "출토 기와·토기·자기·무기류",
+      processSteps: [
+        { text: "1공정: 자연 지형(능선·곡부) 측량 및 기저부 정지·굴광", level: 0 },
+        { text: "암반·풍화암반층 정지 및 기단부 보강토·기초석 배치", level: 1 },
+        { text: "2공정: 체성벽(내벽·외벽) 축조 및 뒷채움석·성토 다짐", level: 0 },
+        { text: "할석·장대석 조적 및 수평 줄눈·배수 계통 구조화", level: 1 },
+        { text: "3공정: 문지·치성·집수시설 및 내부 건물지 운영", level: 0 },
+        { text: "방어·지휘·저장 공간 운영 및 시대별 기와·용기류 공반", level: 1 },
+        { text: "4공정: 후대 수축·개축 및 폐성 후 퇴적층 형성", level: 0 },
+        { text: "시기별 수·개축 층위 누적 및 붕괴석·퇴적토 형성", level: 1 },
+      ],
+    };
+  }
+  if (/사지|사찰|절터|금당|탑지|강당|와요지|가마|요지|건물지|초석/.test(src)) {
+    return {
+      domain: "architecture_kiln",
+      featureLabel: "건물지·생산·종교유구",
+      structureLabel: "기단·초석·아궁이/소성실 등 구조 속성",
+      artifactLabel: "출토 기와·전돌·도자기·생활유물",
+      processSteps: [
+        { text: "1공정: 대지 조성·정지 및 기단·유구 기초부 굴광", level: 0 },
+        { text: "지형 단차 극복을 위한 성토·삭토 정지 및 기초 굴착", level: 1 },
+        { text: "2공정: 기단·적심·초석 또는 소성실·연소실 축조", level: 0 },
+        { text: "상부 구조 지지 및 기능 공간(예불·생활·소성) 구획", level: 1 },
+        { text: "3공정: 시설 운영·중수 및 기종별 유물 사용·소비", level: 0 },
+        { text: "단계별 중수·개축 및 기와·자기·토기 등 유물 조합 형성", level: 1 },
+        { text: "4공정: 유구 폐기 및 후대 문화층·퇴적층 피복", level: 0 },
+        { text: "폐기 퇴적층 형성 및 후행 유구와의 층위적 선후 관계 성립", level: 1 },
+      ],
+    };
+  }
+  return {
+    domain: "general_settlement",
+    featureLabel: "조사 확인 주요 유구군",
+    structureLabel: "평면 형태·바닥/벽면 및 내부 부속시설",
+    artifactLabel: "공반 출토유물 조합상",
+    processSteps: [
+      { text: "1공정: 기반층(생토면·문화층) 정지 및 유구 기초부 굴광", level: 0 },
+      { text: "지형 여건과 지반 조건을 고려한 평면 구획 및 굴착", level: 1 },
+      { text: "2공정: 바닥면·벽면 정비 및 내부 구조시설 설치", level: 0 },
+      { text: "유구 기능에 부합하는 내부 공간 분할 및 부속시설 배치", level: 1 },
+      { text: "3공정: 유구 점유·운영 및 출토유물 조합 형성", level: 0 },
+      { text: "유구 운영 시기의 주요 용기·도구류 사용 및 공반 맥락 형성", level: 1 },
+      { text: "4공정: 유구 폐기 후 퇴적 및 후행 문화층 중첩", level: 0 },
+      { text: "내부 퇴적층 매몰 및 후행 유구와의 층위적·평면적 선후관계 형성", level: 1 },
+    ],
+  };
 }
 
 function buildComparativeChartsFromData(
@@ -286,78 +366,81 @@ function buildComparativeChartsFromData(
   validPapers = [],
   { siteTitle = "본 조사 유적" } = {}
 ) {
-  const chart1Spec = {
-    type: "column",
-    title: `${siteTitle} 및 주변 비교유적군 시기·단계별 연구 논거 및 비교 지표 분포`,
-    legend: "bottom",
-    dataLabels: true,
-    data: {
-      categories: ["Ⅰ단계(형성기)", "Ⅱ단계(전개·확산기)", "Ⅲ단계(전환·재편기)"],
-      series: [
-        {
-          name: "DBpia 검증 논문(편)",
-          values: [
-            Math.max(2, Math.floor(validPapers.length * 0.3)),
-            Math.max(3, Math.floor(validPapers.length * 0.45)),
-            Math.max(2, Math.ceil(validPapers.length * 0.25)),
-          ],
-        },
-        { name: "비교 유적·유구 지표(건)", values: [5, 8, 6] },
-      ],
-    },
-  };
-
   const parsedDims = parseFeatureDimensionsFromMarkdown(md);
-  const dimFeatures =
-    parsedDims.length >= 2
-      ? parsedDims.slice(0, 6)
-      : [
-          { name: "주요 주거유구 A", length: 5.4, width: 5.2, area: 22.8 },
-          { name: "주요 주거유구 B", length: 4.5, width: 4.2, area: 14.8 },
-          { name: "부속 수혈·주혈군", length: 2.6, width: 2.1, area: 4.3 },
-        ];
-
-  const chart2Spec = {
-    type: "column",
-    title: `${siteTitle} 확인 주요 유구별 평면 규모(장축·단축 m 및 면적 ㎡) 정량 비교`,
-    legend: "bottom",
-    dataLabels: true,
-    data: {
-      categories: dimFeatures.map((f) => f.name),
-      series: [
-        { name: "장축/직경(m)", values: dimFeatures.map((f) => f.length) },
-        { name: "단축(m)", values: dimFeatures.map((f) => f.width) },
-        { name: "평면면적(㎡)", values: dimFeatures.map((f) => f.area) },
-      ],
-    },
-  };
-
   const buckets = categorizeCollectedPapers(validPapers);
   const bucketList = [
-    buckets.dwelling,
-    buckets.pottery,
-    buckets.settlement,
-    buckets.exchange,
+    buckets.structure,
+    buckets.typology,
+    buckets.spatial,
+    buckets.context,
   ];
-  const chart3Spec = {
-    type: "column",
-    title: `${siteTitle} 고찰에 활용된 DBpia AI 주제 영역별 인용 논문 수 및 교차검증 지표 분포`,
-    legend: "bottom",
-    dataLabels: true,
-    data: {
-      categories: bucketList.map((b) => b.label),
-      series: [
-        {
-          name: "검증 인용 논문(편)",
-          values: bucketList.map((b) => Math.max(2, b.papers.length)),
-        },
-        {
-          name: "교차검증 지표(건)",
-          values: bucketList.map((b) => Math.max(4, b.indicators + 2)),
-        },
-      ],
-    },
-  };
+
+  // Chart 1: Only build when validPapers exist — group by actual publication period
+  let chart1Spec = null;
+  let chart3Spec = null;
+  if (validPapers.length > 0) {
+    let earlyPapers = 0;
+    let midPapers = 0;
+    let recentPapers = 0;
+    for (const p of validPapers) {
+      const yr = Number(String(p.year || "").replace(/[^0-9]/g, ""));
+      if (yr > 0 && yr < 2010) earlyPapers++;
+      else if (yr >= 2010 && yr < 2018) midPapers++;
+      else recentPapers++;
+    }
+
+    chart1Spec = {
+      type: "column",
+      title: `${siteTitle} 관련 DBpia 검증 선행연구 발표 시기별 학술 근거 분포 (N=${validPapers.length}편)`,
+      legend: "bottom",
+      dataLabels: true,
+      data: {
+        categories: ["~2009년 연구", "2010~2017년 연구", "2018년 이후 연구"],
+        series: [
+          {
+            name: "DBpia 검증 논문(편)",
+            values: [earlyPapers, midPapers, recentPapers],
+          },
+        ],
+      },
+    };
+
+    chart3Spec = {
+      type: "column",
+      title: `${siteTitle} 고찰에 활용된 DBpia AI 주제 영역별 인용 논문 분포 (N=${validPapers.length}편)`,
+      legend: "bottom",
+      dataLabels: true,
+      data: {
+        categories: bucketList.map((b) => b.label),
+        series: [
+          {
+            name: "검증 인용 논문(편)",
+            values: bucketList.map((b) => b.papers.length),
+          },
+        ],
+      },
+    };
+  }
+
+  // Chart 2: Only build when actual feature dimensions were parsed from the report/manuscript (zero fake fallback numbers)
+  let chart2Spec = null;
+  if (parsedDims.length >= 2) {
+    const dimFeatures = parsedDims.slice(0, 6);
+    chart2Spec = {
+      type: "column",
+      title: `${siteTitle} 확인 주요 유구별 평면 규모(장축·단축 m 및 면적 ㎡) 실측 비교`,
+      legend: "bottom",
+      dataLabels: true,
+      data: {
+        categories: dimFeatures.map((f) => compactChartLabel(f.name, 12)),
+        series: [
+          { name: "장축/직경(m)", values: dimFeatures.map((f) => f.length) },
+          { name: "단축(m)", values: dimFeatures.map((f) => f.width) },
+          { name: "평면면적(㎡)", values: dimFeatures.map((f) => f.area) },
+        ],
+      },
+    };
+  }
 
   return [chart1Spec, chart2Spec, chart3Spec];
 }
@@ -367,51 +450,58 @@ function buildSchematicDiagramsFromData(
   validPapers = [],
   { siteTitle = "본 조사 유적" } = {}
 ) {
+  const domInfo = detectSiteFeatureDomain(md, siteTitle);
+
   const diag1Spec = {
     layout: "hierarchy",
     colors: "accent1",
-    title: `${siteTitle} 조사구역 퇴적 층위 및 유구 굴광·축조·폐기 공정 모식도`,
-    items: [
-      { text: "1공정: 기반층(생토면·문화층 기반) 정지 및 수혈·기초부 굴광", level: 0 },
-      { text: "지형 경사면 및 지반 조건을 고려한 평면 구획 및 수혈·주혈 굴착", level: 1 },
-      { text: "2공정: 바닥면 정지·다짐 및 주공(기둥구멍)·배수시설 설치", level: 0 },
-      { text: "바닥면 강화 및 상부 가구(架構) 지지를 위한 주혈군·벽구 배치", level: 1 },
-      { text: "3공정: 내부 취사·작업 공간 구성 및 생활용기(토기·석기) 사용", level: 0 },
-      { text: "노지·화덕 또는 작업 공간 분화 및 일상 토기·생업도구 공반", level: 1 },
-      { text: "4공정: 유구 폐기 후 자연·인위 퇴적 및 후대 문화층 형성", level: 0 },
-      { text: "내부 퇴적토 매몰 및 후행 유구·문화층에 의한 층위적 중첩", level: 1 },
-    ],
+    title: `${siteTitle} 조사구역 퇴적 층위 및 ${domInfo.featureLabel} 축조·폐기 공정 모식도`,
+    items: domInfo.processSteps,
   };
+
+  const headingMatches = Array.from(
+    String(md || "").matchAll(/^#{2,3}\s*([^\r\n#]{4,42})/gm)
+  )
+    .map((m) => m[1].replace(/\*\*|\[|\]/g, "").trim())
+    .filter((h) => !/초록|Abstract|각주|참고문헌/.test(h));
+
+  const diag2Items =
+    headingMatches.length >= 3
+      ? headingMatches.slice(0, 4).flatMap((h, i) => [
+          { text: `${i + 1}단계 논증: ${h}`, level: 0 },
+          { text: `${siteTitle} 원자료 및 선행연구 교차검증 단계`, level: 1 },
+        ])
+      : [
+          { text: "Ⅰ단계: 선행 문화층 및 초기 유구 조영기", level: 0 },
+          { text: `자연 지형 입지 선정 및 초기 ${domInfo.featureLabel} 형성`, level: 1 },
+          { text: "Ⅱ단계: 중심 유구군 확산 및 정형화 단계", level: 0 },
+          { text: `${domInfo.structureLabel} 정착 및 중심 ${domInfo.artifactLabel} 공반`, level: 1 },
+          { text: "Ⅲ단계: 공간 재편 및 후행 물질문화 전환기", level: 0 },
+          { text: "유구 중복·개축 및 주변 권역과의 교류에 따른 양식 변천", level: 1 },
+        ];
 
   const diag2Spec = {
     layout: "process",
     colors: "accent2",
     title: `${siteTitle} 층위·유구 구조 및 출토유물 조합에 기반한 단계별 통시적 변천 모식도`,
-    items: [
-      { text: "Ⅰ단계: 취락 입지 선정 및 선행 문화층·유구 형성기", level: 0 },
-      { text: "자연 지형(대지·구릉·해안 단구)을 활용한 초기 생활면 형성 및 수혈유구 축조", level: 1 },
-      { text: "Ⅱ단계: 중심 주거군 확산 및 지역 양식 토기·생업도구 정착기", level: 0 },
-      { text: "정형화된 주거 구조와 일상용·저장용 토기 조합상의 안정적 운영 및 주변 취락과의 교류", level: 1 },
-      { text: "Ⅲ단계: 취락 공간 재편 및 후행 물질문화 전환기", level: 0 },
-      { text: "유구 폐기·중복 및 새로운 토기 제작기법·집락 경관으로의 이행", level: 1 },
-    ],
+    items: diag2Items,
   };
 
-  const p1 = validPapers[0] ? `${validPapers[0].author}(${validPapers[0].year || ""})` : "선행연구";
-  const p2 = validPapers[1] ? `${validPapers[1].author}(${validPapers[1].year || ""})` : "비교연구";
-  const p3 = validPapers[2] ? `${validPapers[2].author}(${validPapers[2].year || ""})` : "지역사연구";
+  const p1 = validPapers[0] ? `${validPapers[0].author}(${validPapers[0].year || ""})` : "선행연구 1";
+  const p2 = validPapers[1] ? `${validPapers[1].author}(${validPapers[1].year || ""})` : "선행연구 2";
+  const p3 = validPapers[2] ? `${validPapers[2].author}(${validPapers[2].year || ""})` : "선행연구 3";
 
   const diag3Spec = {
     layout: "process",
     colors: "accent3",
-    title: `DBpia AI 수집 문헌 교차검증 기반 ${siteTitle} 및 주변 비교유적군 공간 네트워크 모식도`,
+    title: `DBpia AI 수집 문헌 교차검증 기반 ${siteTitle} 및 주변 비교유적군 관계 모식도`,
     items: [
-      { text: `거점 생활권 및 미시 지형 입지 네트워크 (${p1})`, level: 0 },
-      { text: `${siteTitle}과 주변 동시기 취락·생산유적 간의 지형적·생업적 유기적 결합`, level: 1 },
-      { text: `주거 건축기법 및 토기 제작 전통의 공유와 파급 (${p2})`, level: 0 },
-      { text: "수혈 굴광·주혈 배치 방식 및 출토 토기 기종·구연부 속성의 지역권 내 공시적 확산", level: 1 },
-      { text: `광역 문화 교류 및 역사적 취락 위상 정립 (${p3})`, level: 0 },
-      { text: "인접 권역 거점 유적군과의 교류를 통한 지역 사회 분화 및 거점 취락 위상 확보", level: 1 },
+      { text: `지형 입지 및 공간 배치 구조 (${p1})`, level: 0 },
+      { text: `${siteTitle}과 주변 동시기 유적군 간의 입지·배치 연계성`, level: 1 },
+      { text: `${domInfo.structureLabel} 및 제작 전통 공유 (${p2})`, level: 0 },
+      { text: `${domInfo.featureLabel} 축조 방식 및 ${domInfo.artifactLabel} 속성의 지역권 내 비교`, level: 1 },
+      { text: `광역 문화 교류 및 고고학적 위상 정립 (${p3})`, level: 0 },
+      { text: "인접 권역 유적군과의 교차검증을 통한 편년 및 역사적 성격 규명", level: 1 },
     ],
   };
 
@@ -426,59 +516,56 @@ function buildArtifactAndLiteratureTables(
   validPapers = [],
   { siteTitle = "본 조사 유적", md = "" } = {}
 ) {
+  const domInfo = detectSiteFeatureDomain(md, siteTitle);
   const parsedFeatures = parseFeatureDimensionsFromMarkdown(md);
   const rows1 =
-    parsedFeatures.length >= 2
+    parsedFeatures.length >= 1
       ? parsedFeatures.map(
           (f, i) =>
-            `| ${i + 1} | **${f.name}** | 방형·원형 수혈 | ${f.lengthM}m × ${f.widthM}m (${f.areaM2}㎡) | 문화층 굴광·주혈·노지 | 주요 토기·석기류 공반 |`
+            `| ${i + 1} | **${f.name}** | ${domInfo.featureLabel} | ${f.lengthM}m × ${f.widthM}m (${f.areaM2}㎡) | ${domInfo.structureLabel} | ${domInfo.artifactLabel} |`
         )
       : [
-          `| 1 | **주요 주거·생활유구군** | 평면 방형·원형 수혈 | 중·소형 생활 공간 | 주혈군·벽구·노지 등 내부시설 | 일상 취사·저장용 토기 및 석기류 |`,
-          `| 2 | **수혈·주혈군 및 부속유구** | 원형·타원형 수혈 및 주혈열 | 소형 저장·부속 공간 | 주거지 인접 배치 및 중복 관계 | 소형 완·호류 및 생활도구 편 |`,
-          `| 3 | **기타 유구 및 포함층** | 구상유구·문화층 퇴적 | 조사구역 내 등고선 방향 | 자연 퇴적층 및 생활면 형성 | 시대별 토기편·석기류 일괄 |`,
+          `| 1 | **주요 확인 유구군** | ${domInfo.featureLabel} | 보고서 원문 제원 기준 | ${domInfo.structureLabel} | ${domInfo.artifactLabel} |`,
+          `| 2 | **부속·공반 유구군** | 부속 및 주변 유구 | 조사구역 내 공간 배치 | 선후 중복 및 층위 관계 | 시대별 공반 유물 일괄 |`,
         ];
 
   const table1Md = [
-    `**<표 1> ${siteTitle} 확인 주요 유구 제원·평면구조·내부시설 및 출토유물 종합 정리표**`,
+    `**<표 1> ${siteTitle} 확인 주요 유구 제원·구조 및 공반유물 종합 정리표**`,
     "",
-    "| 연번 | 유구명 / 구분 | 평면 형태 | 평면 규모 (장축×단축 / 면적) | 층위·내부시설 및 중복관계 | 주요 공반 출토유물 |",
+    "| 연번 | 유구명 / 구분 | 유구 성격 | 평면 규모 (장축×단축 / 면적) | 층위·구조 및 중복관계 | 주요 공반 출토유물 |",
     "| :---: | :--- | :--- | :--- | :--- | :--- |",
     ...rows1,
   ].join("\n");
 
   const table2Md = [
-    `**<표 2> ${siteTitle} 주요 출토유물 기종별·형식별 제작기법 속성 및 상대편년 비교표**`,
+    `**<표 2> ${siteTitle} 주요 출토유물 분류별 속성 및 상대편년 비교표**`,
     "",
-    "| 기종 / 분류 | 세부 형태 및 제작기법 속성 | 주요 출토 맥락 | 상대편년 단계 | DBpia 선행연구 교차검증 근거 |",
+    "| 유물 분류 | 세부 형태 및 제작기법 속성 | 주요 출토 맥락 | 상대편년 단계 | DBpia 선행연구 교차검증 근거 |",
     "| :--- | :--- | :--- | :--- | :--- |",
-    "| **일상 자비·취사용 발·심발형 토기** | 직립·외반구연 · 무문양 물손질 정면 또는 타날 성형 | 주거지 내부 바닥면 및 퇴적층 | Ⅰ~Ⅱ단계 | 기형 비례·구연부 단면 형태에 따른 단계별 상대편년 연구 |",
-    "| **저장·운반용 호·옹류 토기** | 평저/원저 · 동체부 정면 기법 및 경부 손누름·물손질 | 주거지 벽면 및 수혈유구 내부 | Ⅱ~Ⅲ단계 | 저장용기 대형화 및 주변 거점 취락 공반 양상 비교 연구 |",
-    "| **소형 완·배·접시류 및 의례용기** | 정선된 태토 · 내외면 물손질·마연 또는 회전 정면 | 주거지 및 부속 유구 출토 | Ⅱ~Ⅲ단계 | 식기류 분화 및 지역 간 물질문화 교류 양상 연구 |",
-    "| **생업·가공용 석기·방추차·기타 유물** | 갈돌·갈판·석부·토제 방추차 등 생활·생업 도구 | 주거지 작업 공간 및 문화층 | 전 단계 공반 | 취락 내 복합 생업(농경·가공·방직) 및 공간 분화 연구 |",
+    `| **주요 용기류 (토기·도자기류)** | 기형 비례·구연부/저부 성형 및 표면 정면 속성 | 주요 ${domInfo.featureLabel} 내부 및 문화층 | 중심 조영 단계 | 기종 구성 및 형식 변화에 따른 단계별 상대편년 연구 |`,
+    `| **의례·부장·특수 기종** | 정선된 태토·특수 기형 및 정밀 정면·시문 기법 | 주요 유구 중심부 및 핵심 맥락 | 전개·확산 단계 | 주변 거점 유적 출토품과의 공반 양상 비교 연구 |`,
+    `| **금속기·석기·생산/생활도구** | 재질별 제작 공정 및 실용·위세 기능 속성 | 유구 바닥면·부속시설 및 퇴적층 | 전 단계 공반 | 유적 성격 규명 및 지역 간 기술·물질문화 교류 연구 |`,
   ].join("\n");
 
   const compPapers = validPapers.slice(0, 4);
   const rows3 =
     compPapers.length > 0
       ? [
-          `| **${siteTitle} (본 조사)** | 구릉 사면부·평탄 대지 | 주요 주거·수혈·주혈군 확인 | 기종별 토기·석기 조합상 확인 | 본 조사 층위·유구·유물 교차검증 기준 |`,
+          `| **${siteTitle} (본 조사)** | 본 조사구역 지형·입지 | ${domInfo.featureLabel} 확인 | ${domInfo.artifactLabel} 확인 | 본 조사 층위·유구·유물 교차검증 기준 |`,
           ...compPapers.map((p, idx) => {
             const authorYear = `${p.author}(${p.year || "연도미상"})`;
             const titleShort = String(p.title || "").slice(0, 26);
-            return `| **주변 비교유적군 ${idx + 1}** | 동일 수계·연접 권역 입지 | 동시기 주거·생산·분묘 유구 병행 | 동일 형식권 토기·유물 조합 공유 | ${authorYear} 「${titleShort}」 비교 검증 |`;
+            return `| **비교연구 사례 ${idx + 1}** | 인접·동일 문화권 입지 | 동시기 비교 유구군 확인 | 동일 계통 유물 조합 공유 | ${authorYear} 「${titleShort}」 비교 검증 |`;
           }),
         ]
       : [
-          `| **${siteTitle} (본 조사)** | 구릉 사면부·평탄 대지 | 주요 주거·수혈·주혈군 확인 | 기종별 토기·석기 조합상 확인 | 본 조사 층위·유구·유물 교차검증 기준 |`,
-          `| **인접 동시기 비교유적군 A** | 동일 수계·인접 구릉 대지 | 동시기 수혈주거지 및 저장수혈 | 자비·저장용 토기 기형 속성 공유 | 동일 문화권 내 공시적 취락 네트워크 형성 |`,
-          `| **광역 권역 거점유적군 B** | 거점 충적대지 및 완사면 | 대형 주거군·환호·의례·생산유구 | 정형화된 표준 기종 및 교류 유물 | 지역 간 기술 파급 및 위계 구조 비교 지표 |`,
+          `| **${siteTitle} (본 조사)** | 본 조사구역 지형·입지 | ${domInfo.featureLabel} 확인 | ${domInfo.artifactLabel} 확인 | 본 조사 층위·유구·유물 교차검증 기준 |`,
         ];
 
   const table3Md = [
-    `**<표 3> ${siteTitle} 및 주변 비교유적군 입지·유구 구조·유물 조합상 및 편년 단계 종합 대비표**`,
+    `**<표 3> ${siteTitle} 및 주변 비교유적군 입지·유구 구조·유물 조합상 종합 대비표**`,
     "",
-    "| 비교 대상 유적군 | 지형·입지 특성 | 확인 유구 및 공간 배치 | 출토유물 조합 및 형식 속성 | 상대·절대편년 및 비교 근거 |",
+    "| 비교 대상 | 지형·입지 특성 | 확인 유구 및 공간 배치 | 출토유물 조합 및 형식 속성 | 상대·절대편년 및 비교 근거 |",
     "| :--- | :--- | :--- | :--- | :--- |",
     ...rows3,
   ].join("\n");
@@ -490,29 +577,30 @@ function buildArtifactAndLiteratureTables(
           const authorYear = `${p.author}(${p.year || "연도미상"})`;
           const titleShort = String(p.title || "").slice(0, 32);
           const journalShort = String(p.journal || "등재학술지").slice(0, 22);
-          let domain = "지역 취락망 및 역사적 성격";
+          let domain = "지역 유적망 및 역사적 성격";
           let application = `${siteTitle}의 입지·공간 구조 및 주변 동시기 유적군과의 비교 검증`;
           const t = `${p.title || ""} ${p.abstract || ""}`;
-          if (/주거|가옥|기초|벽구|부뚜막|구들|공간|수혈|송국리/.test(t)) {
-            domain = "유구 평면·내부시설·축조기법";
-            application = `${siteTitle} 확인 주거·수혈유구의 평면 형태, 주혈 배치 및 축조 공정 비교 규명`;
-          } else if (/토기|무문|타날|편년|상한|하한|유물|연대/.test(t)) {
+          if (/구조|평면|축조|묘제|성벽|기단|요지|주거|유구|층위/.test(t)) {
+            domain = "유구 평면·구조·축조기법";
+            application = `${siteTitle} 확인 유구의 평면 형태, 구조 및 축조 공정 비교 규명`;
+          } else if (/토기|자기|기와|금속|편년|상한|하한|유물|연대/.test(t)) {
             domain = "출토유물 형식 분류 및 편년";
-            application = `${siteTitle} 출토 토기·석기 조합상의 형식학적 위치 및 절대·상대연대 교차검증`;
+            application = `${siteTitle} 출토유물 조합상의 형식학적 위치 및 상대·절대연대 교차검증`;
           }
           return `| ${idx + 1} | **${authorYear}** | 「${titleShort}」 (『${journalShort}』) | ${domain} | ${application} |`;
         })
-      : [
-          `| 1 | **선행연구 A** | 「${siteTitle} 권역 취락 구조와 변천」 (『학술지』) | 유구 평면·축조기법 | ${siteTitle} 확인 유구의 평면 비례 및 축조 방식 비교 |`,
-        ];
+      : [];
 
-  const table4Md = [
-    `**<표 4> DBpia AI 수집 핵심 선행연구(실제 저자·연도·논문명) 학술 쟁점별 논거 및 ${siteTitle} 고찰 적용 종합 대비표**`,
-    "",
-    "| 연번 | 연구자(발행연도) | 논문명 및 수록 학술지 | 핵심 연구 쟁점 | 본 유적(고찰) 교차검증 및 학술적 적용 결과 |",
-    "| :---: | :--- | :--- | :--- | :--- |",
-    ...rows4,
-  ].join("\n");
+  const table4Md =
+    rows4.length > 0
+      ? [
+          `**<표 4> DBpia AI 수집 핵심 선행연구(실제 저자·연도·논문명) 학술 쟁점별 논거 및 ${siteTitle} 고찰 적용 종합 대비표**`,
+          "",
+          "| 연번 | 연구자(발행연도) | 논문명 및 수록 학술지 | 핵심 연구 쟁점 | 본 유적(고찰) 교차검증 및 학술적 적용 결과 |",
+          "| :---: | :--- | :--- | :--- | :--- |",
+          ...rows4,
+        ].join("\n")
+      : "";
 
   return { table1Md, table2Md, table3Md, table4Md };
 }
@@ -588,29 +676,29 @@ function ensureRichArchaeologyVisualsAndTables(
   const sec3Boundary = /\n(?=#{2,4}\s*(?:3\.|Ⅲ\.))/.exec(body);
 
   const sec2Additions = [];
-  if (existingTables.length === 0) {
+  if (existingTables.length === 0 && table1Md) {
     sec2Additions.push(
-      `\n\n${siteTitle}에서 확인된 주요 유구들의 평면 형태, 규모, 내부시설 및 공반유물 속성을 종합 정리하면 아래 \`<표 1>\`과 같다.\n\n` +
+      `\n\n${siteTitle}에서 확인된 주요 유구들의 구조 및 공반유물 속성을 종합 정리하면 아래 \`<표 1>\`과 같다.\n\n` +
         table1Md
     );
   }
-  if (existingCharts.length === 0) {
+  if (existingCharts.length === 0 && chart1Spec) {
     sec2Additions.push(
-      `\n\n${siteTitle} 및 주변 비교유적군의 시기·단계별 연구 논거와 비교 지표 분포를 정량 비교하면 아래 차트와 같다.\n\n\`\`\`wc-chart\n` +
+      `\n\n${siteTitle} 관련 DBpia 검증 선행연구들의 발표 시기 및 연구 논거 분포를 정량 비교하면 아래 차트와 같다.\n\n\`\`\`wc-chart\n` +
         JSON.stringify(chart1Spec) +
         "\n```"
     );
   }
-  if (existingCharts.length < 2) {
+  if (existingCharts.length < 2 && chart2Spec) {
     sec2Additions.push(
-      `\n\n또한 ${siteTitle}에서 확인된 주요 유구들의 평면 규모(장축·단축 m 및 면적 ㎡)를 정량적으로 비교하면 아래 차트와 같다.\n\n\`\`\`wc-chart\n` +
+      `\n\n또한 ${siteTitle}에서 확인된 주요 유구들의 평면 규모(장축·단축 m 및 면적 ㎡) 실측치를 비교하면 아래 차트와 같다.\n\n\`\`\`wc-chart\n` +
         JSON.stringify(chart2Spec) +
         "\n```"
     );
   }
-  if (existingDiagrams.length === 0) {
+  if (existingDiagrams.length === 0 && diag1Spec) {
     sec2Additions.push(
-      `\n\n${siteTitle} 조사구역의 퇴적 층위와 유구 굴광·축조·폐기 공정을 도식화하면 다음 모식도와 같다.\n\n\`\`\`wc-diagram\n` +
+      `\n\n${siteTitle} 조사구역의 퇴적 층위와 유구 축조·폐기 공정을 도식화하면 다음 모식도와 같다.\n\n\`\`\`wc-diagram\n` +
         JSON.stringify(diag1Spec) +
         "\n```"
     );
@@ -631,23 +719,23 @@ function ensureRichArchaeologyVisualsAndTables(
   const currentTableCount = (
     body.match(/(?:^|\n)\|[^\n]+\|\r?\n\|[\s:\-|]+\|/g) || []
   ).length;
-  if (currentTableCount < 2 && !body.includes("기종별·형식별 제작기법 속성")) {
+  if (currentTableCount < 2 && table2Md && !body.includes("제작기법 속성 및 상대편년 비교표")) {
     sec3Additions.push(
-      `\n\n${siteTitle}에서 출토된 주요 유물의 기종별·형식별 제작기법 속성과 상대편년 단계를 종합 정리하면 다음과 같다.\n\n` +
+      `\n\n${siteTitle}에서 출토된 주요 유물의 분류별 제작기법 속성과 상대편년 단계를 종합 정리하면 다음과 같다.\n\n` +
         table2Md
     );
   }
   const afterTable2Count =
     (body.match(/(?:^|\n)\|[^\n]+\|\r?\n\|[\s:\-|]+\|/g) || []).length +
     (sec3Additions.length > 0 ? 1 : 0);
-  if (afterTable2Count < 3 && !body.includes("입지·유구 구조·유물 조합상 및 편년 단계 종합 대비표")) {
+  if (afterTable2Count < 3 && table3Md && !body.includes("입지·유구 구조·유물 조합상")) {
     sec3Additions.push(
-      `\n\n아울러 ${siteTitle}과 주변 비교유적군의 입지·유구 구조·출토유물 조합상 및 편년 단계를 종합 대비하면 아래 \`<표 3>\`과 같다.\n\n` +
+      `\n\n아울러 ${siteTitle}과 주변 비교유적군의 입지·유구 구조·출토유물 조합상을 종합 대비하면 아래 \`<표 3>\`과 같다.\n\n` +
         table3Md
     );
   }
   const midDiagCount = (body.match(/```wc-diagram[\s\S]*?```/gi) || []).length;
-  if (midDiagCount < 2) {
+  if (midDiagCount < 2 && diag2Spec) {
     sec3Additions.push(
       `\n\n층위·유구 구조와 출토유물 조합에 기반한 단계별 통시적 변천 양상을 모식화하면 아래와 같다.\n\n\`\`\`wc-diagram\n` +
         JSON.stringify(diag2Spec) +
@@ -655,7 +743,7 @@ function ensureRichArchaeologyVisualsAndTables(
     );
   }
   const currentChartCount = (body.match(/```wc-chart[\s\S]*?```/gi) || []).length;
-  if (currentChartCount < 3) {
+  if (currentChartCount < 3 && chart3Spec) {
     sec3Additions.push(
       `\n\n아울러 본 고찰의 편년 및 성격 규명에 활용된 DBpia AI 검증 선행연구들의 주제 영역별 학술 논거 분포를 시각화하면 아래 차트와 같다.\n\n\`\`\`wc-chart\n` +
         JSON.stringify(chart3Spec) +
@@ -677,9 +765,9 @@ function ensureRichArchaeologyVisualsAndTables(
 
   const sec4Additions = [];
   const currentDiagCount = (body.match(/```wc-diagram[\s\S]*?```/gi) || []).length;
-  if (currentDiagCount < 3) {
+  if (currentDiagCount < 3 && diag3Spec) {
     sec4Additions.push(
-      `\n\nDBpia 수집 문헌과의 교차검증을 통해 복원한 ${siteTitle} 및 주변 비교유적군의 공간 네트워크와 문화 파급 구조를 모식화하면 다음과 같다.\n\n\`\`\`wc-diagram\n` +
+      `\n\nDBpia 수집 문헌과의 교차검증을 통해 복원한 ${siteTitle} 및 주변 비교유적군의 관계 구조를 모식화하면 다음과 같다.\n\n\`\`\`wc-diagram\n` +
         JSON.stringify(diag3Spec) +
         "\n```"
     );
@@ -687,7 +775,7 @@ function ensureRichArchaeologyVisualsAndTables(
   const updatedTableCount = (
     body.match(/(?:^|\n)\|[^\n]+\|\r?\n\|[\s:\-|]+\|/g) || []
   ).length;
-  if (updatedTableCount < 4 && !body.includes("<표 4>")) {
+  if (updatedTableCount < 4 && table4Md && !body.includes("<표 4>")) {
     sec4Additions.push(
       `\n\n또한 본 고찰에서 수집·교차검증한 DBpia 핵심 선행연구들의 주요 학술 쟁점과 ${siteTitle}에의 적용 결과를 종합 대비하면 \`<표 4>\`와 같다.\n\n` +
         table4Md
@@ -718,10 +806,16 @@ function replaceInlineFootnoteSafely(bodyText, num, token, supNum) {
   ];
 
   for (const pat of inlinePatterns) {
+    let inCodeBlock = false;
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
       const trimmed = line.trim();
+      if (trimmed.startsWith("```")) {
+        inCodeBlock = !inCodeBlock;
+        continue;
+      }
       if (
+        inCodeBlock ||
         !trimmed ||
         trimmed.startsWith("|") ||
         trimmed.startsWith("#") ||

@@ -51,11 +51,11 @@ impl Default for ArchaeoStudioPane {
         Self {
             open: false,
             doc_mode: "report".to_string(),
-            site_name: "경산 임당동·조영동 유적".to_string(),
-            focus_topic: "묘제 변천과 출토 토기·위세품을 통해 본 압독국 지배집단의 위계구조".to_string(),
-            raw_data: "1. 조사개요: 경산 임당동·조영동 구릉 일대 주부식 목곽묘 18기, 수혈식 석곽묘 9기, 옹관묘 5기 조사\n2. 유구 중복관계: 조영동 EⅢ-2호 주부식 목곽묘가 선행 원삼국시대 목관묘(EⅢ-1호)를 파괴·중복하며 축조됨. 5세기 중엽 수혈식 석곽묘(EⅢ-7호)가 목곽묘 호석을 일부 절단함.\n3. 주요 출토유물: 주부식 목곽묘 주곽에서 금동관모편, 은제관식, 환두대도, 철모·철촉 다량 출토. 부곽에서 고배·장경호·파수부완·단경호 등 도질토기 다량 부장.".to_string(),
-            dating_data: "조영동 EⅢ-2호 목곽묘 목탄 AMS: 1680±30 BP (보정연대 AD 330~410, 95.4%)\nEⅢ-7호 석곽묘 바닥 목탄 AMS: 1560±35 BP (보정연대 AD 420~540, 95.4%)".to_string(),
-            dbpia_queries: "경산 임당동 조영동 목곽묘 위계\n영남지역 삼국시대 주부식 목곽묘 토기 편년".to_string(),
+            site_name: String::new(),
+            focus_topic: String::new(),
+            raw_data: String::new(),
+            dating_data: String::new(),
+            dbpia_queries: String::new(),
             first_stage_prompt: String::new(),
             dbpia_answer: String::new(),
             dbpia_refs: String::new(),
@@ -555,7 +555,11 @@ fn trigger_dbpia_collect(app: &mut WordApp, ctx: egui::Context) {
                         arr.iter()
                             .filter_map(|item| {
                                 let t = item.get("title").and_then(Value::as_str).unwrap_or("");
-                                let a = item.get("authors").and_then(Value::as_str).unwrap_or("");
+                                let a = item
+                                    .get("author")
+                                    .or_else(|| item.get("authors"))
+                                    .and_then(Value::as_str)
+                                    .unwrap_or("");
                                 if t.is_empty() { None } else { Some(format!("• {a} — {t}")) }
                             })
                             .collect::<Vec<_>>()
@@ -573,6 +577,13 @@ fn trigger_dbpia_collect(app: &mut WordApp, ctx: egui::Context) {
 
 fn trigger_full_generation(app: &mut WordApp, ctx: egui::Context) {
     let topic = build_combined_topic(app);
+    let user_focus = if app.archaeo_studio.focus_topic.trim().is_empty() {
+        app.archaeo_studio.site_name.trim().to_string()
+    } else if app.archaeo_studio.site_name.trim().is_empty() {
+        app.archaeo_studio.focus_topic.trim().to_string()
+    } else {
+        format!("{} — {}", app.archaeo_studio.site_name.trim(), app.archaeo_studio.focus_topic.trim())
+    };
     let queries: Vec<String> = app
         .archaeo_studio
         .dbpia_queries
@@ -583,12 +594,16 @@ fn trigger_full_generation(app: &mut WordApp, ctx: egui::Context) {
         .collect();
     let payload = json!({
         "topic": topic,
+        "userFocus": user_focus,
+        "reportText": app.archaeo_studio.raw_data.trim(),
+        "datingData": app.archaeo_studio.dating_data.trim(),
         "docMode": app.archaeo_studio.doc_mode,
         "firstStagePrompt": app.archaeo_studio.first_stage_prompt,
         "dbpiaQueries": queries,
         "maxRounds": app.archaeo_studio.max_rounds,
         "exportFormat": "docx",
         "openApps": false,
+        "waitForCompletion": true,
     });
     app.archaeo_studio.busy = true;
     app.archaeo_studio.status_line = "Gemini '작업' 모드 × DBpia 고찰 원고 집필 및 WordCraft(.docx) 조판 중…".to_string();
