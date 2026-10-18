@@ -1096,6 +1096,7 @@ module.exports = {
   normalizeWcDiagramSpec,
   repairCollapsedMarkdownTables,
   replaceInlineFootnoteSafely,
+  parseFeatureDimensionsFromMarkdown,
   ensureRichArchaeologyVisualsAndTables,
   buildComparativeChartsFromData,
   buildSchematicDiagramsFromData,

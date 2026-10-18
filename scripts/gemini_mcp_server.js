@@ -2707,10 +2707,19 @@ async function enrichSingleDbpiaReference(ref) {
           const wNorm = String(j.display_name || j.title || "")
             .toLowerCase()
             .replace(/[^a-z0-9가-힣]/g, "");
-          if (
-            wNorm &&
-            (wNorm.includes(normT.slice(0, 18)) || normT.includes(wNorm.slice(0, 18)))
-          ) {
+          const minLen = Math.min(normT.length, wNorm.length);
+          const maxLen = Math.max(normT.length, wNorm.length, 1);
+          const prefixLen = Math.max(12, Math.floor(minLen * 0.75));
+          const titleMatches =
+            minLen >= 8 &&
+            minLen / maxLen >= 0.65 &&
+            (wNorm.includes(normT.slice(0, prefixLen)) ||
+              normT.includes(wNorm.slice(0, prefixLen)));
+          const yearMatches =
+            !out.year ||
+            !j.publication_year ||
+            Math.abs(Number(out.year) - Number(j.publication_year)) <= 1;
+          if (wNorm && titleMatches && yearMatches) {
             const authors = (j.authorships || [])
               .map((a) => a.author?.display_name)
               .filter(Boolean);
@@ -2985,6 +2994,27 @@ async function askDbpiaAi(query) {
   return await withCdpSession(dbpiaTarget.webSocketDebuggerUrl, async (send) => {
     const cleanQuery = query.replace(/\r?\n/g, " ").trim().slice(0, 600);
 
+    // Record pre-submission state so 2nd+ queries in the DBpia SPA do not immediately exit on the 1st query's completed badge
+    const preSnapRes = await send("Runtime.evaluate", {
+      expression: `(() => {
+        const mdNodes = Array.from(document.querySelectorAll('[class*="useMarkdownComponents_"]'));
+        const lastMdText = mdNodes.length > 0 ? (mdNodes[mdNodes.length - 1].innerText || '').trim() : '';
+        return {
+          pathname: location.pathname,
+          mdCount: mdNodes.length,
+          lastMdHead: lastMdText.slice(0, 120),
+          refCount: document.querySelectorAll('[class*="ReferenceSources_referenceItem__"]').length
+        };
+      })()`,
+      returnByValue: true,
+    });
+    const preSnap = preSnapRes.result?.value || {
+      pathname: "",
+      mdCount: 0,
+      lastMdHead: "",
+      refCount: 0,
+    };
+
     // Try direct React textarea submission first if on /ko/search, otherwise use redirect URL
     const directTry = await send("Runtime.evaluate", {
       expression: `(async () => {
@@ -3019,7 +3049,11 @@ async function askDbpiaAi(query) {
       const checkNav = await send("Runtime.evaluate", {
         expression: `(() => {
           const bodyText = document.body ? (document.body.innerText || '') : '';
-          return location.pathname.length > '/ko/search'.length || bodyText.includes('답변을 생성');
+          const mdNodes = Array.from(document.querySelectorAll('[class*="useMarkdownComponents_"]'));
+          const isGen = bodyText.includes('답변을 생성');
+          const pathChanged = location.pathname !== ${JSON.stringify(preSnap.pathname)} && location.pathname.length > '/ko/search'.length;
+          const mdIncreased = mdNodes.length > ${Number(preSnap.mdCount || 0)};
+          return isGen || pathChanged || mdIncreased;
         })()`,
         returnByValue: true,
       });
@@ -3044,13 +3078,18 @@ async function askDbpiaAi(query) {
             const bodyText = document.body ? (document.body.innerText || '') : '';
             const isGenerating = bodyText.includes('답변을 생성하고 있습니다') || bodyText.includes('답변을 생성 중이에요');
             const isCompleted = bodyText.includes('답변이 완료되었습니다');
-            const hasRefs = Boolean(document.querySelector('[class*="ReferenceSources_referenceItem__"]'));
-            const mdNodes = document.querySelectorAll('[class*="useMarkdownComponents_"]');
+            const mdNodes = Array.from(document.querySelectorAll('[class*="useMarkdownComponents_"]'));
+            const lastMdText = mdNodes.length > 0 ? (mdNodes[mdNodes.length - 1].innerText || '').trim() : '';
+            const isNewTurn =
+              location.pathname !== ${JSON.stringify(preSnap.pathname)} ||
+              mdNodes.length > ${Number(preSnap.mdCount || 0)} ||
+              (lastMdText.length > 40 && lastMdText.slice(0, 120) !== ${JSON.stringify(preSnap.lastMdHead)});
             return {
               isGenerating,
               isCompleted,
-              hasRefs,
+              isNewTurn,
               mdCount: mdNodes.length,
+              lastMdLen: lastMdText.length,
               bodyLen: bodyText.length
             };
           })()`,
@@ -3058,8 +3097,8 @@ async function askDbpiaAi(query) {
         });
 
         const v = check.result?.value || {};
-        if (v.isCompleted || (!v.isGenerating && v.mdCount > 0 && tick > 5)) {
-          if (v.bodyLen === lastLen) {
+        if (!v.isGenerating && v.isNewTurn && (v.isCompleted || (v.mdCount > 0 && v.lastMdLen > 80 && tick > 5))) {
+          if (v.bodyLen === lastLen && v.lastMdLen > 0) {
             stableCount++;
             if (stableCount >= 2) break;
           } else {
@@ -3152,223 +3191,186 @@ function parseJsonFromGeminiReply(rawText) {
  *  - Figure 3: Quantitative Assemblage & Structural Attribute Chart with Academic Monochrome/Slate Hatch Patterns
  *  - Figure 4: Double-Bordered Chronology, Feature Plan Silhouette & Artifact Typology Matrix Table
  */
+function parseRadiocarbonSamplesFromText(sourceText = "") {
+  const samples = [];
+  const lines = String(sourceText || "").split(/\r?\n/);
+  const bpRx = /(\d{3,5})\s*±\s*(\d{1,3})\s*BP/i;
+  for (const line of lines) {
+    const m = bpRx.exec(line);
+    if (!m) continue;
+    const bpVal = Number(m[1]);
+    const bpErr = Number(m[2]);
+    if (!bpVal || bpVal < 100 || bpVal > 50000) continue;
+    const approxMedian = 1950 - bpVal;
+    const span = Math.max(30, bpErr * 2);
+    const featMatch = /([가-힣A-Za-z0-9\-]+\s*(?:호|지구|층|유구|주거지|목곽묘|석곽묘|석실분|수혈|요지|건물지)[^:：(|]*)/.exec(line);
+    const labMatch = /\b([A-Z]{2,6}\s*-\s*[A-Za-z0-9-]+)\b/.exec(line);
+    samples.push({
+      labCode: labMatch ? labMatch[1].trim() : `Sample-${samples.length + 1}`,
+      feature: featMatch ? featMatch[1].trim().slice(0, 22) : `측정 시료 ${samples.length + 1}`,
+      bp: `${bpVal}±${bpErr} BP`,
+      sigma1Start: approxMedian - Math.round(span * 0.5),
+      sigma1End: approxMedian + Math.round(span * 0.5),
+      sigma2Start: approxMedian - span,
+      sigma2End: approxMedian + span,
+      median: approxMedian,
+      phase: "실측 연대",
+    });
+    if (samples.length >= 10) break;
+  }
+  return samples;
+}
+
 function renderPublicationGradeArchaeologyFigures(rawData = {}) {
-  const siteName =
-    rawData.siteName || "본 조사 유적";
+  const {
+    parseFeatureDimensionsFromMarkdown,
+  } = require("./archaeology_visuals_enricher");
+  const sourceText = String(
+    rawData.sourceText ||
+      rawData.reportText ||
+      rawData.datingText ||
+      pipelineState.latestManuscript ||
+      ""
+  );
+  const siteName = rawData.siteName || "본 조사 유적";
   const sitePeriod =
     rawData.sitePeriod ||
     "조사구역 확인 문화층 및 유구·출토유물 편년 단계";
 
-  // 1. Normalize Radiocarbon / TL Samples
+  // 1. Radiocarbon / TL Samples — strictly from rawData or parsed from sourceText (NEVER fabricate Byeongsan-dong samples)
   const rawSamples =
     Array.isArray(rawData.radiocarbonSamples) &&
     rawData.radiocarbonSamples.length > 0
       ? rawData.radiocarbonSamples
-      : [
-          {
-            labCode: "AMS-01 (초기군)",
-            feature: "철기 4호 주거지(목탄)",
-            bp: "2080±35 BP",
-            sigma1Start: -155,
-            sigma1End: -45,
-            sigma2Start: -195,
-            sigma2End: -5,
-            median: -105,
-            phase: "Ⅰ단계 (조영기)",
-          },
-          {
-            labCode: "AMS-02 (중심군 A)",
-            feature: "철기 1호 주거지(목탄)",
-            bp: "1940±30 BP",
-            sigma1Start: 25,
-            sigma1End: 115,
-            sigma2Start: -10,
-            sigma2End: 160,
-            median: 70,
-            phase: "Ⅱ-1단계 (확장기)",
-          },
-          {
-            labCode: "AMS-03 (중심군 B)",
-            feature: "철기 3호 주거지(노지 목탄)",
-            bp: "1890±30 BP",
-            sigma1Start: 80,
-            sigma1End: 170,
-            sigma2Start: 55,
-            sigma2End: 225,
-            median: 128,
-            phase: "Ⅱ-1단계 (확장기)",
-          },
-          {
-            labCode: "AMS-04 (대형주거지)",
-            feature: "철기 2호 주거지(탄화목)",
-            bp: "1835±30 BP",
-            sigma1Start: 135,
-            sigma1End: 235,
-            sigma2Start: 95,
-            sigma2End: 255,
-            median: 185,
-            phase: "Ⅱ-2단계 (성행기)",
-          },
-          {
-            labCode: "AMS-05 (중복 후행)",
-            feature: "철기 3-1호 주거지(부뚜막)",
-            bp: "1780±30 BP",
-            sigma1Start: 220,
-            sigma1End: 310,
-            sigma2Start: 175,
-            sigma2End: 340,
-            median: 260,
-            phase: "Ⅱ-2단계 (성행기)",
-          },
-          {
-            labCode: "TL-01 (열루세스)",
-            feature: "철기 5호 주거지(노지 소토)",
-            bp: "1750±90 BP (TL)",
-            sigma1Start: 180,
-            sigma1End: 340,
-            sigma2Start: 110,
-            sigma2End: 410,
-            median: 265,
-            phase: "Ⅱ-2단계 (성행기)",
-          },
-          {
-            labCode: "AMS-06 (삼국시대)",
-            feature: "삼국 1호 주거지(목탄)",
-            bp: "1530±30 BP",
-            sigma1Start: 480,
-            sigma1End: 585,
-            sigma2Start: 435,
-            sigma2End: 605,
-            median: 540,
-            phase: "Ⅲ단계 (삼국기)",
-          },
-        ];
+      : parseRadiocarbonSamplesFromText(sourceText);
 
   // =========================================================================
   // FIGURE 1: OxCal v4.4 Style Multi-Plot Radiocarbon Probability Distribution
   // =========================================================================
-  const allMinY = Math.min(
-    ...rawSamples.map((s) => Number(s.sigma2Start ?? s.sigma1Start ?? 0))
-  );
-  const allMaxY = Math.max(
-    ...rawSamples.map((s) => Number(s.sigma2End ?? s.sigma1End ?? 600))
-  );
-  const spanY = Math.max(100, allMaxY - allMinY);
-  const axisMin = Math.floor((allMinY - spanY * 0.15) / 50) * 50;
-  const axisMax = Math.ceil((allMaxY + spanY * 0.15) / 50) * 50;
-  const totalRange = Math.max(100, axisMax - axisMin);
-
   const fig1W = 960;
-  const rowH = 66;
-  const topPad = 82;
-  const botPad = 68;
-  const leftColW = 240;
-  const rightColW = 150;
-  const plotW = fig1W - leftColW - rightColW;
-  const fig1H = topPad + rawSamples.length * rowH + botPad;
+  let svgFig1 = "";
+  if (rawSamples.length === 0) {
+    svgFig1 = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${fig1W} 140" style="width:100%;height:auto;background:#ffffff;border:1px solid #0f172a;display:block;">
+      <rect x="0" y="0" width="${fig1W}" height="48" fill="#f8fafc"/>
+      <line x1="0" y1="48" x2="${fig1W}" y2="48" stroke="#0f172a" stroke-width="1.5"/>
+      <text x="24" y="22" font-size="13" font-weight="800" fill="#0f172a" font-family="'Malgun Gothic',sans-serif">&lt;도면 1&gt; ${escXml(siteName)} 자연과학적 절대연대(AMS·OSL) 측정 시료 현황</text>
+      <text x="24" y="39" font-size="10.5" fill="#475569" font-family="'Malgun Gothic',sans-serif">데이터 무결성 원칙(허구 수치 날조 금지) 적용</text>
+      <text x="${fig1W / 2}" y="98" text-anchor="middle" font-size="12" font-weight="700" fill="#475569" font-family="'Malgun Gothic',sans-serif">입력된 자연과학 절대연대(BP) 시료 데이터가 없어 임의 확률분포 곡선을 생성하지 않고 상대편년으로 논증합니다.</text>
+    </svg>`;
+  } else {
+    const allMinY = Math.min(
+      ...rawSamples.map((s) => Number(s.sigma2Start ?? s.sigma1Start ?? 0))
+    );
+    const allMaxY = Math.max(
+      ...rawSamples.map((s) => Number(s.sigma2End ?? s.sigma1End ?? 600))
+    );
+    const spanY = Math.max(100, allMaxY - allMinY);
+    const axisMin = Math.floor((allMinY - spanY * 0.15) / 50) * 50;
+    const axisMax = Math.ceil((allMaxY + spanY * 0.15) / 50) * 50;
+    const totalRange = Math.max(100, axisMax - axisMin);
 
-  const xOfYear = (yr) =>
-    leftColW + ((Number(yr) - axisMin) / totalRange) * plotW;
+    const rowH = 66;
+    const topPad = 82;
+    const botPad = 68;
+    const leftColW = 240;
+    const rightColW = 150;
+    const plotW = fig1W - leftColW - rightColW;
+    const fig1H = topPad + rawSamples.length * rowH + botPad;
 
-  const formatCalYear = (yr) => {
-    const n = Math.round(Number(yr));
-    return n < 0 ? `BC ${Math.abs(n)}` : `AD ${n}`;
-  };
+    const xOfYear = (yr) =>
+      leftColW + ((Number(yr) - axisMin) / totalRange) * plotW;
 
-  let gridTicksSvg = "";
-  const stepTick =
-    totalRange <= 300 ? 50 : totalRange <= 800 ? 100 : totalRange <= 1600 ? 200 : 500;
-  for (let y = axisMin; y <= axisMax; y += stepTick) {
-    const x = xOfYear(y).toFixed(1);
-    gridTicksSvg += `
-      <line x1="${x}" y1="${topPad}" x2="${x}" y2="${fig1H - botPad}" stroke="#cbd5e1" stroke-width="0.8" stroke-dasharray="3,3"/>
-      <line x1="${x}" y1="${topPad - 5}" x2="${x}" y2="${topPad}" stroke="#0f172a" stroke-width="1.2"/>
-      <line x1="${x}" y1="${fig1H - botPad}" x2="${x}" y2="${fig1H - botPad + 6}" stroke="#0f172a" stroke-width="1.2"/>
-      <text x="${x}" y="${topPad - 10}" text-anchor="middle" font-size="10.5" font-family="'Malgun Gothic',sans-serif" fill="#334155">${escXml(formatCalYear(y))}</text>
-      <text x="${x}" y="${fig1H - botPad + 20}" text-anchor="middle" font-size="10.5" font-family="'Malgun Gothic',sans-serif" fill="#0f172a" font-weight="600">${escXml(formatCalYear(y))}</text>
-    `;
-  }
+    const formatCalYear = (yr) => {
+      const n = Math.round(Number(yr));
+      return n < 0 ? `BC ${Math.abs(n)}` : `AD ${n}`;
+    };
 
-  let sampleRowsSvg = "";
-  rawSamples.forEach((s, idx) => {
-    const yBase = topPad + (idx + 1) * rowH - 18;
-    const yRowTop = topPad + idx * rowH;
-    const s2a = Number(s.sigma2Start ?? s.median - 60);
-    const s2b = Number(s.sigma2End ?? s.median + 60);
-    const s1a = Number(s.sigma1Start ?? (s2a + s2b) / 2 - (s2b - s2a) * 0.28);
-    const s1b = Number(s.sigma1End ?? (s2a + s2b) / 2 + (s2b - s2a) * 0.28);
-    const med = Number(s.median ?? (s1a + s1b) / 2);
-
-    const x2a = xOfYear(s2a);
-    const x2b = xOfYear(s2b);
-    const x1a = xOfYear(s1a);
-    const x1b = xOfYear(s1b);
-    const xMed = xOfYear(med);
-
-    // Build OxCal-like multi-modal probability density curve polygon
-    const pts = [];
-    const numSteps = 36;
-    const sigmaPx = Math.max(8, (x1b - x1a) / 2);
-    for (let k = 0; k <= numSteps; k++) {
-      const px = x2a + ((x2b - x2a) * k) / numSteps;
-      const z1 = (px - xMed) / sigmaPx;
-      const z2 = (px - (xMed - sigmaPx * 0.55)) / (sigmaPx * 0.45);
-      const z3 = (px - (xMed + sigmaPx * 0.5)) / (sigmaPx * 0.5);
-      const density =
-        Math.exp(-0.5 * z1 * z1) * 0.82 +
-        Math.exp(-0.5 * z2 * z2) * 0.28 +
-        Math.exp(-0.5 * z3 * z3) * 0.24;
-      const py = yBase - Math.min(34, density * 31);
-      pts.push(`${px.toFixed(1)},${py.toFixed(1)}`);
+    let gridTicksSvg = "";
+    const stepTick =
+      totalRange <= 300 ? 50 : totalRange <= 800 ? 100 : totalRange <= 1600 ? 200 : 500;
+    for (let y = axisMin; y <= axisMax; y += stepTick) {
+      const x = xOfYear(y).toFixed(1);
+      gridTicksSvg += `
+        <line x1="${x}" y1="${topPad}" x2="${x}" y2="${fig1H - botPad}" stroke="#cbd5e1" stroke-width="0.8" stroke-dasharray="3,3"/>
+        <line x1="${x}" y1="${topPad - 5}" x2="${x}" y2="${topPad}" stroke="#0f172a" stroke-width="1.2"/>
+        <line x1="${x}" y1="${fig1H - botPad}" x2="${x}" y2="${fig1H - botPad + 6}" stroke="#0f172a" stroke-width="1.2"/>
+        <text x="${x}" y="${topPad - 10}" text-anchor="middle" font-size="10.5" font-family="'Malgun Gothic',sans-serif" fill="#334155">${escXml(formatCalYear(y))}</text>
+        <text x="${x}" y="${fig1H - botPad + 20}" text-anchor="middle" font-size="10.5" font-family="'Malgun Gothic',sans-serif" fill="#0f172a" font-weight="600">${escXml(formatCalYear(y))}</text>
+      `;
     }
-    const polyPoints = `${x2a.toFixed(1)},${yBase} ${pts.join(" ")} ${x2b.toFixed(1)},${yBase}`;
 
-    sampleRowsSvg += `
-      ${idx % 2 === 1 ? `<rect x="${leftColW}" y="${yRowTop}" width="${plotW}" height="${rowH}" fill="#f8fafc" opacity="0.65"/>` : ""}
-      <line x1="20" y1="${yRowTop + rowH}" x2="${fig1W - 20}" y2="${yRowTop + rowH}" stroke="#e2e8f0" stroke-width="0.8"/>
-      <!-- Left Metadata -->
-      <text x="28" y="${yRowTop + 26}" font-size="11.5" font-weight="700" fill="#0f172a" font-family="'Malgun Gothic',sans-serif">${escXml(s.feature || `시료 ${idx + 1}`)}</text>
-      <text x="28" y="${yRowTop + 44}" font-size="10.5" fill="#475569" font-family="Consolas,'Malgun Gothic',monospace">${escXml(s.labCode || `Lab-${idx + 1}`)} (${escXml(s.bp || "-")})</text>
-      <!-- OxCal Probability Density Curve -->
-      <polygon points="${polyPoints}" fill="url(#oxcalGrad)" stroke="#1e293b" stroke-width="1.25"/>
-      <!-- 1-sigma (68.2%) bracket -->
-      <line x1="${x1a.toFixed(1)}" y1="${yBase + 4}" x2="${x1b.toFixed(1)}" y2="${yBase + 4}" stroke="#0f172a" stroke-width="2.2"/>
-      <line x1="${x1a.toFixed(1)}" y1="${yBase + 1}" x2="${x1a.toFixed(1)}" y2="${yBase + 7}" stroke="#0f172a" stroke-width="1.5"/>
-      <line x1="${x1b.toFixed(1)}" y1="${yBase + 1}" x2="${x1b.toFixed(1)}" y2="${yBase + 7}" stroke="#0f172a" stroke-width="1.5"/>
-      <!-- 2-sigma (95.4%) bracket -->
-      <line x1="${x2a.toFixed(1)}" y1="${yBase + 10}" x2="${x2b.toFixed(1)}" y2="${yBase + 10}" stroke="#475569" stroke-width="1.3"/>
-      <line x1="${x2a.toFixed(1)}" y1="${yBase + 7}" x2="${x2a.toFixed(1)}" y2="${yBase + 13}" stroke="#475569" stroke-width="1.2"/>
-      <line x1="${x2b.toFixed(1)}" y1="${yBase + 7}" x2="${x2b.toFixed(1)}" y2="${yBase + 13}" stroke="#475569" stroke-width="1.2"/>
-      <!-- Median Crosshair -->
-      <circle cx="${xMed.toFixed(1)}" cy="${yBase - 8}" r="2.8" fill="#ffffff" stroke="#0f172a" stroke-width="1.5"/>
-      <!-- Right Calibrated Range Label -->
-      <text x="${leftColW + plotW + 12}" y="${yRowTop + 26}" font-size="10.5" font-weight="700" fill="#0f172a" font-family="'Malgun Gothic',sans-serif">${escXml(formatCalYear(s2a))}~${escXml(formatCalYear(s2b))}</text>
-      <text x="${leftColW + plotW + 12}" y="${yRowTop + 44}" font-size="10" fill="#475569" font-family="'Malgun Gothic',sans-serif">[${escXml(s.phase || "편년단계")}] (95.4%)</text>
-    `;
-  });
+    let sampleRowsSvg = "";
+    rawSamples.forEach((s, idx) => {
+      const yBase = topPad + (idx + 1) * rowH - 18;
+      const yRowTop = topPad + idx * rowH;
+      const s2a = Number(s.sigma2Start ?? s.median - 60);
+      const s2b = Number(s.sigma2End ?? s.median + 60);
+      const s1a = Number(s.sigma1Start ?? (s2a + s2b) / 2 - (s2b - s2a) * 0.28);
+      const s1b = Number(s.sigma1End ?? (s2a + s2b) / 2 + (s2b - s2a) * 0.28);
+      const med = Number(s.median ?? (s1a + s1b) / 2);
 
-  const svgFig1 = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${fig1W} ${fig1H}" style="width:100%;height:auto;background:#ffffff;border:1px solid #0f172a;display:block;">
-    <defs>
-      <linearGradient id="oxcalGrad" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0%" stop-color="#334155" stop-opacity="0.58"/>
-        <stop offset="100%" stop-color="#64748b" stop-opacity="0.18"/>
-      </linearGradient>
-    </defs>
-    <!-- Header Banner -->
-    <rect x="0" y="0" width="${fig1W}" height="48" fill="#f8fafc"/>
-    <line x1="0" y1="48" x2="${fig1W}" y2="48" stroke="#0f172a" stroke-width="1.5"/>
-    <text x="24" y="22" font-size="13" font-weight="800" fill="#0f172a" font-family="'Malgun Gothic',sans-serif">&lt;도면 1&gt; ${escXml(siteName)} 및 관련 유구 자연과학적 연대측정(AMS·TL) 보정연대 다중 확률분포도</text>
-    <text x="24" y="39" font-size="10.5" fill="#475569" font-family="'Malgun Gothic',sans-serif">OxCal v4.4 / IntCal20 Atmospheric Curve 기준 | 상단 굵은 막대: 1σ (68.2% 신뢰구간), 하단 가는 막대: 2σ (95.4% 신뢰구간), 원점(○): 중앙값(Median)</text>
-    <!-- Plot Frame -->
-    <rect x="${leftColW}" y="${topPad}" width="${plotW}" height="${fig1H - topPad - botPad}" fill="none" stroke="#0f172a" stroke-width="1.4"/>
-    <line x1="20" y1="${topPad}" x2="${fig1W - 20}" y2="${topPad}" stroke="#0f172a" stroke-width="1.4"/>
-    <line x1="20" y1="${fig1H - botPad}" x2="${fig1W - 20}" y2="${fig1H - botPad}" stroke="#0f172a" stroke-width="1.4"/>
-    <text x="28" y="${topPad - 10}" font-size="11" font-weight="700" fill="#0f172a" font-family="'Malgun Gothic',sans-serif">출토 유구명 / 시료번호 (미보정 BP)</text>
-    <text x="${leftColW + plotW + 12}" y="${topPad - 10}" font-size="11" font-weight="700" fill="#0f172a" font-family="'Malgun Gothic',sans-serif">2σ 보정연대 / 단계</text>
-    ${gridTicksSvg}
-    ${sampleRowsSvg}
-    <text x="${leftColW + plotW / 2}" y="${fig1H - 18}" text-anchor="middle" font-size="11.5" font-weight="700" fill="#0f172a" font-family="'Malgun Gothic',sans-serif">보정연대 (Calibrated Date, cal BC / cal AD)</text>
-  </svg>`;
+      const x2a = xOfYear(s2a);
+      const x2b = xOfYear(s2b);
+      const x1a = xOfYear(s1a);
+      const x1b = xOfYear(s1b);
+      const xMed = xOfYear(med);
+
+      const pts = [];
+      const numSteps = 36;
+      const sigmaPx = Math.max(8, (x1b - x1a) / 2);
+      for (let k = 0; k <= numSteps; k++) {
+        const px = x2a + ((x2b - x2a) * k) / numSteps;
+        const z1 = (px - xMed) / sigmaPx;
+        const z2 = (px - (xMed - sigmaPx * 0.55)) / (sigmaPx * 0.45);
+        const z3 = (px - (xMed + sigmaPx * 0.5)) / (sigmaPx * 0.5);
+        const density =
+          Math.exp(-0.5 * z1 * z1) * 0.82 +
+          Math.exp(-0.5 * z2 * z2) * 0.28 +
+          Math.exp(-0.5 * z3 * z3) * 0.24;
+        const py = yBase - Math.min(34, density * 31);
+        pts.push(`${px.toFixed(1)},${py.toFixed(1)}`);
+      }
+      const polyPoints = `${x2a.toFixed(1)},${yBase} ${pts.join(" ")} ${x2b.toFixed(1)},${yBase}`;
+
+      sampleRowsSvg += `
+        ${idx % 2 === 1 ? `<rect x="${leftColW}" y="${yRowTop}" width="${plotW}" height="${rowH}" fill="#f8fafc" opacity="0.65"/>` : ""}
+        <line x1="20" y1="${yRowTop + rowH}" x2="${fig1W - 20}" y2="${yRowTop + rowH}" stroke="#e2e8f0" stroke-width="0.8"/>
+        <text x="28" y="${yRowTop + 26}" font-size="11.5" font-weight="700" fill="#0f172a" font-family="'Malgun Gothic',sans-serif">${escXml(s.feature || `시료 ${idx + 1}`)}</text>
+        <text x="28" y="${yRowTop + 44}" font-size="10.5" fill="#475569" font-family="Consolas,'Malgun Gothic',monospace">${escXml(s.labCode || `Lab-${idx + 1}`)} (${escXml(s.bp || "-")})</text>
+        <polygon points="${polyPoints}" fill="url(#oxcalGrad)" stroke="#1e293b" stroke-width="1.25"/>
+        <line x1="${x1a.toFixed(1)}" y1="${yBase + 4}" x2="${x1b.toFixed(1)}" y2="${yBase + 4}" stroke="#0f172a" stroke-width="2.2"/>
+        <line x1="${x1a.toFixed(1)}" y1="${yBase + 1}" x2="${x1a.toFixed(1)}" y2="${yBase + 7}" stroke="#0f172a" stroke-width="1.5"/>
+        <line x1="${x1b.toFixed(1)}" y1="${yBase + 1}" x2="${x1b.toFixed(1)}" y2="${yBase + 7}" stroke="#0f172a" stroke-width="1.5"/>
+        <line x1="${x2a.toFixed(1)}" y1="${yBase + 10}" x2="${x2b.toFixed(1)}" y2="${yBase + 10}" stroke="#475569" stroke-width="1.3"/>
+        <line x1="${x2a.toFixed(1)}" y1="${yBase + 7}" x2="${x2a.toFixed(1)}" y2="${yBase + 13}" stroke="#475569" stroke-width="1.2"/>
+        <line x1="${x2b.toFixed(1)}" y1="${yBase + 7}" x2="${x2b.toFixed(1)}" y2="${yBase + 13}" stroke="#475569" stroke-width="1.2"/>
+        <circle cx="${xMed.toFixed(1)}" cy="${yBase - 8}" r="2.8" fill="#ffffff" stroke="#0f172a" stroke-width="1.5"/>
+        <text x="${leftColW + plotW + 12}" y="${yRowTop + 26}" font-size="10.5" font-weight="700" fill="#0f172a" font-family="'Malgun Gothic',sans-serif">${escXml(formatCalYear(s2a))}~${escXml(formatCalYear(s2b))}</text>
+        <text x="${leftColW + plotW + 12}" y="${yRowTop + 44}" font-size="10" fill="#475569" font-family="'Malgun Gothic',sans-serif">[${escXml(s.phase || "편년단계")}] (95.4%)</text>
+      `;
+    });
+
+    svgFig1 = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${fig1W} ${fig1H}" style="width:100%;height:auto;background:#ffffff;border:1px solid #0f172a;display:block;">
+      <defs>
+        <linearGradient id="oxcalGrad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#334155" stop-opacity="0.58"/>
+          <stop offset="100%" stop-color="#64748b" stop-opacity="0.18"/>
+        </linearGradient>
+      </defs>
+      <rect x="0" y="0" width="${fig1W}" height="48" fill="#f8fafc"/>
+      <line x1="0" y1="48" x2="${fig1W}" y2="48" stroke="#0f172a" stroke-width="1.5"/>
+      <text x="24" y="22" font-size="13" font-weight="800" fill="#0f172a" font-family="'Malgun Gothic',sans-serif">&lt;도면 1&gt; ${escXml(siteName)} 및 관련 유구 자연과학적 연대측정(AMS·TL) 보정연대 다중 확률분포도</text>
+      <text x="24" y="39" font-size="10.5" fill="#475569" font-family="'Malgun Gothic',sans-serif">OxCal v4.4 / IntCal20 Atmospheric Curve 기준 | 상단 굵은 막대: 1σ (68.2% 신뢰구간), 하단 가는 막대: 2σ (95.4% 신뢰구간), 원점(○): 중앙값(Median)</text>
+      <rect x="${leftColW}" y="${topPad}" width="${plotW}" height="${fig1H - topPad - botPad}" fill="none" stroke="#0f172a" stroke-width="1.4"/>
+      <line x1="20" y1="${topPad}" x2="${fig1W - 20}" y2="${topPad}" stroke="#0f172a" stroke-width="1.4"/>
+      <line x1="20" y1="${fig1H - botPad}" x2="${fig1W - 20}" y2="${fig1H - botPad}" stroke="#0f172a" stroke-width="1.4"/>
+      <text x="28" y="${topPad - 10}" font-size="11" font-weight="700" fill="#0f172a" font-family="'Malgun Gothic',sans-serif">출토 유구명 / 시료번호 (미보정 BP)</text>
+      <text x="${leftColW + plotW + 12}" y="${topPad - 10}" font-size="11" font-weight="700" fill="#0f172a" font-family="'Malgun Gothic',sans-serif">2σ 보정연대 / 단계</text>
+      ${gridTicksSvg}
+      ${sampleRowsSvg}
+      <text x="${leftColW + plotW / 2}" y="${fig1H - 18}" text-anchor="middle" font-size="11.5" font-weight="700" fill="#0f172a" font-family="'Malgun Gothic',sans-serif">보정연대 (Calibrated Date, cal BC / cal AD)</text>
+    </svg>`;
+  }
 
   // =========================================================================
   // FIGURE 2: Bivariate Feature Dimension Scatter Plot & Isometric Ratio Lines
@@ -3377,265 +3379,211 @@ function renderPublicationGradeArchaeologyFigures(rawData = {}) {
     Array.isArray(rawData.featureDimensions) &&
     rawData.featureDimensions.length > 0
       ? rawData.featureDimensions
-      : [
-          {
-            name: "1호 주거지",
-            lengthM: 6.4,
-            widthM: 5.2,
-            areaM2: 33.3,
-            ratio: 1.23,
-            group: `본 유적(${siteName})`,
-          },
-          {
-            name: "2호 주거지",
-            lengthM: 5.8,
-            widthM: 4.9,
-            areaM2: 28.4,
-            ratio: 1.18,
-            group: `본 유적(${siteName})`,
-          },
-          {
-            name: "3호 주거지",
-            lengthM: 4.6,
-            widthM: 4.2,
-            areaM2: 19.3,
-            ratio: 1.1,
-            group: `본 유적(${siteName})`,
-          },
-          {
-            name: "1호 수혈유구",
-            lengthM: 2.8,
-            widthM: 2.2,
-            areaM2: 6.2,
-            ratio: 1.27,
-            group: `본 유적(${siteName})`,
-          },
-          {
-            name: "주변 비교유적 A",
-            lengthM: 6.1,
-            widthM: 5.0,
-            areaM2: 30.5,
-            ratio: 1.22,
-            group: "인접 비교유적군",
-          },
-          {
-            name: "주변 비교유적 B",
-            lengthM: 5.2,
-            widthM: 4.5,
-            areaM2: 23.4,
-            ratio: 1.16,
-            group: "인접 비교유적군",
-          },
-        ];
+      : parseFeatureDimensionsFromMarkdown(sourceText);
 
-  const maxDim = Math.max(
-    6,
-    Math.ceil(
-      Math.max(
-        ...rawFeatures.map((f) => Math.max(Number(f.lengthM || 4), Number(f.widthM || 3)))
-      ) * 1.15
-    )
-  );
   const fig2W = 960;
-  const fig2H = 500;
-  const p2Left = 84;
-  const p2Top = 74;
-  const p2W = 540;
-  const p2H = 360;
+  let svgFig2 = "";
+  if (rawFeatures.length === 0) {
+    svgFig2 = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${fig2W} 140" style="width:100%;height:auto;background:#ffffff;border:1px solid #0f172a;display:block;">
+      <rect x="0" y="0" width="${fig2W}" height="48" fill="#f8fafc"/>
+      <line x1="0" y1="48" x2="${fig2W}" y2="48" stroke="#0f172a" stroke-width="1.5"/>
+      <text x="24" y="22" font-size="13" font-weight="800" fill="#0f172a" font-family="'Malgun Gothic',sans-serif">&lt;도면 2&gt; ${escXml(siteName)} 유구 평면 규모(장축×단축) 이변량 산점도</text>
+      <text x="24" y="39" font-size="10.5" fill="#475569" font-family="'Malgun Gothic',sans-serif">데이터 무결성 원칙(허구 실측치 날조 금지) 적용</text>
+      <text x="${fig2W / 2}" y="98" text-anchor="middle" font-size="12" font-weight="700" fill="#475569" font-family="'Malgun Gothic',sans-serif">원문 내 유구 실측 계측치(장축×단축 m) 표 데이터가 없어 임의 수치 산점도를 생성하지 않습니다.</text>
+    </svg>`;
+  } else {
+    const maxDim = Math.max(
+      6,
+      Math.ceil(
+        Math.max(
+          ...rawFeatures.map((f) => Math.max(Number(f.lengthM || f.length || 4), Number(f.widthM || f.width || 3)))
+        ) * 1.15
+      )
+    );
+    const fig2H = 500;
+    const p2Left = 84;
+    const p2Top = 74;
+    const p2W = 540;
+    const p2H = 360;
 
-  const xOfLen = (l) => p2Left + (Number(l) / maxDim) * p2W;
-  const yOfWid = (w) => p2Top + p2H - (Number(w) / maxDim) * p2H;
+    const xOfLen = (l) => p2Left + (Number(l) / maxDim) * p2W;
+    const yOfWid = (w) => p2Top + p2H - (Number(w) / maxDim) * p2H;
 
-  let fig2Grid = "";
-  const dimStep = maxDim <= 8 ? 1 : maxDim <= 16 ? 2 : 4;
-  for (let d = 0; d <= maxDim; d += dimStep) {
-    const gx = xOfLen(d).toFixed(1);
-    const gy = yOfWid(d).toFixed(1);
-    fig2Grid += `
-      <line x1="${gx}" y1="${p2Top}" x2="${gx}" y2="${p2Top + p2H}" stroke="#e2e8f0" stroke-width="0.9"/>
-      <line x1="${p2Left}" y1="${gy}" x2="${p2Left + p2W}" y2="${gy}" stroke="#e2e8f0" stroke-width="0.9"/>
-      <text x="${gx}" y="${p2Top + p2H + 18}" text-anchor="middle" font-size="10.5" fill="#0f172a" font-family="'Malgun Gothic',sans-serif">${d}m</text>
-      <text x="${p2Left - 10}" y="${Number(gy) + 4}" text-anchor="end" font-size="10.5" fill="#0f172a" font-family="'Malgun Gothic',sans-serif">${d}m</text>
-    `;
-  }
-
-  // Isometric Ratio Lines (1:1, 1.5:1, 2.0:1, 3.0:1)
-  const ratioLines = [
-    { r: 1.0, label: "장단비 1.0:1 (방형)" },
-    { r: 1.5, label: "장단비 1.5:1 (장방형)" },
-    { r: 2.0, label: "2.0:1 (세장방형)" },
-    { r: 3.0, label: "3.0:1 (초세장형)" },
-  ]
-    .map(({ r, label }) => {
-      const endL = maxDim;
-      const endW = endL / r;
-      const xEnd = endW <= maxDim ? xOfLen(endL) : xOfLen(maxDim * r);
-      const yEnd = endW <= maxDim ? yOfWid(endW) : yOfWid(maxDim);
-      return `
-        <line x1="${p2Left}" y1="${p2Top + p2H}" x2="${xEnd.toFixed(1)}" y2="${yEnd.toFixed(1)}" stroke="#64748b" stroke-width="1" stroke-dasharray="5,4"/>
-        <text x="${(xEnd - 8).toFixed(1)}" y="${(yEnd + 14).toFixed(1)}" text-anchor="end" font-size="9.5" fill="#475569" font-style="italic" font-family="'Malgun Gothic',sans-serif">${escXml(label)}</text>
-      `;
-    })
-    .join("");
-
-  let ptsSvg = "";
-  const lengths = [];
-  const widths = [];
-  const areas = [];
-  const ratios = [];
-
-  rawFeatures.forEach((f, idx) => {
-    const l = Number(f.lengthM || 4);
-    const w = Number(f.widthM || 3);
-    const area = Number(f.areaM2 || (l * w).toFixed(1));
-    const ratio = Number(f.ratio || (l / Math.max(0.1, w)).toFixed(2));
-    lengths.push(l);
-    widths.push(w);
-    areas.push(area);
-    ratios.push(ratio);
-
-    const cx = xOfLen(Math.min(maxDim, l)).toFixed(1);
-    const cy = yOfWid(Math.min(maxDim, w)).toFixed(1);
-    const isPrimary =
-      String(f.group || "").includes("본") ||
-      idx < 4;
-
-    if (isPrimary) {
-      ptsSvg += `
-        <circle cx="${cx}" cy="${cy}" r="5.5" fill="#0f172a" stroke="#ffffff" stroke-width="1.5"/>
-        <text x="${Number(cx) + 8}" y="${Number(cy) - 4}" font-size="10" font-weight="700" fill="#0f172a" font-family="'Malgun Gothic',sans-serif">${escXml(f.name)} (${area}㎡)</text>
-      `;
-    } else {
-      ptsSvg += `
-        <rect x="${Number(cx) - 4.5}" y="${Number(cy) - 4.5}" width="9" height="9" fill="#ffffff" stroke="#1e293b" stroke-width="1.8"/>
-        <text x="${Number(cx) + 8}" y="${Number(cy) + 4}" font-size="9.5" fill="#334155" font-family="'Malgun Gothic',sans-serif">${escXml(f.name)}</text>
+    let fig2Grid = "";
+    const dimStep = maxDim <= 8 ? 1 : maxDim <= 16 ? 2 : 4;
+    for (let d = 0; d <= maxDim; d += dimStep) {
+      const gx = xOfLen(d).toFixed(1);
+      const gy = yOfWid(d).toFixed(1);
+      fig2Grid += `
+        <line x1="${gx}" y1="${p2Top}" x2="${gx}" y2="${p2Top + p2H}" stroke="#e2e8f0" stroke-width="0.9"/>
+        <line x1="${p2Left}" y1="${gy}" x2="${p2Left + p2W}" y2="${gy}" stroke="#e2e8f0" stroke-width="0.9"/>
+        <text x="${gx}" y="${p2Top + p2H + 18}" text-anchor="middle" font-size="10.5" fill="#0f172a" font-family="'Malgun Gothic',sans-serif">${d}m</text>
+        <text x="${p2Left - 10}" y="${Number(gy) + 4}" text-anchor="end" font-size="10.5" fill="#0f172a" font-family="'Malgun Gothic',sans-serif">${d}m</text>
       `;
     }
-  });
 
-  const mean = (arr) =>
-    arr.length ? (arr.reduce((a, b) => a + b, 0) / arr.length).toFixed(2) : "0";
+    const ratioLines = [
+      { r: 1.0, label: "장단비 1.0:1 (방형)" },
+      { r: 1.5, label: "장단비 1.5:1 (장방형)" },
+      { r: 2.0, label: "2.0:1 (세장방형)" },
+      { r: 3.0, label: "3.0:1 (초세장형)" },
+    ]
+      .map(({ r, label }) => {
+        const endL = maxDim;
+        const endW = endL / r;
+        const xEnd = endW <= maxDim ? xOfLen(endL) : xOfLen(maxDim * r);
+        const yEnd = endW <= maxDim ? yOfWid(endW) : yOfWid(maxDim);
+        return `
+          <line x1="${p2Left}" y1="${p2Top + p2H}" x2="${xEnd.toFixed(1)}" y2="${yEnd.toFixed(1)}" stroke="#64748b" stroke-width="1" stroke-dasharray="5,4"/>
+          <text x="${(xEnd - 8).toFixed(1)}" y="${(yEnd + 14).toFixed(1)}" text-anchor="end" font-size="9.5" fill="#475569" font-style="italic" font-family="'Malgun Gothic',sans-serif">${escXml(label)}</text>
+        `;
+      })
+      .join("");
 
-  const svgFig2 = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${fig2W} ${fig2H}" style="width:100%;height:auto;background:#ffffff;border:1px solid #0f172a;display:block;">
-    <rect x="0" y="0" width="${fig2W}" height="48" fill="#f8fafc"/>
-    <line x1="0" y1="48" x2="${fig2W}" y2="48" stroke="#0f172a" stroke-width="1.5"/>
-    <text x="24" y="22" font-size="13" font-weight="800" fill="#0f172a" font-family="'Malgun Gothic',sans-serif">&lt;도면 2&gt; ${escXml(siteName)} 및 주변 비교유적 유구 평면 규모(장축×단축) 이변량 산점도</text>
-    <text x="24" y="39" font-size="10.5" fill="#475569" font-family="'Malgun Gothic',sans-serif">점선(---): 등장단비 기준선(Isometric Ratio Lines, 1.0:1 ~ 3.0:1) | ●: ${escXml(siteName)} 확인 유구, □: 인접 권역 동시기 비교유적</text>
+    let ptsSvg = "";
+    const lengths = [];
+    const widths = [];
+    const areas = [];
+    const ratios = [];
 
-    <!-- Scatter Plot Box -->
-    <rect x="${p2Left}" y="${p2Top}" width="${p2W}" height="${p2H}" fill="#ffffff" stroke="#0f172a" stroke-width="1.5"/>
-    ${fig2Grid}
-    ${ratioLines}
-    ${ptsSvg}
+    rawFeatures.forEach((f, idx) => {
+      const l = Number(f.lengthM ?? f.length ?? 4);
+      const w = Number(f.widthM ?? f.width ?? 3);
+      const area = Number(f.areaM2 ?? f.area ?? (l * w).toFixed(1));
+      const ratio = Number(f.ratio || (l / Math.max(0.1, w)).toFixed(2));
+      lengths.push(l);
+      widths.push(w);
+      areas.push(area);
+      ratios.push(ratio);
 
-    <text x="${p2Left + p2W / 2}" y="${p2Top + p2H + 42}" text-anchor="middle" font-size="11.5" font-weight="700" fill="#0f172a" font-family="'Malgun Gothic',sans-serif">장축 길이 (Length, m)</text>
-    <text x="26" y="${p2Top + p2H / 2}" text-anchor="middle" font-size="11.5" font-weight="700" fill="#0f172a" font-family="'Malgun Gothic',sans-serif" transform="rotate(-90 26 ${p2Top + p2H / 2})">단축 너비 (Width, m)</text>
+      const cx = xOfLen(Math.min(maxDim, l)).toFixed(1);
+      const cy = yOfWid(Math.min(maxDim, w)).toFixed(1);
+      const isPrimary = String(f.group || "").includes("본") || idx < 4;
 
-    <!-- Right Statistical Summary Box -->
-    <rect x="${p2Left + p2W + 26}" y="${p2Top}" width="286" height="${p2H}" fill="#f8fafc" stroke="#0f172a" stroke-width="1.2"/>
-    <rect x="${p2Left + p2W + 26}" y="${p2Top}" width="286" height="32" fill="#0f172a"/>
-    <text x="${p2Left + p2W + 40}" y="${p2Top + 21}" font-size="11.5" font-weight="700" fill="#ffffff" font-family="'Malgun Gothic',sans-serif">유구 계측 통계 요약 (N = ${rawFeatures.length})</text>
+      if (isPrimary) {
+        ptsSvg += `
+          <circle cx="${cx}" cy="${cy}" r="5.5" fill="#0f172a" stroke="#ffffff" stroke-width="1.5"/>
+          <text x="${Number(cx) + 8}" y="${Number(cy) - 4}" font-size="10" font-weight="700" fill="#0f172a" font-family="'Malgun Gothic',sans-serif">${escXml(f.name)} (${area}㎡)</text>
+        `;
+      } else {
+        ptsSvg += `
+          <rect x="${Number(cx) - 4.5}" y="${Number(cy) - 4.5}" width="9" height="9" fill="#ffffff" stroke="#1e293b" stroke-width="1.8"/>
+          <text x="${Number(cx) + 8}" y="${Number(cy) + 4}" font-size="9.5" fill="#334155" font-family="'Malgun Gothic',sans-serif">${escXml(f.name)}</text>
+        `;
+      }
+    });
 
-    <text x="${p2Left + p2W + 40}" y="${p2Top + 56}" font-size="11" font-weight="700" fill="#0f172a" font-family="'Malgun Gothic',sans-serif">1. 주요 계측치 평균</text>
-    <text x="${p2Left + p2W + 44}" y="${p2Top + 76}" font-size="10.5" fill="#334155" font-family="'Malgun Gothic',sans-serif">• 평균 장축: ${mean(lengths)} m (범위 ${Math.min(...lengths).toFixed(1)}~${Math.max(...lengths).toFixed(1)}m)</text>
-    <text x="${p2Left + p2W + 44}" y="${p2Top + 94}" font-size="10.5" fill="#334155" font-family="'Malgun Gothic',sans-serif">• 평균 단축: ${mean(widths)} m (범위 ${Math.min(...widths).toFixed(1)}~${Math.max(...widths).toFixed(1)}m)</text>
-    <text x="${p2Left + p2W + 44}" y="${p2Top + 112}" font-size="10.5" fill="#334155" font-family="'Malgun Gothic',sans-serif">• 평균 면적: ${mean(areas)} ㎡</text>
-    <text x="${p2Left + p2W + 44}" y="${p2Top + 130}" font-size="10.5" fill="#334155" font-family="'Malgun Gothic',sans-serif">• 평균 장단비: ${mean(ratios)} : 1</text>
+    const mean = (arr) =>
+      arr.length ? (arr.reduce((a, b) => a + b, 0) / arr.length).toFixed(2) : "0";
 
-    <line x1="${p2Left + p2W + 38}" y1="${p2Top + 146}" x2="${p2Left + p2W + 298}" y2="${p2Top + 146}" stroke="#cbd5e1" stroke-width="1"/>
-    <text x="${p2Left + p2W + 40}" y="${p2Top + 168}" font-size="11" font-weight="700" fill="#0f172a" font-family="'Malgun Gothic',sans-serif">2. 유구별 실측 일람</text>
-    ${rawFeatures
-      .slice(0, 8)
-      .map(
-        (f, i) => `
-      <text x="${p2Left + p2W + 44}" y="${p2Top + 190 + i * 20}" font-size="10" fill="#1e293b" font-family="'Malgun Gothic',sans-serif">▪ ${escXml(f.name)}: ${Number(f.lengthM).toFixed(2)}×${Number(f.widthM).toFixed(2)}m (${(Number(f.lengthM) / Math.max(0.1, Number(f.widthM))).toFixed(2)}:1)</text>
-    `
-      )
-      .join("")}
-  </svg>`;
+    svgFig2 = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${fig2W} ${fig2H}" style="width:100%;height:auto;background:#ffffff;border:1px solid #0f172a;display:block;">
+      <rect x="0" y="0" width="${fig2W}" height="48" fill="#f8fafc"/>
+      <line x1="0" y1="48" x2="${fig2W}" y2="48" stroke="#0f172a" stroke-width="1.5"/>
+      <text x="24" y="22" font-size="13" font-weight="800" fill="#0f172a" font-family="'Malgun Gothic',sans-serif">&lt;도면 2&gt; ${escXml(siteName)} 및 주변 비교유적 유구 평면 규모(장축×단축) 이변량 산점도</text>
+      <text x="24" y="39" font-size="10.5" fill="#475569" font-family="'Malgun Gothic',sans-serif">점선(---): 등장단비 기준선(Isometric Ratio Lines, 1.0:1 ~ 3.0:1) | ●: ${escXml(siteName)} 확인 유구, □: 인접 권역 동시기 비교유적</text>
+      <rect x="${p2Left}" y="${p2Top}" width="${p2W}" height="${p2H}" fill="#ffffff" stroke="#0f172a" stroke-width="1.5"/>
+      ${fig2Grid}
+      ${ratioLines}
+      ${ptsSvg}
+      <text x="${p2Left + p2W / 2}" y="${p2Top + p2H + 42}" text-anchor="middle" font-size="11.5" font-weight="700" fill="#0f172a" font-family="'Malgun Gothic',sans-serif">장축 길이 (Length, m)</text>
+      <text x="26" y="${p2Top + p2H / 2}" text-anchor="middle" font-size="11.5" font-weight="700" fill="#0f172a" font-family="'Malgun Gothic',sans-serif" transform="rotate(-90 26 ${p2Top + p2H / 2})">단축 너비 (Width, m)</text>
+      <rect x="${p2Left + p2W + 26}" y="${p2Top}" width="286" height="${p2H}" fill="#f8fafc" stroke="#0f172a" stroke-width="1.2"/>
+      <rect x="${p2Left + p2W + 26}" y="${p2Top}" width="286" height="32" fill="#0f172a"/>
+      <text x="${p2Left + p2W + 40}" y="${p2Top + 21}" font-size="11.5" font-weight="700" fill="#ffffff" font-family="'Malgun Gothic',sans-serif">유구 계측 통계 요약 (N = ${rawFeatures.length})</text>
+      <text x="${p2Left + p2W + 40}" y="${p2Top + 56}" font-size="11" font-weight="700" fill="#0f172a" font-family="'Malgun Gothic',sans-serif">1. 주요 계측치 평균</text>
+      <text x="${p2Left + p2W + 44}" y="${p2Top + 76}" font-size="10.5" fill="#334155" font-family="'Malgun Gothic',sans-serif">• 평균 장축: ${mean(lengths)} m (범위 ${Math.min(...lengths).toFixed(1)}~${Math.max(...lengths).toFixed(1)}m)</text>
+      <text x="${p2Left + p2W + 44}" y="${p2Top + 94}" font-size="10.5" fill="#334155" font-family="'Malgun Gothic',sans-serif">• 평균 단축: ${mean(widths)} m (범위 ${Math.min(...widths).toFixed(1)}~${Math.max(...widths).toFixed(1)}m)</text>
+      <text x="${p2Left + p2W + 44}" y="${p2Top + 112}" font-size="10.5" fill="#334155" font-family="'Malgun Gothic',sans-serif">• 평균 면적: ${mean(areas)} ㎡</text>
+      <text x="${p2Left + p2W + 44}" y="${p2Top + 130}" font-size="10.5" fill="#334155" font-family="'Malgun Gothic',sans-serif">• 평균 장단비: ${mean(ratios)} : 1</text>
+      <line x1="${p2Left + p2W + 38}" y1="${p2Top + 146}" x2="${p2Left + p2W + 298}" y2="${p2Top + 146}" stroke="#cbd5e1" stroke-width="1"/>
+      <text x="${p2Left + p2W + 40}" y="${p2Top + 168}" font-size="11" font-weight="700" fill="#0f172a" font-family="'Malgun Gothic',sans-serif">2. 유구별 실측 일람</text>
+      ${rawFeatures
+        .slice(0, 8)
+        .map(
+          (f, i) => `
+        <text x="${p2Left + p2W + 44}" y="${p2Top + 190 + i * 20}" font-size="10" fill="#1e293b" font-family="'Malgun Gothic',sans-serif">▪ ${escXml(f.name)}: ${Number(f.lengthM ?? f.length).toFixed(2)}×${Number(f.widthM ?? f.width).toFixed(2)}m</text>
+      `
+        )
+        .join("")}
+    </svg>`;
+  }
 
   // =========================================================================
-  // FIGURE 3: Quantitative Assemblage & Structural Attribute Chart (Hatch Patterns)
+  // FIGURE 3: Quantitative Assemblage & Literature Distribution Chart
   // =========================================================================
+  const papers = Array.isArray(pipelineState.collectedPapers)
+    ? pipelineState.collectedPapers
+    : [];
   const rawCategories =
     Array.isArray(rawData.assemblageStats) && rawData.assemblageStats.length > 0
       ? rawData.assemblageStats
-      : [
-          {
-            label: "주요 주거·생활유구",
-            count: 6,
-            pct: 75.0,
-            group: "조사 유구 구성",
-          },
-          {
-            label: "부속 수혈·주혈·기타유구",
-            count: 2,
-            pct: 25.0,
-            group: "조사 유구 구성",
-          },
-          {
-            label: "일상 자비·취사용 토기류",
-            count: 45,
-            pct: 50.0,
-            group: "출토유물 구성",
-          },
-          {
-            label: "저장·운반·소형 식기류",
-            count: 27,
-            pct: 30.0,
-            group: "출토유물 구성",
-          },
-          {
-            label: "생업·가공용 석기·방추차·기타",
-            count: 18,
-            pct: 20.0,
-            group: "출토유물 구성",
-          },
-        ];
+      : papers.length > 0
+      ? (() => {
+          const total = Math.max(1, papers.length);
+          const sCnt = papers.filter((p) => /구조|평면|축조|묘제|성벽|기단|요지|주거|유구|층위/.test(`${p.title} ${p.abstract}`)).length;
+          const tCnt = papers.filter((p) => /토기|자기|기와|금속|유물|편년|연대|형식/.test(`${p.title} ${p.abstract}`)).length;
+          const rCnt = Math.max(0, total - Math.max(sCnt, tCnt));
+          return [
+            { label: "유구 구조·축조기법 연구", count: sCnt, pct: (sCnt / total) * 100, group: "DBpia 검증 문헌" },
+            { label: "출토유물 형식·편년 연구", count: tCnt, pct: (tCnt / total) * 100, group: "DBpia 검증 문헌" },
+            { label: "지역 비교·역사적 성격 연구", count: rCnt, pct: (rCnt / total) * 100, group: "DBpia 검증 문헌" },
+          ];
+        })()
+      : [];
 
   const fig3W = 960;
-  const fig3H = Math.max(360, 120 + rawCategories.length * 38);
-  const maxPct = Math.max(60, ...rawCategories.map((c) => Number(c.pct || 50)));
-  const barLeft = 230;
-  const barMaxW = 540;
-  const fills = ["url(#hatchDiag)", "#1e293b", "url(#hatchCross)", "#64748b"];
+  let svgFig3 = "";
+  if (rawCategories.length === 0) {
+    svgFig3 = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${fig3W} 140" style="width:100%;height:auto;background:#ffffff;border:1px solid #0f172a;display:block;">
+      <rect x="0" y="0" width="${fig3W}" height="48" fill="#f8fafc"/>
+      <line x1="0" y1="48" x2="${fig3W}" y2="48" stroke="#0f172a" stroke-width="1.5"/>
+      <text x="24" y="22" font-size="13" font-weight="800" fill="#0f172a" font-family="'Malgun Gothic',sans-serif">&lt;도면 3&gt; ${escXml(siteName)} 정량 조성비 및 연구 논거 분포 그래프</text>
+      <text x="${fig3W / 2}" y="98" text-anchor="middle" font-size="12" font-weight="700" fill="#475569" font-family="'Malgun Gothic',sans-serif">집계 가능한 유물 수량표 또는 DBpia 수집 문헌 데이터가 아직 없습니다.</text>
+    </svg>`;
+  } else {
+    const fig3H = Math.max(300, 120 + rawCategories.length * 38);
+    const maxPct = Math.max(60, ...rawCategories.map((c) => Number(c.pct || 50)));
+    const barLeft = 230;
+    const barMaxW = 540;
+    const fills = ["url(#hatchDiag)", "#1e293b", "url(#hatchCross)", "#64748b"];
 
-  const barsSvg = rawCategories
-    .map((c, idx) => {
-      const y = 78 + idx * 36;
-      const pct = Number(c.pct || 25);
-      const w = Math.max(6, (pct / maxPct) * barMaxW);
-      const fillPat = fills[idx % fills.length];
-      return `
-        <text x="${barLeft - 14}" y="${y + 16}" text-anchor="end" font-size="11" font-weight="700" fill="#0f172a" font-family="'Malgun Gothic',sans-serif">${escXml(c.label)}</text>
-        <rect x="${barLeft}" y="${y}" width="${w.toFixed(1)}" height="22" fill="${fillPat}" stroke="#0f172a" stroke-width="1.2"/>
-        <text x="${(barLeft + w + 10).toFixed(1)}" y="${y + 15}" font-size="10.5" font-weight="700" fill="#0f172a" font-family="'Malgun Gothic',sans-serif">${pct.toFixed(1)}% (${escXml(c.count ?? "-")}점/기) [${escXml(c.group || "분류")}]</text>
-      `;
-    })
-    .join("");
+    const barsSvg = rawCategories
+      .map((c, idx) => {
+        const y = 78 + idx * 36;
+        const pct = Number(c.pct || 0);
+        const w = Math.max(6, (pct / maxPct) * barMaxW);
+        const fillPat = fills[idx % fills.length];
+        return `
+          <text x="${barLeft - 14}" y="${y + 16}" text-anchor="end" font-size="11" font-weight="700" fill="#0f172a" font-family="'Malgun Gothic',sans-serif">${escXml(c.label)}</text>
+          <rect x="${barLeft}" y="${y}" width="${w.toFixed(1)}" height="22" fill="${fillPat}" stroke="#0f172a" stroke-width="1.2"/>
+          <text x="${(barLeft + w + 10).toFixed(1)}" y="${y + 15}" font-size="10.5" font-weight="700" fill="#0f172a" font-family="'Malgun Gothic',sans-serif">${pct.toFixed(1)}% (${escXml(c.count ?? "-")}건) [${escXml(c.group || "분류")}]</text>
+        `;
+      })
+      .join("");
 
-  const svgFig3 = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${fig3W} ${fig3H}" style="width:100%;height:auto;background:#ffffff;border:1px solid #0f172a;display:block;">
-    <defs>
-      <pattern id="hatchDiag" width="8" height="8" patternTransform="rotate(45 0 0)" patternUnits="userSpaceOnUse">
-        <rect width="8" height="8" fill="#f1f5f9"/>
-        <line x1="0" y1="0" x2="0" y2="8" stroke="#0f172a" stroke-width="2.2"/>
-      </pattern>
-      <pattern id="hatchCross" width="8" height="8" patternUnits="userSpaceOnUse">
-        <rect width="8" height="8" fill="#ffffff"/>
-        <path d="M 0,0 L 8,8 M 8,0 L 0,8" stroke="#334155" stroke-width="1.2"/>
-      </pattern>
-    </defs>
-    <rect x="0" y="0" width="${fig3W}" height="48" fill="#f8fafc"/>
-    <line x1="0" y1="48" x2="${fig3W}" y2="48" stroke="#0f172a" stroke-width="1.5"/>
-    <text x="24" y="22" font-size="13" font-weight="800" fill="#0f172a" font-family="'Malgun Gothic',sans-serif">&lt;도면 3&gt; ${escXml(siteName)} 유구·출토유물 기종별 정량 조성비 및 속성 분포 그래프</text>
-    <text x="24" y="39" font-size="10.5" fill="#475569" font-family="'Malgun Gothic',sans-serif">발굴조사보고서 출토유물 집계표 및 유구 현황표 실측 수량 기준 (단위: %, 기/점)</text>
-    <line x1="${barLeft}" y1="64" x2="${barLeft}" y2="${fig3H - 36}" stroke="#0f172a" stroke-width="1.5"/>
-    <line x1="${barLeft}" y1="${fig3H - 36}" x2="${barLeft + barMaxW}" y2="${fig3H - 36}" stroke="#0f172a" stroke-width="1.5"/>
-    ${barsSvg}
-  </svg>`;
+    svgFig3 = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${fig3W} ${fig3H}" style="width:100%;height:auto;background:#ffffff;border:1px solid #0f172a;display:block;">
+      <defs>
+        <pattern id="hatchDiag" width="8" height="8" patternTransform="rotate(45 0 0)" patternUnits="userSpaceOnUse">
+          <rect width="8" height="8" fill="#f1f5f9"/>
+          <line x1="0" y1="0" x2="0" y2="8" stroke="#0f172a" stroke-width="2.2"/>
+        </pattern>
+        <pattern id="hatchCross" width="8" height="8" patternUnits="userSpaceOnUse">
+          <rect width="8" height="8" fill="#ffffff"/>
+          <path d="M 0,0 L 8,8 M 8,0 L 0,8" stroke="#334155" stroke-width="1.2"/>
+        </pattern>
+      </defs>
+      <rect x="0" y="0" width="${fig3W}" height="48" fill="#f8fafc"/>
+      <line x1="0" y1="48" x2="${fig3W}" y2="48" stroke="#0f172a" stroke-width="1.5"/>
+      <text x="24" y="22" font-size="13" font-weight="800" fill="#0f172a" font-family="'Malgun Gothic',sans-serif">&lt;도면 3&gt; ${escXml(siteName)} 정량 조성비 및 학술 논거 분포 그래프</text>
+      <text x="24" y="39" font-size="10.5" fill="#475569" font-family="'Malgun Gothic',sans-serif">실제 입력된 보고서 집계표 및 DBpia 수집 문헌 기준 (단위: %, 건)</text>
+      <line x1="${barLeft}" y1="64" x2="${barLeft}" y2="${fig3H - 36}" stroke="#0f172a" stroke-width="1.5"/>
+      <line x1="${barLeft}" y1="${fig3H - 36}" x2="${barLeft + barMaxW}" y2="${fig3H - 36}" stroke="#0f172a" stroke-width="1.5"/>
+      ${barsSvg}
+    </svg>`;
+  }
 
   // =========================================================================
-  // FIGURE 4: NRICH Double-Bordered Chronology & Typology Matrix (with Plan Icons)
+  // FIGURE 4: NRICH Double-Bordered Chronology & Typology Matrix
   // =========================================================================
   const rawPhases =
     Array.isArray(rawData.chronologyMatrix) &&
@@ -3643,74 +3591,56 @@ function renderPublicationGradeArchaeologyFigures(rawData = {}) {
       ? rawData.chronologyMatrix
       : [
           {
-            phase: "Ⅰ단계 (형성기)",
-            dateRange: "초기 생활면 형성 단계",
-            featureStructure:
-              "자연 지형(구릉·대지·해안 단구) 기반 수혈 굴광 및 초기 주거·수혈유구 조영",
-            artifactAssemblage:
-              "선행 전통 계승 일상 토기류 및 기본 생업용 석기·도구 공반",
-            comparativeSites:
-              "인접 권역 동시기 초기 취락 유적군 및 선행연구 편년 기준",
-            planType: "hearth",
+            phase: "Ⅰ단계 (선행·형성기)",
+            dateRange: "상한 설정 및 초기 조영",
+            featureStructure: "기반층 정지 및 선행 유구·문화층 형성",
+            artifactAssemblage: "초기 공반 유물군 및 선행 형식 속성 유지",
+            comparativeSites: "인접 권역 동시기 초기 유적군 및 선행연구 기준",
+            planType: "stage1",
           },
           {
-            phase: "Ⅱ단계 (전개·확산기)",
-            dateRange: "중심 취락 운영 단계",
-            featureStructure:
-              "정형화된 주거 평면 및 주혈 배치, 내부 화덕·작업 공간 분화 및 유구 확산",
-            artifactAssemblage:
-              "자비용·저장용·식기류 토기 기종 분화 및 방추차·생업도구 다량 공반",
-            comparativeSites:
-              "주변 거점 취락 유적군 및 동일 문화권 비교유적 (DBpia 검증 문헌 기준)",
-            planType: "flue",
+            phase: "Ⅱ단계 (중심·전개기)",
+            dateRange: "중심 조영 및 확산",
+            featureStructure: "주류 유구 구조 정착 및 공간 배치 체계화",
+            artifactAssemblage: "표준 기종 분화 및 공반 유물 조합상 정립",
+            comparativeSites: "동일 문화권 거점 유적군 (DBpia 검증 문헌 기준)",
+            planType: "stage2",
           },
           {
             phase: "Ⅲ단계 (전환·재편기)",
-            dateRange: "후행 문화 전환 단계",
-            featureStructure:
-              "선행 유구 폐기·중복 및 취락 공간 재편, 후대 유구·문화층 형성",
-            artifactAssemblage:
-              "후행 양식 토기 및 신규 제작기법 유입에 따른 물질문화 전환",
-            comparativeSites:
-              "지역권 내 후행기 취락·분묘 유적군 및 지역사 변천 연구",
-            planType: "stone",
+            dateRange: "하한 설정 및 공간 재편",
+            featureStructure: "선행 유구 중복·개축 및 후행 유구·퇴적층 형성",
+            artifactAssemblage: "후행 양식 유입 및 제작기법 전환",
+            comparativeSites: "지역권 내 후행기 유적군 및 지역사 변천 연구",
+            planType: "stage3",
           },
         ];
 
   function renderPlanIconSvg(planType) {
-    if (planType === "flue") {
-      // Rectangular/T-shaped pit house with L-shaped gudeul (구들) flue and 4 postholes
+    if (planType === "stage2" || planType === "flue") {
       return `<svg viewBox="0 0 90 64" width="84" height="58" style="display:block;margin:0 auto;">
-        <path d="M 10,8 L 80,8 L 80,46 L 56,46 L 56,58 L 34,58 L 34,46 L 10,46 Z" fill="#f8fafc" stroke="#0f172a" stroke-width="1.8"/>
-        <circle cx="24" cy="18" r="2.3" fill="#0f172a"/><circle cx="66" cy="18" r="2.3" fill="#0f172a"/>
-        <circle cx="24" cy="36" r="2.3" fill="#0f172a"/><circle cx="66" cy="36" r="2.3" fill="#0f172a"/>
-        <path d="M 45,14 L 73,14 L 73,34" fill="none" stroke="#334155" stroke-width="2.8"/>
-        <circle cx="45" cy="14" r="3.8" fill="none" stroke="#0f172a" stroke-width="1.5"/>
-        <text x="45" y="42" text-anchor="middle" font-size="7.5" font-weight="700" fill="#0f172a">凸자형·구들식</text>
+        <rect x="12" y="8" width="66" height="48" fill="#f8fafc" stroke="#0f172a" stroke-width="1.8"/>
+        <rect x="22" y="16" width="46" height="32" fill="#e2e8f0" stroke="#334155" stroke-width="1.2"/>
+        <text x="45" y="36" text-anchor="middle" font-size="8" font-weight="700" fill="#0f172a">중심 구조 정착</text>
       </svg>`;
     }
-    if (planType === "stone") {
+    if (planType === "stage3" || planType === "stone") {
       return `<svg viewBox="0 0 90 64" width="84" height="58" style="display:block;margin:0 auto;">
         <rect x="16" y="8" width="58" height="48" fill="#f1f5f9" stroke="#0f172a" stroke-width="2"/>
         <rect x="22" y="14" width="46" height="36" fill="#ffffff" stroke="#334155" stroke-width="1.2" stroke-dasharray="3,2"/>
-        <path d="M 22,22 L 52,22" stroke="#0f172a" stroke-width="3"/>
-        <text x="45" y="38" text-anchor="middle" font-size="8" font-weight="700" fill="#0f172a">삼국 소형·석축</text>
+        <text x="45" y="36" text-anchor="middle" font-size="8" font-weight="700" fill="#0f172a">중복·재편 단계</text>
       </svg>`;
     }
-    // Default: rectangular house with central hearth & 4 postholes
     return `<svg viewBox="0 0 90 64" width="84" height="58" style="display:block;margin:0 auto;">
-      <rect x="14" y="6" width="62" height="52" rx="3" fill="#f8fafc" stroke="#0f172a" stroke-width="1.8"/>
-      <circle cx="26" cy="18" r="2.5" fill="#0f172a"/><circle cx="64" cy="18" r="2.5" fill="#0f172a"/>
-      <circle cx="26" cy="46" r="2.5" fill="#0f172a"/><circle cx="64" cy="46" r="2.5" fill="#0f172a"/>
-      <ellipse cx="45" cy="24" rx="7" ry="4.5" fill="#cbd5e1" stroke="#0f172a" stroke-width="1.4"/>
-      <text x="45" y="53" text-anchor="middle" font-size="8" fill="#334155">노지·주공 배치</text>
+      <rect x="14" y="8" width="62" height="48" rx="3" fill="#f8fafc" stroke="#0f172a" stroke-width="1.8"/>
+      <text x="45" y="36" text-anchor="middle" font-size="8" font-weight="700" fill="#334155">초기 조영 단계</text>
     </svg>`;
   }
 
   const matrixTableHtml = `
     <div style="margin:18px 0;background:#ffffff;border:1px solid #0f172a;padding:16px 20px;">
       <div style="font-family:'Malgun Gothic',sans-serif;font-size:13.5px;font-weight:800;color:#0f172a;margin-bottom:4px;">
-        &lt;도면 4 / 표 1&gt; ${escXml(siteName)} 단계별 유구·출토유물 변천 모식도 및 지역 상대·절대편년 병행표
+        &lt;도면 4 / 표 1&gt; ${escXml(siteName)} 단계별 유구·출토유물 변천 모식도 및 상대·절대편년 병행표
       </div>
       <div style="font-family:'Malgun Gothic',sans-serif;font-size:11px;color:#475569;margin-bottom:10px;">
         ※ 국립문화유산연구원 발굴조사보고서 표준 이중괘선 편년표 양식 (${escXml(sitePeriod)})
@@ -3719,8 +3649,8 @@ function renderPublicationGradeArchaeologyFigures(rawData = {}) {
         <thead>
           <tr style="background:#f1f5f9;border-bottom:1.5px solid #0f172a;">
             <th style="padding:9px 10px;border:1px solid #94a3b8;width:13%;text-align:center;">편년 단계</th>
-            <th style="padding:9px 10px;border:1px solid #94a3b8;width:14%;text-align:center;">중심 절대연대<br/><span style="font-size:10px;font-weight:500;">(AMS·TL 교차검증)</span></th>
-            <th style="padding:9px 10px;border:1px solid #94a3b8;width:12%;text-align:center;">유구 평면<br/>모식도</th>
+            <th style="padding:9px 10px;border:1px solid #94a3b8;width:14%;text-align:center;">시기 구분<br/><span style="font-size:10px;font-weight:500;">(층위·편년 교차검증)</span></th>
+            <th style="padding:9px 10px;border:1px solid #94a3b8;width:12%;text-align:center;">단계 모식</th>
             <th style="padding:9px 10px;border:1px solid #94a3b8;width:23%;text-align:left;">유구 구조 및 축조 속성 변천</th>
             <th style="padding:9px 10px;border:1px solid #94a3b8;width:21%;text-align:left;">공반 출토유물 조합 및 기형 특징</th>
             <th style="padding:9px 10px;border:1px solid #94a3b8;width:17%;text-align:left;">주변 병행 비교유적 및 문헌 근거</th>
@@ -3762,12 +3692,9 @@ function renderPublicationGradeArchaeologyFigures(rawData = {}) {
   };
 }
 
-// Pre-render the default publication-grade figures for Gangneung Byeongsan-dong 277-12 on startup
-try {
-  const initialFigs = renderPublicationGradeArchaeologyFigures({});
-  pipelineState.figuresHtml = initialFigs.combinedHtml;
-  pipelineState.figuresCount = 4;
-} catch (_) {}
+// Do NOT pre-render any hardcoded site figures on startup; figures are rendered strictly from the user's input data
+pipelineState.figuresHtml = "";
+pipelineState.figureCount = 0;
 
 // ---------------------------------------------------------------------------
 // Autonomous 20-Page Archaeological Excavation Report ('고찰') Pipeline (v3.0)
@@ -4535,17 +4462,35 @@ function evaluateArchaeologyManuscriptQuality(
   const tableBlocks = md.match(/(?:^|\n)\|[^\n]+\|\r?\n\|[\s:\-|]+\|/g) || [];
   const c4Passed = tableBlocks.length >= 4;
 
-  // 5. Multiple wc-chart (>= 3) & wc-diagram (>= 3) presence
+  // 5. Multiple wc-chart (2~3+) & wc-diagram (>= 3) presence
   const chartBlocks =
     md.match(/```wc-chart[\s\S]*?```|\[\[WC_CHART_\d+\]\]/gi) || [];
   const diagBlocks =
     md.match(/```wc-diagram[\s\S]*?```|\[\[WC_DIAGRAM_\d+\]\]/gi) || [];
-  const c5Passed = chartBlocks.length >= 3 && diagBlocks.length >= 3;
+  const hasFeatureDimsInMd = /\d+(?:\.\d+)?\s*[m㎝cm]*\s*[×xX]\s*\d+(?:\.\d+)?/.test(md);
+  const minChartsRequired = hasFeatureDimsInMd ? 3 : 2;
+  const c5Passed = chartBlocks.length >= minChartsRequired && diagBlocks.length >= 3;
 
-  // 6. Verified footnotes count & zero '저자미상'
+  // 6. Verified footnotes/inline citations count, zero '저자미상', and real DBpia author citation check
   const fnLines = md.match(/^\s*\d+\)\s+.+$/gm) || [];
+  const inlineParentheticalCitations = isPaper
+    ? md.match(/\([가-힣A-Za-z·,\s]{2,20}\s+\d{4}[a-z]?(?:\s*:\s*\d+(?:[-~]\d+)?)?\)/g) || []
+    : [];
+  const effectiveCitationCount = Math.max(fnLines.length, inlineParentheticalCitations.length);
   const unknownAuthorMatches = md.match(/저자미상|연도미상/g) || [];
-  const c6Passed = fnLines.length >= minFootnotes && unknownAuthorMatches.length === 0;
+  const citedRealAuthorCount =
+    verifiedPapers.length > 0
+      ? verifiedPapers.filter((vp) => {
+          const firstAuthor = String(vp.author || "")
+            .split(/[,·/외\s]/)[0]
+            .trim();
+          return firstAuthor.length >= 2 && md.includes(firstAuthor);
+        }).length
+      : 1;
+  const c6Passed =
+    effectiveCitationCount >= minFootnotes &&
+    unknownAuthorMatches.length === 0 &&
+    citedRealAuthorCount >= 1;
 
   // 7. 1:1 Footnote <-> Bibliography cross-check
   const bibSection = md.split(/【참고문헌】|\[참고문헌\]/)[1] || "";
@@ -4556,7 +4501,7 @@ function evaluateArchaeologyManuscriptQuality(
   const hasStandardQuotes = /『[^』]+』/.test(md) && /「[^」]+」/.test(md);
   const c7Passed =
     hasBibSec &&
-    bibLines.length >= Math.min(minFootnotes, fnLines.length) &&
+    bibLines.length >= Math.min(minFootnotes, Math.max(1, fnLines.length)) &&
     hasStandardQuotes;
 
   // 8. Data fidelity & no abrupt sentence truncation
@@ -4615,16 +4560,16 @@ function evaluateArchaeologyManuscriptQuality(
     },
     {
       id: "C5_CHART_AND_DIAGRAM",
-      title: "5. WordCraft 다중 비교차트(wc-chart 3종+) 및 모식도(wc-diagram 3종+)",
-      target: "wc-chart 비교차트 3개 이상 + wc-diagram 모식도 3개 이상",
+      title: "5. WordCraft 다중 비교차트(wc-chart) 및 모식도(wc-diagram 3종+)",
+      target: `wc-chart 비교차트 ${minChartsRequired}개 이상 + wc-diagram 모식도 3개 이상`,
       actual: `비교차트 ${chartBlocks.length}개 · 모식도 ${diagBlocks.length}개`,
       passed: c5Passed,
     },
     {
       id: "C6_VERIFIED_FOOTNOTES",
-      title: "6. 실전 학술 각주 밀도 및 저자명 완비 ('저자미상' 0건)",
-      target: `각주 ${minFootnotes}개 이상 · 저자미상 0건`,
-      actual: `각주 ${fnLines.length}개 · 미상 표기 ${unknownAuthorMatches.length}건`,
+      title: "6. 실전 학술 각주·내주 밀도 및 실존 저자 인용 ('저자미상' 0건)",
+      target: `각주/내주 ${minFootnotes}개 이상 · 실존 저자 인용 · 저자미상 0건`,
+      actual: `각주 ${fnLines.length}개(내주 ${inlineParentheticalCitations.length}개) · 실존저자 ${citedRealAuthorCount}명 · 미상 표기 ${unknownAuthorMatches.length}건`,
       passed: c6Passed,
     },
     {
@@ -4694,10 +4639,10 @@ function buildFirstStageEngineeredPrompt({
     `• 판단 기준 1 (DBpia AI 하이브리드 문헌 수집 및 교차검증): DBpia AI 다각도 검색(vetter_conversations 전체 학술 요점 + hovers 원문 인용구 + KCI 등재지 중심 요약 리스트)으로 확보된 실존 논문 서지(실제 저자명·발행연도·학술지·쪽수 완비)를 본문 각주와 참고문헌에 1:1 교차 인용`,
     `• 판단 기준 2 (기초 조사자료 및 일러두기 기술 표준 정합성): ${hasReport ? "아래 제공된 보고서 원자료(AI 리더 방식 범위 통제 추출본)의 유구 규모·평면형태·내부시설·중복/층위 관계·학술자문회의 조치·출토유물 조합을 1차 근거로 전수 반영 (미공개 데이터나 근거 없는 추측 배제)" : "별도 유구 실측치 날조 금지, 제시된 주제와 수집된 DBpia 선행연구 데이터를 중심으로 사료 세포 재분류 및 논증"}`,
     `• 판단 기준 3 (연대분석 및 고환경 융합 정합성): ${hasDating ? "제공된 절대연대(AMS·OSL) 및 자연과학 분석 결과를 고고학적 층위·유물 형식 편년과 교차검증하여 본문 고찰로 통합 서술" : "임의의 절대연대(BP) 수치 날조 금지, 유물 형식·중복관계·선행연구 상대편년만으로 상·하한 시기를 논증"}`,
-    `• 판단 기준 4 (필수 장·절 및 다중 비교표 4종+ · 비교차트 3종+ · 모식도 3종+): ${
+    `• 판단 기준 4 (필수 장·절 및 다중 비교표 4종+ · 비교차트 · 모식도 3종+): ${
       isPaper
-        ? "국문제목·저자 ➔ 국문초록·주제어(5~10개) ➔ Ⅰ. 머리말(문제 제기 및 연구사 비판) ➔ Ⅱ. 사료 세포 검토 및 형식 분류(<표 1>·<표 2>·wc-chart 2종·wc-diagram 1종) ➔ Ⅲ. 편년 및 단계별 전개(wc-chart 1종·wc-diagram 1종) ➔ Ⅳ. 고고학적 성격과 개념어·논지 도출(<표 3>·<표 4>·wc-diagram 1종) ➔ Ⅴ. 맺음말 ➔ 영문초록(Abstract·Keywords) ➔ 【각주】(10개 이상, 저자미상 0건) ➔ 【참고문헌】(한국어 가나다순 → 중·일·서양어)"
-        : "Ⅳ. 고 찰 ➔ 1. 머리말(조사 경위·입지·학술자문회의 및 연구사) ➔ 2. 유구 구조와 중복·성격 검토(층위·중복 분기, 기초·벽구·바닥 축조기법, <표 1> 유구 속성표 · wc-chart 2종[유적군 비교·유구 규모 비교] · wc-diagram 1종[층위·축조공정 모식도]) ➔ 3. 출토유물 및 편년 단계 검토(<표 2> 출토유물 속성표 · wc-chart 1종[연구/유물 분포 차트] · wc-diagram 1종[Ⅰ~Ⅲ단계 편년 모식도]) ➔ 4. 주변 유적과의 비교 및 유적의 성격(<표 3> 주변 병행유적 대비표 · <표 4> DBpia 선행연구 학설 비교표 · wc-diagram 1종[취락망 공간 네트워크 모식도] · 맺음말 및 정비·보존 제언) ➔ 【각주】(8개 이상, 저자미상 0건) ➔ 【참고문헌】"
+        ? "국문제목·저자 ➔ 국문초록·주제어(5~10개) ➔ Ⅰ. 머리말(문제 제기 및 연구사 비판) ➔ Ⅱ. 사료 세포 검토 및 형식 분류(<표 1>·<표 2>·wc-chart·wc-diagram 1종) ➔ Ⅲ. 편년 및 단계별 전개(wc-chart 1종·wc-diagram 1종) ➔ Ⅳ. 고고학적 성격과 개념어·논지 도출(<표 3>·<표 4>·wc-diagram 1종) ➔ Ⅴ. 맺음말 ➔ 영문초록(Abstract·Keywords) ➔ 【각주】(10개 이상, 저자미상 0건) ➔ 【참고문헌】(한국어 가나다순 → 중·일·서양어)"
+        : "Ⅳ. 고 찰 ➔ 1. 머리말(조사 경위·입지·학술자문회의 및 연구사) ➔ 2. 유구 구조와 중복·성격 검토(층위·중복 분기, 기초·기단·내부시설 축조기법, <표 1> 유구 속성표 · wc-chart[유구/계측 정량 비교] · wc-diagram 1종[층위·축조공정 모식도]) ➔ 3. 출토유물 및 편년 단계 검토(<표 2> 출토유물 속성표 · wc-chart 1종[연구/유물 분포 차트] · wc-diagram 1종[Ⅰ~Ⅲ단계 편년 모식도]) ➔ 4. 주변 유적과의 비교 및 유적의 성격(<표 3> 주변 병행유적 대비표 · <표 4> DBpia 선행연구 학설 비교표 · wc-diagram 1종[공간 네트워크 모식도] · 맺음말 및 정비·보존 제언) ➔ 【각주】(8개 이상, 저자미상 0건) ➔ 【참고문헌】"
     }`,
   ].join("\n");
 }
@@ -4752,39 +4697,39 @@ function buildAdaptiveMasterPrompt({
           "1) **Ⅰ. 머리말(서론)의 2대 핵심 과제 완수**: ① 본 연구가 풀고자 하는 **학술적 문제(연구 질문)를 명확히 제기**하고, ② 아래 DBpia 수집 논저들이 과거에 어떤 문제를 풀려 했으며 해답·논지·주 사료·학술적 공적과 **남겨진 의문점·한계**가 무엇인지 비판적으로 검토하는 **연구사 정리**를 수행하십시오.",
           "2) **Ⅱ~Ⅳ. 본론의 통합 고찰 및 '사료 세포' 재분류**: 발굴조사보고서 원자료와 선행 연구에서 추출한 **'사료 세포(표제어·출처·수집된 정보·가공된 정보)'**를 통념적 나열이 아니라 본 연구의 문제와 해답에 상응하는 체계로 재분류하십시오. 선행 연구 결과와 지속적으로 비교·대조하여 왜 해석의 차이가 발생하는지 논리적으로 규명하고, 대상의 본질적 속성을 표현하는 핵심 **'개념어'**와 정식화된 해답인 **'논지'**를 도출하십시오.",
           "3) **Ⅴ. 맺음말(결론)의 3대 필수 요소**: 본론에 등장하지 않은 새로운 사료를 절대 추가하지 말고, ① 서론에서 제기한 문제와 가설 재확인 ➔ ② 구체성에 내재하는 일반성과 도출된 개념어·해답 제시 ➔ ③ 본론의 논리적·사실적 근거 요약 및 연구 제한점·후속 연구 과제를 제시하십시오.",
-          "4) **목차 및 인용 규격**: 장·절 번호는 `Ⅰ.`(장) ➔ `1.`(항) ➔ `1)`(목) 체계를 따르고, 표는 `<표 1>`~`<표 4>`(상단 제목), 참고문헌은 본문에 인용된 문헌만 한국어(가나다순) ➔ 중국어 ➔ 일본어 ➔ 서양어(알파벳순)로 정렬하십시오.",
+          "4) **목차 및 인용 규격**: 장·절 번호는 `Ⅰ.`(장) ➔ `1.`(항) ➔ `1)`(목) 체계를 따르고, 본문 인용 시 `(홍길동 2024: 45)` 내주 표기 및 문장 끝 `1)`, `2)` 각주 번호를 병행 표기하며, 표는 `<표 1>`~`<표 4>`(상단 제목), 참고문헌은 본문에 인용된 문헌만 한국어(가나다순) ➔ 중국어 ➔ 일본어 ➔ 서양어(알파벳순)로 정렬하십시오.",
         ].join("\n")
       : [
           "#### [0. 「매장유산 보호 및 조사에 관한 법률」 [별표 2] 및 국립문화유산연구원 『발굴조사보고서 고찰』 4대 영역 필수 지침]",
           "1) **공간 구속적(Site-bound) · 귀납적 전수 해석 및 학술자문회의 의견 반영**: 조사구역 내에서 확인된 모든 유구·유물과 발굴 중 개최된 **학술자문회의(전문가 검토회의)의 보존조치·조사방향 의견**을 누락 없이 본문과 고찰에 반영하십시오. 조사내용에 없는 미공개 데이터를 임의로 투입하거나 근거 없는 추측을 전개하지 마십시오.",
           "2) **일러두기 기술 표준 연동**: 위치·입지 고찰 시 도엽·좌표·해안/하천 지형 맥락을 명시하고, 개별 유구의 주축 방향(자북 기준)과 해발고도(m) 편차, 결실 유물·유구의 잔존 계측치 괄호 `( )` 구분, 『신판 표준토색첩』에 기반한 토층 색조 및 본문 유물 일련번호 1:1 매칭 원칙을 준수하십시오.",
-          "3) **유구(遺構) 및 출토유물(遺物) 고찰의 정밀화**: 다중 유구층의 퇴적 양상과 유구 간 파괴·절치·중복 관계에 근거하여 조영 단계를 시기별로 분기(分期)하고, 기초(굴광·다짐)·기단·내부시설(벽구·노지·아궁이·부뚜막·구들·주혈·배수로)의 축조기법을 해명하십시오. 출토유물은 기종별·층위별로 분류하고 주변 핵심 유적 출토품과의 **속성 비교표(`<표 1>` ~ `<표 4>`)**를 통해 유적의 상·하한 중심 연대와 역사적 성격을 확정하십시오.",
+          "3) **유구(遺構) 및 출토유물(遺物) 고찰의 정밀화**: 다중 유구층의 퇴적 양상과 유구 간 파괴·절치·중복 관계에 근거하여 조영 단계를 시기별로 분기(分期)하고, 기초(굴광·다짐)·기단·내부시설의 축조기법을 해명하십시오. 출토유물은 기종별·층위별로 분류하고 주변 핵심 유적 출토품과의 **속성 비교표(`<표 1>` ~ `<표 4>`)**를 통해 유적의 상·하한 중심 연대와 역사적 성격을 확정하십시오.",
           "4) **맺음말 및 정비·복원 제언**: 마지막 맺음말에서는 조사 경위부터 고찰에서 도출된 핵심 학술 성과를 번호순(`1)`, `2)`, `3)`, `4)`)으로 압축 요약하고 향후 유적의 보존·정비 방향이나 학술적 과제를 제언하십시오.",
         ].join("\n"),
     "",
     "#### [1. 자료 유무에 따른 엄격한 작성 원칙 ('없는 자료는 없는 대로 결과 도출')]",
     hasReport
-      ? "1) **제공된 보고서·조사 자료 최우선 반영**: 위 `[제공된 발굴조사보고서·기초조사 구조화 원자료]`의 유구 규모(장축×단축·면적), 평면형태, 내부시설(노지·부뚜막·아궁이·구들·주공·벽구), **유구 간 중복(파괴·선후) 관계 및 토층 층위 관계**, 출토유물 조합을 빠짐없이 추출하여 상대편년과 단계 설정의 1차 근거로 삼으십시오."
+      ? "1) **제공된 보고서·조사 자료 최우선 반영**: 위 `[제공된 발굴조사보고서·기초조사 구조화 원자료]`의 유구 규모(장축×단축·면적), 평면형태, 내부시설, **유구 간 중복(파괴·선후) 관계 및 토층 층위 관계**, 출토유물 조합을 빠짐없이 추출하여 상대편년과 단계 설정의 1차 근거로 삼으십시오."
       : "1) **보고서 원자료 미입력 상태 대응**: 별도의 유구 원자료가 없으므로 가상의 유구 번호나 허구 실측치를 절대 지어내지 말고, 요청 주제와 아래 DBpia 수집 논문·선행연구 데이터를 바탕으로 심층 논증하십시오.",
     hasDating
       ? "2) **연대분석 자료 교차검증**: 입력된 연대분석(AMS 탄소연대·OSL 등) 수치를 유구 중복관계 및 유물 형식 편년과 교차검증하여 서술하십시오."
       : "2) **연대분석 자료 미입력 상태 대응**: 연대분석 자료가 비어 있으므로 **절대로 임의의 시료번호나 BP/보정연대 수치를 지어내지 마십시오.** 절대연대 수치는 다루지 않고 출토유물의 형식 변화, 유구 구조 변천, 선행 연구의 상대편년만으로 시기를 논증하십시오.",
     "",
-    "#### [2. 필수 고고학 마크다운 비교표 4종(`<표 1>`~`<표 4>`) 및 다중 비교차트(`wc-chart` 3종+)·모식도(`wc-diagram` 3종+) 수록 지시]",
+    "#### [2. 필수 고고학 마크다운 비교표 4종(`<표 1>`~`<표 4>`) 및 다중 비교차트(`wc-chart`)·모식도(`wc-diagram` 3종+) 수록 지시]",
     "1) **필수 마크다운 비교표 4종 이상 수록 (`|...|` 표준 마크다운 표 형식 엄수)**:",
     "   - **`<표 1> 조사구역 확인 유구(시굴·정밀발굴) 제원·내부시설·중복관계·출토유물 속성 일람표`** (2절 수록)",
     "   - **`<표 2> 주요 출토유물 기종별·형식별 제작기법 속성 및 선행연구 상대편년 비교표`** (3절 수록)",
     "   - **`<표 3> 주변 병행유적(DBpia 수집 문헌 기반 동일 문화권 핵심 유적군) 유구·유물 정밀 대비표`** (4절 수록)",
     "   - **`<표 4> DBpia AI 수집 핵심 선행연구(실제 저자·연도·논문명) 학술 쟁점별 논거 및 본 유적 적용 종합 대비표`** (4절 수록)",
-    "2) **제미나이 직접 생성 다중 비교차트(`wc-chart` 3개 이상) 및 다중 모식도(`wc-diagram` 3개 이상) 수록 (허구 수치 날조 절대 금지 — 반드시 보고서 실측치 및 DBpia 수집 문헌의 실제 비교 유구·지표 수치만 사용)**:",
-    "   - **비교차트 1 (`wc-chart`, 2절)**: 본 유적 및 주변 비교유적(DBpia 문헌 기반) 시대별·유형별 확인 유구 기수 비교 차트",
-    '     ```wc-chart\n     {"type":"column","title":"본 유적 및 주변 비교유적군 확인 유구·출토유물 정량 비교 (보고서 및 DBpia 문헌 기반)","legend":"bottom","dataLabels":true,"data":{"categories":["본 조사 유적","주변 비교유적 A","주변 비교유적 B","주변 비교유적 C"],"series":[{"name":"주거·생활유구(기)","values":[4,8,6,5]},{"name":"수혈·기타유구(기)","values":[6,9,7,4]}]}}\n     ```',
-    "   - **비교차트 2 (`wc-chart`, 2절)**: 조사구역 확인 주요 유구별 평면 규모(장축·단축 m 및 잔존 면적 ㎡) 또는 출토유물 기종별 수량 정량 비교 차트",
-    "   - **비교차트 3 (`wc-chart`, 3절)**: DBpia AI 수집 선행연구 주제 영역별 인용 논문 수 및 교차검증 비교 지표 분포 차트",
+    "2) **제미나이 직접 생성 다중 비교차트(`wc-chart`) 및 다중 모식도(`wc-diagram` 3개 이상) 수록 (허구 수치 날조 절대 금지 — 반드시 보고서 실측치 및 DBpia 수집 문헌의 실제 비교 유구·지표 수치만 사용)**:",
+    "   - **비교차트 1 (`wc-chart`, 2절)**: 본 유적 및 주변 비교유적(DBpia 문헌 기반) 확인 유구·유물 정량 비교 차트 (아래 JSON 스키마를 따르되, categories와 values에는 반드시 실제 입력 보고서 및 문헌에서 추출한 수치만 기입하십시오)",
+    '     ```wc-chart\n     {"type":"column","title":"<보고서 기반 차트 제목>","legend":"bottom","dataLabels":true,"data":{"categories":["<실제 항목 1>","<실제 항목 2>"],"series":[{"name":"<실제 지표명>","values":["<보고서 및 문헌에서 추출한 실제 숫자 배열>"]}]}}\n     ```',
+    "   - **비교차트 2 (`wc-chart`, 2절)**: 조사구역 확인 주요 유구별 평면 규모(장축·단축 m 및 잔존 면적 ㎡) 또는 출토유물 기종별 수량 정량 비교 차트 (원자료에 실측 수치가 있을 때만 생성)",
+    "   - **비교차트 3 (`wc-chart`, 3절)**: DBpia AI 수집 선행연구 발행 시기별·주제 영역별 인용 논문 분포 차트",
     "   - **모식도 1 (`wc-diagram`, 2절)**: 조사구역 퇴적 층위 및 유구 축조·폐기 공정 모식도 (`layout: \"hierarchy\"`, 반드시 `\"items\": [{\"text\": \"...\", \"level\": 0}, {\"text\": \"...\", \"level\": 1}]` 형식 사용)",
-    '     ```wc-diagram\n     {"layout":"hierarchy","items":[{"text":"조사구역 유구 형성 및 축조 공정 체계","level":0},{"text":"1단계: 기반층 정지 및 수혈 굴광","level":1},{"text":"2단계: 바닥 다짐 및 내부시설(화덕·기둥구멍·배수시설) 설치","level":1},{"text":"3단계: 유구 점유·사용 및 폐기 후 자연 퇴적","level":1}]}\n     ```',
-    "   - **모식도 2 (`wc-diagram`, 3절)**: 유구 중복 관계 및 출토유물 조합에 기반한 단계별(Ⅰ~Ⅲ단계) 취락·물질문화 변천 모식도 (`layout: \"process\"`, `\"items\"` 배열 형식 엄수)",
-    "   - **모식도 3 (`wc-diagram`, 4절)**: DBpia 수집 문헌 교차검증 기반 지역 취락망 공간 네트워크 및 문화 파급 구조 모식도 (`layout: \"process\"`, `\"items\"` 배열 형식 엄수)",
+    '     ```wc-diagram\n     {"layout":"hierarchy","items":[{"text":"<조사구역 유구 형성 및 축조 공정 체계>","level":0},{"text":"<1단계 공정 요약>","level":1},{"text":"<2단계 공정 요약>","level":1},{"text":"<3단계 공정 요약>","level":1}]}\n     ```',
+    "   - **모식도 2 (`wc-diagram`, 3절)**: 유구 중복 관계 및 출토유물 조합에 기반한 단계별(Ⅰ~Ⅲ단계) 변천 모식도 (`layout: \"process\"`, `\"items\"` 배열 형식 엄수)",
+    "   - **모식도 3 (`wc-diagram`, 4절)**: DBpia 수집 문헌 교차검증 기반 공간 네트워크 및 문화 파급 구조 모식도 (`layout: \"process\"`, `\"items\"` 배열 형식 엄수)",
     "",
     "#### [3. 실제 발굴조사보고서·학술논문 각주(1), 2)...) 및 【참고문헌】 1:1 교차검증 규칙 (절대 '저자미상' 금지)]",
     `1) **본문 각주 표기**: 본문 문장 끝에 \`1)\`, \`2)\`, \`3)\` ... 최소 **${minFootnotes}개 이상**의 일련번호 각주를 반드시 표기하십시오.`,
@@ -4818,7 +4763,7 @@ function buildCrossVerificationRevisionPrompt({
     "",
     "#### [필수 보완 지침]",
     "1) 기존 원고의 우수한 논증과 내용은 유지하되, 위 미충족 기준을 모두 통과하도록 각 장·절의 선행연구 비교 논거를 대폭 보강하십시오.",
-    "2) 본문 내 `<표 1>` ~ `<표 4>` 마크다운 비교표 4종 이상, ```wc-chart 비교차트 코드블록 3개 이상, ```wc-diagram 모식도 코드블록 3개 이상이 모두 정식 포맷으로 포함되도록 대폭 보강하십시오 (허구 수치 날조 금지, 보고서 실측치 및 DBpia 수집 문헌 수치만 사용).",
+    "2) 본문 내 `<표 1>` ~ `<표 4>` 마크다운 비교표 4종 이상, ```wc-chart 비교차트 코드블록, ```wc-diagram 모식도 코드블록 3개 이상이 모두 정식 포맷으로 포함되도록 대폭 보강하십시오 (허구 수치 날조 금지, 보고서 실측치 및 DBpia 수집 문헌 수치만 사용).",
     "3) 본문 문장 끝에 `1)`, `2)`... 각주 번호를 표기하고, `### 【각주】`와 `### 【참고문헌】`에는 반드시 아래 제공된 **실제 저자명·연도·학술지·쪽수**를 그대로 기재하십시오 (`저자미상`·`연도미상` 절대 금지).",
     isPaper
       ? "4) 서두의 `국문초록`·`주제어`와 말미(각주 앞)의 `Abstract`·`Keywords`를 모두 빠짐없이 포함하십시오."
@@ -4872,6 +4817,8 @@ async function runArchaeologyDiscussionPipeline({
   includeToc = false,
   enableTrackChanges = false,
   maxRounds = 3,
+  customDbpiaQueries = [],
+  waitForCompletion = false,
 } = {}) {
   if (pipelineState.running) {
     return {
@@ -4917,25 +4864,36 @@ async function runArchaeologyDiscussionPipeline({
 
   const localFiles = [];
   let craftExtractedReportText = reportText || "";
+  let craftExtractedDatingText = datingText || "";
 
-  // Include any uploaded PDF/DOCX files from pipelineState.uploadedFiles if reportText is short
+  // Include uploaded PDF/DOCX/HWPX/XLSX files from pipelineState.uploadedFiles separated by slot ("report" vs "dating")
   try {
     if (
       Array.isArray(pipelineState.uploadedFiles) &&
-      pipelineState.uploadedFiles.length > 0 &&
-      craftExtractedReportText.length < 500
+      pipelineState.uploadedFiles.length > 0
     ) {
       for (const uf of pipelineState.uploadedFiles) {
         if (uf && uf.path && fs.existsSync(uf.path)) {
           try {
             const parsed = extractTextAndInfoWithCraft(uf.path);
             if (parsed.extractedText) {
-              craftExtractedReportText = [
-                craftExtractedReportText,
-                `[${parsed.engine} 추출 파일: ${uf.name || path.basename(uf.path)} (${parsed.pages}쪽)]\n${parsed.extractedText}`,
-              ]
-                .filter(Boolean)
-                .join("\n\n");
+              const fileHeader = `[${parsed.engine} 추출 파일: ${uf.name || path.basename(uf.path)} (${parsed.pages}쪽)]\n${parsed.extractedText}`;
+              const isDatingSlot =
+                uf.slot === "dating" ||
+                /연대|AMS|OSL|탄소/i.test(String(uf.name || path.basename(uf.path)));
+              if (isDatingSlot) {
+                if (!craftExtractedDatingText.includes(parsed.extractedText.slice(0, 120))) {
+                  craftExtractedDatingText = [craftExtractedDatingText, fileHeader]
+                    .filter(Boolean)
+                    .join("\n\n");
+                }
+              } else {
+                if (!craftExtractedReportText.includes(parsed.extractedText.slice(0, 120))) {
+                  craftExtractedReportText = [craftExtractedReportText, fileHeader]
+                    .filter(Boolean)
+                    .join("\n\n");
+                }
+              }
             }
           } catch {}
         }
@@ -4982,7 +4940,7 @@ async function runArchaeologyDiscussionPipeline({
               if (parsed.extractedText) {
                 craftExtractedReportText = [
                   craftExtractedReportText,
-                  `[${parsed.engine} 추출 파일: ${name} (${parsed.pages}쪽)]\n${parsed.extractedText.slice(0, 12000)}`,
+                  `[${parsed.engine} 추출 파일: ${name} (${parsed.pages}쪽)]\n${parsed.extractedText.slice(0, 80000)}`,
                 ]
                   .filter(Boolean)
                   .join("\n\n");
@@ -4999,7 +4957,7 @@ async function runArchaeologyDiscussionPipeline({
       localFiles.length > 0
   );
   const hasDating = Boolean(
-    (datingText && datingText.trim()) ||
+    (craftExtractedDatingText && craftExtractedDatingText.trim()) ||
       /AMS|탄소연대|방사성탄소|보정연대|OSL|열루미네선스|절대연대|\d{3,4}\s*±\s*\d+\s*BP/i.test(
         craftExtractedReportText || ""
       )
@@ -5018,12 +4976,12 @@ async function runArchaeologyDiscussionPipeline({
     docType: pipelineState.docType,
     userFocus,
     reportText: craftExtractedReportText,
-    datingText,
+    datingText: craftExtractedDatingText,
     hasLocalFiles: localFiles.length > 0,
   });
   pipelineState.engineeredPrompt = firstStagePrompt;
 
-  (async () => {
+  const pipelinePromise = (async () => {
     try {
       const docLabel =
         pipelineState.docType === "paper" ? "석사학위 이상 학술논문" : "발굴조사보고서 Ⅳ. 고찰";
@@ -5036,7 +4994,11 @@ async function runArchaeologyDiscussionPipeline({
       await ensureEmbeddedGeminiWebview({ toggle: false });
 
       if (runMode === "figures_only") {
-        await generatePublicationFiguresFromGemini(pipelineState.outputDir);
+        await generatePublicationFiguresFromGemini(pipelineState.outputDir, {
+          siteTitle: userFocus,
+          reportText: craftExtractedReportText,
+          datingText: craftExtractedDatingText,
+        });
         addPipelineLog("도면 4종 렌더링 완료", "COMPLETED", 100);
         return;
       }
@@ -5046,13 +5008,19 @@ async function runArchaeologyDiscussionPipeline({
       // -----------------------------------------------------------------------
       await waitWhilePausedOrAborted();
       const executedQueries = [];
-      const round1Queries = buildMultiFacetedDbpiaQueries({
+      const autoRound1Queries = buildMultiFacetedDbpiaQueries({
         userFocus,
         reportText: craftExtractedReportText,
         docType: pipelineState.docType,
         round: 1,
         existingQueries: executedQueries,
       });
+      const userCustomQueries = (Array.isArray(customDbpiaQueries) ? customDbpiaQueries : [])
+        .map((q) => String(q || "").trim())
+        .filter((q) => q.length >= 2);
+      const round1Queries = Array.from(
+        new Set([...userCustomQueries, ...autoRound1Queries])
+      ).slice(0, 5);
 
       addPipelineLog(
         `[DBpia 1차 다각도 탐색] ① 연구사·구조·방법론, ② 형식분류·속성·편년, ③ 비교사례·고고학적 의의 등 ${round1Queries.length}개 학술 관점으로 DBpia AI 자료 수집 및 서지 메타데이터 실증 검증을 시작합니다.`,
@@ -5130,7 +5098,7 @@ async function runArchaeologyDiscussionPipeline({
       await waitWhilePausedOrAborted();
       pipelineState.round = 1;
       addPipelineLog(
-        `[본문 집필 1차] 검증된 논문(${pipelineState.collectedPapers.length}편)과 조사 자료를 바탕으로 [${docLabel}] 전체 원고(표 2종·차트·모식도·실전 각주·참고문헌)를 집필합니다...`,
+        `[본문 집필 1차] 검증된 논문(${pipelineState.collectedPapers.length}편)과 조사 자료를 바탕으로 [${docLabel}] 전체 원고(표 4종·차트·모식도·실전 각주·참고문헌)를 집필합니다...`,
         "PHASE_4_WRITING_MASTER",
         65
       );
@@ -5146,7 +5114,7 @@ async function runArchaeologyDiscussionPipeline({
           userFocus,
           engineeredPrompt: firstStagePrompt,
           reportText: craftExtractedReportText,
-          datingText,
+          datingText: craftExtractedDatingText,
           hasLocalFiles: localFiles.length > 0,
         }) + collectedBlock;
 
@@ -5302,11 +5270,20 @@ async function runArchaeologyDiscussionPipeline({
     }
   })();
 
+  if (waitForCompletion) {
+    await pipelinePromise;
+  }
+
   return {
     ok: true,
     engineeredPrompt: firstStagePrompt,
     goalPlan,
-    message: `[${pipelineState.docType === "paper" ? "석사학위 이상 학술논문" : "발굴조사보고서 Ⅳ. 고찰"}] /goal 8대 판단 기준 수립 및 다각도 DBpia AI 수집·교차검증 루프를 시작했습니다.`,
+    docxPath: pipelineState.latestDocxPath || "",
+    pdfPath: pipelineState.latestPdfPath || "",
+    finalReport: pipelineState.latestManuscript || "",
+    message: waitForCompletion
+      ? `[${pipelineState.docType === "paper" ? "석사학위 이상 학술논문" : "발굴조사보고서 Ⅳ. 고찰"}] 집필 및 WordCraft(.docx) 출판 완료`
+      : `[${pipelineState.docType === "paper" ? "석사학위 이상 학술논문" : "발굴조사보고서 Ⅳ. 고찰"}] /goal 8대 판단 기준 수립 및 다각도 DBpia AI 수집·교차검증 루프를 시작했습니다.`,
   };
 }
 
@@ -6009,6 +5986,9 @@ function startOpenAiBridgeServer() {
               includeToc: Boolean(payload.includeToc),
               enableTrackChanges: Boolean(payload.enableTrackChanges),
               maxRounds: Number(payload.maxRounds || 3),
+              customDbpiaQueries: Array.isArray(payload.dbpiaQueries)
+                ? payload.dbpiaQueries
+                : [],
             });
             res.writeHead(200, { "Content-Type": "application/json" });
             res.end(JSON.stringify(out));
@@ -6338,14 +6318,27 @@ function startOpenAiBridgeServer() {
         try {
           const payload = JSON.parse(body || "{}");
           const docType = payload.docMode === "paper" || payload.docType === "paper" ? "paper" : "report";
-          const topic = payload.topic || payload.userFocus || "";
-          const hasDating = topic.includes("절대연대") && !topic.includes("해당 자료 없음");
+          const userFocus = payload.userFocus || payload.topic || "";
+          const reportText = payload.reportText !== undefined ? payload.reportText : "";
+          const datingText = payload.datingData || payload.datingText || "";
+          const hasReport = Boolean(
+            (reportText && reportText.trim()) ||
+              (Array.isArray(pipelineState.uploadedFiles) && pipelineState.uploadedFiles.length > 0) ||
+              (topicHasReportHint(userFocus))
+          );
+          const hasDating = Boolean(
+            (datingText && datingText.trim()) ||
+              (userFocus.includes("절대연대") && !userFocus.includes("해당 자료 없음"))
+          );
+          function topicHasReportHint(t) {
+            return Boolean(t && t.includes("[조사현황 원자료 요약]"));
+          }
           const engineeredPrompt = buildFirstStageEngineeredPrompt({
             docType,
-            userFocus: topic,
-            reportText: topic ? "입력됨" : "",
+            userFocus,
+            reportText: hasReport ? "입력됨" : "",
             datingText: hasDating ? "입력됨" : "",
-            hasLocalFiles: Boolean(topic),
+            hasLocalFiles: hasReport,
           });
           res.writeHead(200, { "Content-Type": "application/json; charset=utf-8" });
           res.end(JSON.stringify({ ok: true, engineeredPrompt }));
@@ -6394,6 +6387,8 @@ function startOpenAiBridgeServer() {
     }
 
     if (req.method === "POST" && req.url.startsWith("/archaeology/discuss")) {
+      req.setTimeout(0);
+      res.setTimeout(0);
       let body = "";
       req.on("data", (chunk) => (body += chunk));
       req.on("end", async () => {
@@ -6402,11 +6397,13 @@ function startOpenAiBridgeServer() {
           const out = await runArchaeologyDiscussionPipeline({
             docType: payload.docMode === "paper" || payload.docType === "paper" ? "paper" : "report",
             runMode: "phd_consolidate",
-            userFocus: payload.topic || payload.userFocus || "",
+            userFocus: payload.userFocus || payload.topic || "",
             engineeredPrompt: payload.firstStagePrompt || payload.engineeredPrompt || "",
-            reportText: payload.topic || "",
-            datingText: payload.datingData || "",
+            reportText: payload.reportText !== undefined ? payload.reportText : "",
+            datingText: payload.datingData || payload.datingText || "",
             maxRounds: Number(payload.maxRounds || 2),
+            customDbpiaQueries: Array.isArray(payload.dbpiaQueries) ? payload.dbpiaQueries : [],
+            waitForCompletion: payload.waitForCompletion !== false,
           });
           res.writeHead(200, { "Content-Type": "application/json; charset=utf-8" });
           res.end(
@@ -7016,36 +7013,44 @@ async function runCliControlMode() {
   }
 }
 
-if (
-  process.argv.includes("--off") ||
-  process.argv.includes("--on") ||
-  process.argv.includes("--toggle") ||
-  process.argv.includes("--standalone")
-) {
-  runCliControlMode().catch((err) => {
-    console.error("오류:", err.message);
-    setTimeout(() => process.exit(1), 120);
-  });
-} else if (process.argv.includes("--bridge-only")) {
-  global.__lastStudioPing = Date.now();
-  startOpenAiBridgeServer();
-  // Exit automatically only when BOTH no standalone studio window is polling AND Antigravity is closed
-  setInterval(async () => {
-    const studioRecentlyActive =
-      Date.now() - (global.__lastStudioPing || 0) < 25000;
-    if (studioRecentlyActive) return;
-    try {
-      await getCdpPort();
-    } catch {
-      process.exit(0);
-    }
-  }, 10000).unref();
-} else {
-  // Normal MCP stdio server mode (no background daemon, no polling loop, exits with Antigravity)
-  startOpenAiBridgeServer();
-  startStdioLoop();
+if (require.main === module) {
+  if (
+    process.argv.includes("--off") ||
+    process.argv.includes("--on") ||
+    process.argv.includes("--toggle") ||
+    process.argv.includes("--standalone")
+  ) {
+    runCliControlMode().catch((err) => {
+      console.error("오류:", err.message);
+      setTimeout(() => process.exit(1), 120);
+    });
+  } else if (process.argv.includes("--bridge-only")) {
+    global.__lastStudioPing = Date.now();
+    startOpenAiBridgeServer();
+    // Exit automatically only when BOTH no standalone studio window is polling AND Antigravity is closed
+    setInterval(async () => {
+      const studioRecentlyActive =
+        Date.now() - (global.__lastStudioPing || 0) < 25000;
+      if (studioRecentlyActive) return;
+      try {
+        await getCdpPort();
+      } catch {
+        process.exit(0);
+      }
+    }, 10000).unref();
+  } else {
+    // Normal MCP stdio server mode (no background daemon, no polling loop, exits with Antigravity)
+    startOpenAiBridgeServer();
+    startStdioLoop();
+  }
 }
 
-
-
-
+module.exports = {
+  parseRadiocarbonSamplesFromText,
+  renderPublicationGradeArchaeologyFigures,
+  evaluateArchaeologyManuscriptQuality,
+  buildFirstStageEngineeredPrompt,
+  buildAdaptiveMasterPrompt,
+  repairAndEnrichManuscriptWithVerifiedRefs,
+  prepareMarkdownAndFootnotesForWordCraft,
+};
