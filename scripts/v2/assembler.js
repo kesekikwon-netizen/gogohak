@@ -52,12 +52,12 @@ function assemble(outline = {}, sections = [], facts = [], lit = [], options = {
 
   if (converted.footnotes.length > 0) {
     const fnLines = converted.footnotes.map((fn) => `${fn.num}) ${fn.text}`);
-    extraBlocks.push(`## 각주\n\n${fnLines.join('\n')}`);
+    extraBlocks.push(`## 【각주】\n\n${fnLines.join('\n')}`);
   }
 
   if (converted.bibliography.length > 0) {
     const bibLines = converted.bibliography.map((b) => `- ${b.text}`);
-    extraBlocks.push(`## 참고문헌\n\n${bibLines.join('\n')}`);
+    extraBlocks.push(`## 【참고문헌】\n\n${bibLines.join('\n')}`);
   }
 
   const manuscriptMd = [cleanBody, ...extraBlocks].filter(Boolean).join('\n\n').trim();
