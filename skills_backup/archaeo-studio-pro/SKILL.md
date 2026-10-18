@@ -61,16 +61,19 @@ This skill contains the complete, zero-omission specification of **ARCHAEO STUDI
 
 ## 3. Critical CDP Bridge Rules (`scripts/gemini_mcp_server.js`)
 
-### 3.1 CRITICAL FIX #1: Multi-Line Prompt Injection into Gemini `.ql-editor` (Preventing First-Newline Auto-Submit)
-- **Never** pass a multi-line string containing `\n` into `document.execCommand('insertText', false, fullPrompt)` on Gemini Web's Quill editor (`.ql-editor`). Quill intercepts the first `\n` as an `Enter` key press and immediately submits **only line 1**, discarding the rest of the prompt and causing Gemini to search Gmail/Google Drive for the missing text!
+### 3.1 CRITICAL FIX #1: Multi-Line Prompt Injection into Gemini `.ql-editor` (TrustedHTML-Safe + Newline-Safe)
+- **Never** pass a multi-line string containing `\n` into `document.execCommand('insertText', false, fullPrompt)` on Gemini Web's Quill editor (`.ql-editor`) — Quill intercepts the first `\n` as an `Enter` key press and immediately submits **only line 1**, discarding the rest of the prompt!
+- **Never** assign `editor.innerHTML = ...` on `gemini.google.com/app` — it enforces CSP `TrustedHTML` (`TypeError: Failed to set the 'innerHTML' property on 'Element': This document requires 'TrustedHTML' assignment`).
 - **Mandatory Implementation (`_askGeminiWebImpl` & `injectTextIntoGeminiEditor`)**:
   ```javascript
   const rawText = String(fullPrompt || '');
-  const escHtml = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  editor.innerHTML = rawText
-    .split(/\r?\n/)
-    .map(line => '<p>' + (escHtml(line) || '<br>') + '</p>')
-    .join('');
+  while (editor.firstChild) editor.removeChild(editor.firstChild);
+  for (const line of rawText.split(/\r?\n/)) {
+    const p = document.createElement('p');
+    if (line) p.textContent = line;
+    else p.appendChild(document.createElement('br'));
+    editor.appendChild(p);
+  }
 
   const sel = window.getSelection();
   const range = document.createRange();
@@ -83,16 +86,11 @@ This skill contains the complete, zero-omission specification of **ARCHAEO STUDI
   editor.dispatchEvent(new Event('change', { bubbles: true }));
   ```
 
-### 3.2 CRITICAL FIX #2: 100% DBpia-Only Literature Search & Anti-Google Workspace Guard
+### 3.2 CRITICAL FIX #2: Pure Gemini + DBpia AI Only (Zero Google Workspace / Gmail / Drive Trigger)
 1. **No Gemini Call in Step 2**: Step 2 must **never** call `askGeminiWeb` to generate DBpia queries. Instead, `buildDeterministicDbpiaQueries({ userFocus, reportText, docType })` extracts Korean site names, periods (`청동기`, `초기철기`, `원삼국`, `삼국시대`, etc.), and feature types (`주거지`, `목곽묘`, `석곽묘`, `구들`, `토기`) directly in JS and calls `askDbpiaAi(q)` on `https://ai.dbpia.co.kr`.
-2. **Explicit Anti-Google Workspace Guard in `buildAdaptiveMasterPrompt()`**:
-   Always prepend at the top of the Master Prompt:
-   ```text
-   ### [시스템 절대 규칙: 외부 Google Workspace(Gmail·Google Drive·Google Docs) 검색 및 호출 엄격 금지]
-   - 절대 금지: @Google Workspace, @Gmail, @Google Drive, @Google Docs 등 개인 계정 확장 도구를 절대 호출하거나 검색하지 마십시오.
-   - 즉시 집필 원칙: 이메일(Gmail)이나 구글 드라이브(Google Drive)에서 문서를 찾지 마십시오. 필요한 모든 조사자료와 DBpia 학술논문 서지 데이터는 바로 이 메시지 아래에 직접 포함되어 있으므로, 질문 없이 즉시 완성된 본문 원고 전체를 처음부터 끝까지 작성하십시오.
-   ```
-3. **Start Step 4 with `newChat: true`**: Prevents any prior conversation state from interfering with the manuscript generation.
+2. **Never Include `@Google Workspace`, `@Gmail`, `@Google Drive`, or `Google` Keywords in Prompts**: Even negative mentions (`@Google Drive를 사용하지 마십시오`) are parsed by Gemini's frontend router as extension `@mentions` and trigger the Google Drive connection popup! Instead write:
+   `"- 외부 도구나 외부 문서를 일절 조회하지 말고, 사용자에게 추가 질문을 하지 마십시오. 필요한 모든 기초 조사자료와 DBpia 학술논문 서지 데이터는 바로 이 메시지 아래에 직접 수록되어 있으므로, 오직 아래 데이터만을 근거로 지금 즉시 완성된 원고 본문 전체를 처음부터 끝까지 작성하십시오."`
+3. **Auto-Replace Stale Port 18787 Processes (`ensureBridgeServerProcess`)**: Always kill any idle node process holding port `18787` before starting the bridge server so stale boot-time MCP processes never serve outdated code.
 
 ### 3.3 DBpia AI Vetter JSON API Enrichment (`extractLatestDbpiaAnswer`)
 After submitting a query on `https://ai.dbpia.co.kr/ko/search`, extract the conversation ID from `/search/{convId}` and fetch `https://agent.dbpia.co.kr/vetter_conversations/{convId}` with `{ credentials: 'include' }` inside the DBpia webview to retrieve complete JSON metadata (`authors`, `pub_year`, `title`, `journal_title`, `pages`, `kci_listed`, `node_id`, `abstract`).

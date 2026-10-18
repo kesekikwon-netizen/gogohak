@@ -2158,8 +2158,13 @@ async function injectTextIntoGeminiEditor(textToAppend) {
         editor.focus();
         const existing = (editor.innerText || editor.textContent || '').trim();
         const full = existing ? (existing + '\\n\\n' + ${escaped}) : ${escaped};
-        const escHtml = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-        editor.innerHTML = String(full).split(/\\r?\\n/).map(line => '<p>' + (escHtml(line) || '<br>') + '</p>').join('');
+        while (editor.firstChild) editor.removeChild(editor.firstChild);
+        for (const line of String(full).split(/\\r?\\n/)) {
+          const p = document.createElement('p');
+          if (line) p.textContent = line;
+          else p.appendChild(document.createElement('br'));
+          editor.appendChild(p);
+        }
         const sel = window.getSelection();
         const range = document.createRange();
         range.selectNodeContents(editor);
@@ -3239,21 +3244,32 @@ async function _askGeminiWebImpl({
         const existingCount = mrs.length;
         const lastPanelText = existingCount > 0 ? (mrs[existingCount - 1].textContent || '').trim() : '';
 
+        // Auto-dismiss any Google Drive / Workspace extension connection card ("아니요") if present
+        Array.from(document.querySelectorAll('button')).forEach(b => {
+          const t = (b.textContent || '').trim();
+          if (t === '아니요' || t === 'No thanks' || t === 'Dismiss') {
+            try { b.click(); } catch (e) {}
+          }
+        });
+
         const editor = document.querySelector('.ql-editor, [contenteditable="true"]');
         if (!editor) throw new Error('Gemini input editor not found');
         editor.scrollIntoView({ block: 'center' });
         editor.focus();
 
-        // CRITICAL FIX: Never pass multi-line text with '\\n' into document.execCommand('insertText'),
-        // because Quill (.ql-editor) intercepts the first '\\n' as an Enter key press and immediately
-        // submits ONLY the first line! Instead, populate <p> paragraph nodes directly and insert a single space ' '.
+        // CRITICAL FIX (TrustedHTML-Safe + Newline-Safe):
+        // 1. Never pass multi-line text with '\\n' into document.execCommand('insertText') because Quill (.ql-editor)
+        //    treats the first '\\n' as an Enter key press and immediately submits ONLY line 1!
+        // 2. Never assign editor.innerHTML because gemini.google.com enforces CSP TrustedHTML!
+        // 3. Instead, build <p> DOM nodes via document.createElement('p') + p.textContent and append a single space ' '.
         const rawText = String(${escapedPrompt} || '');
-        const escHtml = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-        const htmlParagraphs = rawText
-          .split(/\\r?\\n/)
-          .map(line => '<p>' + (escHtml(line) || '<br>') + '</p>')
-          .join('');
-        editor.innerHTML = htmlParagraphs;
+        while (editor.firstChild) editor.removeChild(editor.firstChild);
+        for (const line of rawText.split(/\\r?\\n/)) {
+          const p = document.createElement('p');
+          if (line) p.textContent = line;
+          else p.appendChild(document.createElement('br'));
+          editor.appendChild(p);
+        }
 
         const sel = window.getSelection();
         const range = document.createRange();
@@ -4686,22 +4702,18 @@ function buildAdaptiveMasterPrompt({
   }
 
   return [
-    "### [시스템 절대 규칙: 외부 Google Workspace(Gmail·Google Drive·Google Docs) 검색 및 호출 엄격 금지]",
-    "- **절대 금지**: `@Google Workspace`, `@Gmail`, `@Google Drive`, `@Google Docs` 등 개인 계정 확장 도구를 절대 호출하거나 검색하지 마십시오.",
-    "- **즉시 집필 원칙**: 이메일(Gmail)이나 구글 드라이브(Google Drive)에서 문서를 찾지 마십시오. 또한 사용자에게 '원고나 파일을 보내달라'거나 '어떤 문서 형식으로 제작할지 알려달라'고 되묻지 마십시오. 필요한 모든 조사자료와 DBpia 학술논문 서지 데이터는 **바로 이 메시지 아래에 직접 포함되어 있으므로**, 질문 없이 즉시 완성된 본문 원고 전체를 처음부터 끝까지 작성하십시오.",
-    "",
     isPaper
-      ? "### [고고학 학술논문(『한국고고학보』 투고 규격) 최종 원고 작성 지시]"
-      : "### [발굴조사보고서 『Ⅳ. 고찰(考察)』 최종 원고 작성 지시]",
+      ? "### [고고학 학술논문(『한국고고학보』 투고 규격) 본문 즉시 집필 지시]"
+      : "### [발굴조사보고서 『Ⅳ. 고찰(考察)』 본문 즉시 집필 지시]",
+    "- 외부 도구나 외부 문서를 일절 조회하지 말고, 사용자에게 추가 질문을 하지 마십시오. 필요한 모든 기초 조사자료와 DBpia 학술논문 서지 데이터는 **바로 이 메시지 아래에 직접 수록되어 있으므로**, 오직 아래 데이터만을 근거로 지금 즉시 완성된 원고 본문 전체를 처음부터 끝까지 작성하십시오.",
     "",
-    engineeredPrompt ||
-      buildFirstStageEngineeredPrompt({
-        docType,
-        userFocus,
-        reportText,
-        datingText,
-        hasLocalFiles,
-      }),
+    buildFirstStageEngineeredPrompt({
+      docType,
+      userFocus,
+      reportText,
+      datingText,
+      hasLocalFiles,
+    }),
     "",
     materialBlocks.length > 0 ? materialBlocks.join("\n\n") + "\n" : "",
     "#### [1. 자료 유무에 따른 엄격한 작성 원칙 ('없는 자료는 없는 대로 결과 도출')]",
@@ -4863,15 +4875,14 @@ async function runArchaeologyDiscussionPipeline({
     // ignore
   }
 
-  const firstStagePrompt =
-    (engineeredPrompt && engineeredPrompt.trim()) ||
-    buildFirstStageEngineeredPrompt({
-      docType: pipelineState.docType,
-      userFocus,
-      reportText: craftExtractedReportText,
-      datingText,
-      hasLocalFiles: localFiles.length > 0,
-    });
+  // Always build fresh firstStagePrompt on server so stale "[1차 가공 완료..." strings from unrefreshed tabs are never used
+  const firstStagePrompt = buildFirstStageEngineeredPrompt({
+    docType: pipelineState.docType,
+    userFocus,
+    reportText: craftExtractedReportText,
+    datingText,
+    hasLocalFiles: localFiles.length > 0,
+  });
   pipelineState.engineeredPrompt = firstStagePrompt;
 
   (async () => {
@@ -6482,35 +6493,34 @@ function startStdioLoop() {
 
 async function ensureBridgeServerProcess() {
   try {
-    const res = await fetch(`http://127.0.0.1:${BRIDGE_PORT}/studio`, {
+    const statusRes = await fetch(`http://127.0.0.1:${BRIDGE_PORT}/studio/status`, {
       signal: AbortSignal.timeout(900),
     });
-    if (res.ok) return true;
-    if (res.status === 404) {
-      // Stale node process from an older version is holding port 18787 without /studio
-      try {
-        const { execSync } = require("child_process");
-        const out = execSync(`netstat -ano | findstr :${BRIDGE_PORT}`, {
-          encoding: "utf8",
-          windowsHide: true,
-        });
-        const lines = out.split(/\r?\n/);
-        for (const l of lines) {
-          if (l.includes("LISTENING")) {
-            const parts = l.trim().split(/\s+/);
-            const pid = Number(parts[parts.length - 1]);
-            if (pid > 0 && pid !== process.pid) {
-              try {
-                process.kill(pid);
-              } catch {}
-            }
-          }
-        }
-        await new Promise((r) => setTimeout(r, 300));
-      } catch {
-        // ignore
+    if (statusRes.ok) {
+      const st = await statusRes.json().catch(() => ({}));
+      if (st && st.running) {
+        return true;
       }
     }
+    // Always replace any idle/stale node process holding port 18787 so the latest code is active
+    const { execSync } = require("child_process");
+    const out = execSync(`netstat -ano | findstr :${BRIDGE_PORT}`, {
+      encoding: "utf8",
+      windowsHide: true,
+    });
+    const lines = out.split(/\r?\n/);
+    for (const l of lines) {
+      if (l.includes("LISTENING")) {
+        const parts = l.trim().split(/\s+/);
+        const pid = Number(parts[parts.length - 1]);
+        if (pid > 0 && pid !== process.pid) {
+          try {
+            process.kill(pid);
+          } catch {}
+        }
+      }
+    }
+    await new Promise((r) => setTimeout(r, 300));
   } catch {
     // Not running yet; spawn a single on-demand bridge process
   }

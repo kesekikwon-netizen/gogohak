@@ -15,14 +15,19 @@ description: Universal blueprint and workflow for reverse-engineering any target
      - Inspect CLI command schemas (`wordcraft-cli.exe --help-json`), engine dispatch (`crates/engine/src/dispatch.rs`), UI crates (`crates/ui-egui`), and font database (`crates/fonts/src/fontdb.rs`).
      - Embed custom docked left studio panels (`crates/ui-egui/src/archaeo_studio.rs`) and patch Korean system fonts (`C:\Windows\Fonts\malgun.ttf`).
 
-## 2. Critical Gemini `.ql-editor` Multi-Line Injection & Anti-Workspace Rules
-1. **Never Pass `\n` into `document.execCommand('insertText')` on `.ql-editor`**:
-   - Gemini Web's Quill editor intercepts the first `\n` inside `insertText` as an `Enter` key press and immediately submits only line 1, truncating the body and causing Gemini's Google Workspace extension to search Gmail / Google Drive for the missing text.
-   - **Mandatory Multi-Line Injection Pattern**:
+## 2. Critical Gemini `.ql-editor` Multi-Line Injection & Pure DBpia Rules
+1. **Never Pass `\n` into `document.execCommand('insertText')` AND Never Assign `editor.innerHTML` on `.ql-editor`**:
+   - Gemini Web's Quill editor intercepts the first `\n` inside `insertText` as an `Enter` key press and immediately submits only line 1, and `gemini.google.com` enforces CSP `TrustedHTML` which throws on `editor.innerHTML = ...`.
+   - **Mandatory TrustedHTML-Safe Multi-Line Injection Pattern**:
      ```javascript
      const rawText = String(fullPrompt || '');
-     const escHtml = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-     editor.innerHTML = rawText.split(/\r?\n/).map(line => '<p>' + (escHtml(line) || '<br>') + '</p>').join('');
+     while (editor.firstChild) editor.removeChild(editor.firstChild);
+     for (const line of rawText.split(/\r?\n/)) {
+       const p = document.createElement('p');
+       if (line) p.textContent = line;
+       else p.appendChild(document.createElement('br'));
+       editor.appendChild(p);
+     }
      const sel = window.getSelection();
      const range = document.createRange();
      range.selectNodeContents(editor);
@@ -34,7 +39,7 @@ description: Universal blueprint and workflow for reverse-engineering any target
      ```
 2. **Prevent Unwanted Google Workspace (Gmail / Drive / Docs) Searches**:
    - Never ask Gemini to generate DBpia search queries before DBpia runs; build DBpia queries deterministically in JS (`buildDeterministicDbpiaQueries`) and call `askDbpiaAi(q)` directly.
-   - Prepend an explicit Anti-Workspace guard (`@Google Workspace, @Gmail, @Google Drive, @Google Docs 호출 절대 금지`) at the top of the Master Prompt and start with `newChat: true`.
+   - Never include `@Google Workspace`, `@Gmail`, `@Google Drive`, or `Google` keywords inside the prompt (even in negative instructions), as Gemini's router parses `@...` as an extension trigger.
 
 ## 3. Structured OOXML Document Generation (`wordcraft-cli`)
 - Set Korean theme fonts first: `design.themeFonts={"heading":"Malgun Gothic","body":"Malgun Gothic"}`.

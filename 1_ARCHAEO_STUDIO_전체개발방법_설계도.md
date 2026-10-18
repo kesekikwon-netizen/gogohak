@@ -238,23 +238,21 @@ $Shortcut.Save()
 
 다른 AI가 이 시스템을 재구축할 때 반드시 지켜야 할 **가장 중요한 3대 기술 규칙**입니다.
 
-### 4.1 [핵심 규칙 1] Gemini `.ql-editor` 멀티라인 프롬프트 무손실 주입 (줄바꿈 조기 전송 원천 차단)
-- **절대 하지 말아야 할 구현 (금지)**:
-  ```javascript
-  // ❌ 절대 금지: 줄바꿈(\n)이 포함된 멀티라인 문자열을 insertText로 넣으면
-  // Gemini의 Quill 에디터(.ql-editor)가 첫 번째 \n을 Enter(메시지 즉시 전송)로 처리하여
-  // 맨 첫 줄 머리말만 전송되고 수만 자의 보고서 본문이 통째로 잘려 나갑니다!
-  document.execCommand('insertText', false, fullPromptWithNewlines);
-  ```
-- **올바른 무손실 주입 구현 (`_askGeminiWebImpl` 필수 코드)**:
-  줄 단위로 분리하여 `<p>...</p>` DOM 문단으로 `editor.innerHTML`에 한 번에 주입한 뒤, 커서를 맨 끝으로 옮기고 **줄바꿈 없는 단일 공백(`' '`)만 `insertText`로 트리거**해야 30,000자 이상의 고고학 보고서 원문과 DBpia 서지 데이터가 단 한 글자도 잘리지 않고 전송됩니다.
+### 4.1 [핵심 규칙 1] Gemini `.ql-editor` 멀티라인 프롬프트 무손실 주입 (줄바꿈 조기 전송 & `TrustedHTML` 에러 동시 차단)
+- **절대 하지 말아야 할 구현 2가지 (금지)**:
+  1. `document.execCommand('insertText', false, fullPromptWithNewlines)`: 줄바꿈(`\n`)이 포함된 멀티라인 문자열을 `insertText`로 넣으면 Gemini의 Quill 에디터(`.ql-editor`)가 첫 번째 `\n`을 `Enter`(메시지 즉시 전송)로 처리하여 **맨 첫 줄 머리말만 전송되고 수만 자의 보고서 본문이 통째로 잘려 나갑니다!**
+  2. `editor.innerHTML = ...`: `https://gemini.google.com/app`은 브라우저 CSP **Trusted Types (`TrustedHTML`)** 보안 정책이 강제되어 있어 `innerHTML` 대입 시 `TypeError: Failed to set the 'innerHTML' property on 'Element': This document requires 'TrustedHTML' assignment` 예외가 발생합니다!
+- **올바른 무손실 주입 구현 (`_askGeminiWebImpl` 필수 코드 — `document.createElement('p')` + `p.textContent`)**:
+  기존 자식 노드를 비운 뒤 줄 단위로 `document.createElement('p')`와 `p.textContent = line`을 사용하여 DOM 노드를 직접 추가하고, 커서를 맨 끝으로 옮긴 뒤 **줄바꿈 없는 단일 공백(`' '`)만 `insertText`로 트리거**해야 `TrustedHTML` 에러 없이 30,000자 이상의 고고학 보고서 원문과 DBpia 서지 데이터가 단 한 글자도 잘리지 않고 전송됩니다.
   ```javascript
   const rawText = String(fullPrompt || '');
-  const escHtml = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  editor.innerHTML = rawText
-    .split(/\r?\n/)
-    .map(line => '<p>' + (escHtml(line) || '<br>') + '</p>')
-    .join('');
+  while (editor.firstChild) editor.removeChild(editor.firstChild);
+  for (const line of rawText.split(/\r?\n/)) {
+    const p = document.createElement('p');
+    if (line) p.textContent = line;
+    else p.appendChild(document.createElement('br'));
+    editor.appendChild(p);
+  }
 
   const sel = window.getSelection();
   const range = document.createRange();
@@ -269,17 +267,12 @@ $Shortcut.Save()
 
 ### 4.2 [핵심 규칙 2] Google Workspace(Gmail · Google Drive · Google Docs) 확장 호출 원천 차단 및 DBpia 단독 검색
 - **왜 Google Workspace가 호출되었는가?**
-  1) 위 4.1의 줄바꿈 버그로 인해 첫 줄(`[1차 가공 완료 · 작성 형식: 발굴조사보고서 『Ⅳ. 고찰』]`)만 전송되었을 때, 본문이 없자 제미나이가 사용자의 Gmail 이메일 스레드/초안이나 Google 드라이브에서 `'발굴조사보고서'` 또는 `'1차 가공'` 문서를 찾으려고 Google Workspace 확장 도구를 자동 실행했습니다.
-  2) 또한 2단계(DBpia 검색어 생성)에서 불필요하게 제미나이를 호출하던 구조가 원인이었습니다.
-- **완벽 해결 아키텍처**:
+  1) 구버전 브리지 프로세스가 포트 `18787`을 점유한 상태에서 줄바꿈 조기 전송 버그 또는 `TrustedHTML` 에러로 인해 첫 줄(`[1차 가공 완료 · 작성 형식: 발굴조사보고서 『Ⅳ. 고찰』]`)만 전송되었을 때, 본문이 없자 제미나이가 사용자의 Gmail이나 Google 드라이브에서 `'발굴조사보고서'` 문서를 찾으려고 Google Workspace 확장을 자동 실행했습니다.
+  2) 또한 프롬프트 내부에 `@Google Workspace`, `@Gmail`, `@Google Drive` 같은 `@확장명` 키워드가 들어가면(심지어 "쓰지 말라"는 부정문이라 하더라도) 제미나이 파서가 이를 확장 프로그램 호출 태그로 인식해 연결 팝업을 띄웁니다.
+- **완벽 해결 아키텍처 (오직 제미나이 + DBpia AI만 순수 연동)**:
   1) **2단계 제미나이 호출 전면 제거**: `runArchaeologyDiscussionPipeline()`의 2단계에서는 제미나이를 절대 호출하지 않고, `buildDeterministicDbpiaQueries()`가 사용자 입력 및 업로드 보고서에서 유적명(예: `강릉 병산동`, `경산 임당동`), 시대(`초기철기`, `원삼국`, `삼국시대`), 유구/유물(`주거지`, `목곽묘`, `구들`, `토기`) 키워드를 즉시 추출해 **100% DBpia AI(`askDbpiaAi`)로만 직행**합니다.
-  2) **4단계 마스터 프롬프트 상단 Anti-Workspace 가드 명시**:
-     ```text
-     ### [시스템 절대 규칙: 외부 Google Workspace(Gmail·Google Drive·Google Docs) 검색 및 호출 엄격 금지]
-     - 절대 금지: @Google Workspace, @Gmail, @Google Drive, @Google Docs 등 개인 계정 확장 도구를 절대 호출하거나 검색하지 마십시오.
-     - 즉시 집필 원칙: 이메일(Gmail)이나 구글 드라이브(Google Drive)에서 문서를 찾지 마십시오. 필요한 모든 조사자료와 DBpia 학술논문 서지 데이터는 바로 이 메시지 아래에 직접 포함되어 있으므로, 질문 없이 즉시 완성된 본문 원고 전체를 처음부터 끝까지 작성하십시오.
-     ```
-  3) **새 채팅 세션(`newChat: true`)에서 본문 집필**: 이전 대화의 잔여 컨텍스트가 섞이지 않도록 4단계 본문 작성 시 `newChat: true`로 깨끗한 세션을 열어 작성합니다.
+  2) **프롬프트 내 `@` 멘션 및 외부 앱 이름 완전 배제**: 프롬프트에 `Google`, `Drive`, `Gmail`, `Workspace` 단어를 일절 넣지 않고, `"외부 도구나 외부 문서를 일절 조회하지 말고 바로 이 메시지 아래에 직접 수록된 기초 조사자료와 DBpia 학술논문 서지 데이터만을 근거로 지금 즉시 완성된 원고 본문 전체를 작성하십시오"`로 지시합니다.
+  3) **브리지 서버 시작 시 구버전 포트(`18787`) 점유 프로세스 자동 교체 (`ensureBridgeServerProcess`)**: 스튜디오 실행 시 이전 프로세스가 남아 구버전 코드를 실행하는 일이 없도록 유휴 프로세스를 자동 종료하고 최신 코드로 기동합니다.
 
 ### 4.3 [핵심 규칙 3] DBpia AI 하이브리드 수집 엔진 (React DOM + Vetter JSON API)
 `askDbpiaAi(query)` 및 `extractLatestDbpiaAnswer()`는 다음 2단계로 국내 학술논문·발굴조사보고서 서지정보를 수집합니다:
