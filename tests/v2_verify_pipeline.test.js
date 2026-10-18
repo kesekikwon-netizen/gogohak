@@ -376,8 +376,8 @@ test('6단계 Nano Banana Pro 시각자료 생성 및 runPipelineV2 전체 E2E �
   // E2E 파이프라인 가짜 드라이버 핸들러
   const { geminiDriver, dbpiaDriver, craftDriver, calls } = createFakeDrivers({
     defaultGeminiHandler: async (prompt) => {
-      const m = prompt.match(/<<END:([^>]+)>>/);
-      const stepId = m ? m[1] : 'STEP';
+      const allMarkers = [...prompt.matchAll(/<<END:([^>]+)>>/g)];
+      const stepId = allMarkers.length > 0 ? allMarkers[allMarkers.length - 1][1] : 'STEP';
       const marker = `<<END:${stepId}>>`;
 
       if (stepId.startsWith('P1.CH')) {
