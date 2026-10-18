@@ -5,7 +5,7 @@
 
 ## 12장 보고 항목
 - **브랜치**: `v6/s10-docs`
-- **커밋 SHA**: `HEAD`
+- **커밋 SHA**: `5916c88`
 - **만든 파일**: scripts/v2/tools/check.js, .githooks/pre-commit, .github/workflows/v6-check.yml, .agent/workflows/v6-intent.md, .agent/workflows/v6-spec.md, .agent/workflows/v6-build.md, .agent/workflows/v6-verify.md, .agent/workflows/v6-review.md, .agent/workflows/v6-report.md, ARCHAEO_STUDIO_6.1_Antigravity_구현명세서_하네스_교차검증.md
 - **바꾼 파일**: README.md, 1_ARCHAEO_STUDIO_전체개발방법_설계도.md, skills/archaeo-studio-pro/SKILL.md, skills_backup/archaeo-studio-pro/SKILL.md
 - **검증 명령 및 종료 코드**: `node scripts/v2/tools/check.js` (`0`), `node --test tests/` (`0`)
