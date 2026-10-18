@@ -377,9 +377,10 @@ test('6단계 Nano Banana Pro 시각자료 생성 및 runPipelineV2 전체 E2E �
   const { geminiDriver, dbpiaDriver, craftDriver, calls } = createFakeDrivers({
     defaultGeminiHandler: async (prompt) => {
       const m = prompt.match(/<<END:([^>]+)>>/);
-      const marker = m ? `<<END:${m[1]}>>` : '<<END:STEP>>';
+      const stepId = m ? m[1] : 'STEP';
+      const marker = `<<END:${stepId}>>`;
 
-      if (prompt.includes('P1.CH') || prompt.includes('보고서 원문')) {
+      if (stepId.startsWith('P1.CH')) {
         return (
           '```json\n' +
           JSON.stringify([
@@ -409,7 +410,7 @@ test('6단계 Nano Banana Pro 시각자료 생성 및 runPipelineV2 전체 E2E �
         );
       }
 
-      if (prompt.includes('P3.OUTLINE')) {
+      if (stepId === 'P3.OUTLINE') {
         return (
           '```json\n' +
           JSON.stringify({
@@ -438,7 +439,7 @@ test('6단계 Nano Banana Pro 시각자료 생성 및 runPipelineV2 전체 E2E �
         );
       }
 
-      if (prompt.includes('P4.S')) {
+      if (stepId.startsWith('P4.S')) {
         return (
           '## 1. 주거지 구조와 편년\n\n' +
           '가상유적의 3호 주거지는 장축 6.2m, 단축 4.8m의 평면 凸자형 주거지이다 ⟦F1⟧ ⟦F2⟧.\n\n' +
@@ -448,7 +449,7 @@ test('6단계 Nano Banana Pro 시각자료 생성 및 runPipelineV2 전체 E2E �
         );
       }
 
-      if (prompt.includes('.X1')) {
+      if (stepId.includes('.X1')) {
         return (
           '```json\n' +
           JSON.stringify([
@@ -464,7 +465,7 @@ test('6단계 Nano Banana Pro 시각자료 생성 및 runPipelineV2 전체 E2E �
         );
       }
 
-      if (prompt.includes('.X2')) {
+      if (stepId.includes('.X2')) {
         return (
           '```json\n' +
           JSON.stringify([
@@ -479,7 +480,7 @@ test('6단계 Nano Banana Pro 시각자료 생성 및 runPipelineV2 전체 E2E �
         );
       }
 
-      if (prompt.includes('.X3')) {
+      if (stepId.includes('.X3')) {
         return (
           '```json\n' +
           JSON.stringify({
