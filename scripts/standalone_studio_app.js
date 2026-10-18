@@ -185,8 +185,10 @@ button { font: inherit; color: inherit; }
 .as-goal-item__name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .as-goal-item__badge { font: 600 10px var(--font-mono); flex: none; }
 
-/* A4 문서 */
-.as-page { box-sizing: border-box; width: var(--size-a4-w); min-height: var(--size-a4-h); padding: 25mm 20mm 18mm; background: var(--page); color: var(--page-ink); box-shadow: var(--shadow-page); font-family: var(--font-serif); display: flex; flex-direction: column; margin: 0 auto; outline: none; }
+/* A4 문서 (다중 페이지 분리 지원) */
+.as-pages-wrap { display: flex; flex-direction: column; gap: 22px; align-items: center; }
+.as-page { box-sizing: border-box; width: var(--size-a4-w); min-height: var(--size-a4-h); padding: 25mm 20mm 18mm; background: var(--page); color: var(--page-ink); box-shadow: var(--shadow-page); font-family: var(--font-serif); display: flex; flex-direction: column; margin: 0 auto; outline: none; position: relative; }
+.as-page__head-running { font-size: 10px; color: var(--page-ink-muted); border-bottom: 0.5px solid #D5D3C9; padding-bottom: 4px; margin-bottom: 14px; display: flex; justify-content: space-between; font-family: var(--font-sans); }
 .as-page__body { flex: 1; outline: none; }
 .as-page__empty { margin: 60mm 0 0; text-align: center; font-size: 13.33px; line-height: 1.7; color: var(--page-ink-muted); font-family: var(--font-sans); }
 .as-doc-chapter { font-size: 21.33px; font-weight: 700; line-height: 1.4; text-align: center; margin: 0 0 1.2em; white-space: pre-wrap; }
@@ -222,9 +224,21 @@ button { font: inherit; color: inherit; }
 .as-page__notes ol { list-style: none; margin: 0; padding: 0; }
 .as-page__notes li { display: flex; gap: .4em; margin-bottom: 2px; }
 .as-page__fnn { flex: none; font-weight: 600; }
-.as-page__num { text-align: center; font-size: 10.67px; margin-top: 1.2em; color: var(--page-ink-muted); }
+.as-page__num { text-align: center; font-size: 10.67px; margin-top: 1.2em; color: var(--page-ink-muted); font-family: var(--font-sans); }
 .as-caret { display: inline-block; width: 1.5px; height: 1.05em; background: var(--clay); vertical-align: -0.15em; margin-left: 1px; animation: as-blink 1s steps(1) infinite; }
 @keyframes as-blink { 50% { opacity: 0; } }
+
+/* DBpia AI 실시간 다각도 검색 요점 & 실존 논문 수집 보드 */
+.as-dbpia-board { width: calc(var(--size-a4-w) * 0.9); max-width: 92%; margin: 0 auto 18px; background: var(--bg); border: 1px solid var(--brass-line); border-radius: var(--radius-7); box-shadow: 0 2px 10px rgba(20,20,19,0.08); overflow: hidden; font-family: var(--font-sans); }
+.as-dbpia-board__head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 9px 14px; background: var(--brass-soft); border-bottom: 1px solid var(--brass-line); font-size: 12px; font-weight: 600; color: var(--ink); }
+.as-dbpia-board__body { padding: 12px 14px; max-height: 440px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
+.as-dbpia-feed-card { border: 1px solid var(--line); border-radius: var(--radius-5); background: var(--input); padding: 10px 12px; }
+.as-dbpia-feed-card__q { font-size: 12px; font-weight: 700; color: var(--brass); margin-bottom: 6px; display: flex; align-items: center; justify-content: space-between; }
+.as-dbpia-feed-card__sum { font-size: 11.8px; line-height: 1.6; color: var(--ink); white-space: pre-wrap; max-height: 180px; overflow-y: auto; padding-right: 4px; }
+.as-dbpia-papers-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.as-dbpia-paper-item { border: 1px solid var(--line); border-radius: var(--radius-5); background: var(--tab); padding: 8px 10px; font-size: 11.2px; line-height: 1.45; }
+.as-dbpia-paper-item__cite { font-weight: 600; color: var(--ink); margin-bottom: 4px; }
+.as-dbpia-paper-item__quote { color: var(--ink-muted); font-size: 10.8px; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 
 /* 전체 화면 틀 */
 .as-screen { position: relative; width: 100vw; height: 100vh; display: grid; grid-template-rows: var(--size-title-bar) var(--size-ribbon) 1fr var(--size-status-bar); background: var(--bg); color: var(--ink); overflow: hidden; }
@@ -516,22 +530,35 @@ button { font: inherit; color: inherit; }
           <span>실행 전</span>
         </span>
         <span class="as-collect__r">
+          <button type="button" class="as-btn as-btn--brass" id="btn-toggle-dbpia-board" style="height:22px;padding:0 10px;font-size:11px;display:none;" onclick="toggleDbpiaBoard()">DBpia 검색 요점 · 수집 논문 보기 ▾</button>
           <span id="collect-right-time">WordCraft .docx 대기</span>
           <button type="button" class="as-btn" style="height:22px;padding:0 10px;font-size:11px;" onclick="openInWordCraft()">WordCraft 창 열기</button>
         </span>
       </div>
 
       <div class="as-screen__scroll" id="doc-scroll">
-        <article class="as-page" id="doc-page" contenteditable="true" spellcheck="false">
-          <div class="as-page__body" id="doc-page-body">
-            <p class="as-page__empty" id="doc-page-empty">실행하면 이 자리에 『Ⅳ. 고찰』이 작성됩니다. 직접 써 넣으셔도 됩니다.</p>
+        <!-- DBpia AI 실시간 다각도 검색 요점 & 실존 논문 수집 현황 보드 -->
+        <section class="as-dbpia-board" id="dbpia-live-board" style="display:none;" aria-label="DBpia AI 실시간 다각도 검색 요점 및 수집 논문">
+          <div class="as-dbpia-board__head">
+            <span id="dbpia-board-title">🔍 DBpia AI 다각도 검색 요점(vetter_conversations) 및 실존 논문 서지·인용문(hovers) 실시간 수집 현황</span>
+            <button type="button" class="as-btn as-btn--quiet" style="height:20px;padding:0 8px;font-size:11px;" onclick="toggleDbpiaBoard(false)">접기 ▴</button>
           </div>
-          <div class="as-page__notes" id="doc-page-notes" style="display:none;">
-            <hr>
-            <ol id="doc-page-notes-list"></ol>
-          </div>
-          <div class="as-page__num" id="doc-page-num">- 1 -</div>
-        </article>
+          <div class="as-dbpia-board__body" id="dbpia-board-body"></div>
+        </section>
+
+        <!-- A4 다중 페이지 컨테이너 (1쪽, 2쪽, 3쪽... 자동 분할) -->
+        <div class="as-pages-wrap" id="doc-pages-wrap">
+          <article class="as-page" id="doc-page" contenteditable="true" spellcheck="false">
+            <div class="as-page__body" id="doc-page-body">
+              <p class="as-page__empty" id="doc-page-empty">실행하면 이 자리에 『Ⅳ. 고찰』이 작성됩니다. 직접 써 넣으셔도 됩니다.</p>
+            </div>
+            <div class="as-page__notes" id="doc-page-notes" style="display:none;">
+              <hr>
+              <ol id="doc-page-notes-list"></ol>
+            </div>
+            <div class="as-page__num" id="doc-page-num">- 1 -</div>
+          </article>
+        </div>
       </div>
     </main>
   </div>
@@ -625,6 +652,9 @@ let studioOpen = true;
 let showProcessed = false;
 let currentEngineeredPrompt = '';
 let lastRenderedText = '';
+let lastRenderedPagesCount = 1;
+let dbpiaBoardManualOverride = null;
+let lastDbpiaSignature = '';
 let uploadedReportFiles = [];
 let uploadedDatingFiles = [];
 let exportAfterAction = 'open-pdf';
@@ -636,6 +666,18 @@ function escapeHtml(str) {
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;');
+}
+
+function toggleDbpiaBoard(forceState) {
+  const board = document.getElementById('dbpia-live-board');
+  if (!board) return;
+  const next = typeof forceState === 'boolean' ? forceState : (board.style.display === 'none');
+  dbpiaBoardManualOverride = next;
+  board.style.display = next ? 'block' : 'none';
+  const btn = document.getElementById('btn-toggle-dbpia-board');
+  if (btn) {
+    btn.textContent = next ? 'DBpia 검색 요점 · 수집 논문 닫기 ▴' : 'DBpia 검색 요점 · 수집 논문 보기 ▾';
+  }
 }
 
 function toggleTheme() {
@@ -656,14 +698,16 @@ function toggleStudioPanel() {
 function cycleZoom() {
   currentZoomIdx = (currentZoomIdx + 1) % ZOOMS.length;
   const z = ZOOMS[currentZoomIdx];
-  document.getElementById('doc-page').style.zoom = String(z);
+  document.querySelectorAll('.as-page').forEach(p => { p.style.zoom = String(z); });
   document.getElementById('status-zoom').textContent = Math.round(z * 100) + '% ▾';
 }
 
 function togglePageFont() {
-  const p = document.getElementById('doc-page');
-  const isSans = p.style.fontFamily && p.style.fontFamily.includes('Sans');
-  p.style.fontFamily = isSans ? 'var(--font-serif)' : 'var(--font-sans)';
+  const pages = document.querySelectorAll('.as-page');
+  if (!pages.length) return;
+  const isSans = pages[0].style.fontFamily && pages[0].style.fontFamily.includes('Sans');
+  const nextFont = isSans ? 'var(--font-serif)' : 'var(--font-sans)';
+  pages.forEach(p => { p.style.fontFamily = nextFont; });
 }
 
 function selectDocMode(mode) {
@@ -953,16 +997,32 @@ async function saveAndOpenWordCraft() {
 }
 
 function newDocument() {
-  document.getElementById('doc-page-body').innerHTML =
-    '<p class="as-page__empty" id="doc-page-empty">실행하면 이 자리에 ' +
-    (currentDocType === 'paper' ? '논문' : '『Ⅳ. 고찰』') +
-    '이 작성됩니다. 직접 써 넣으셔도 됩니다.</p>';
-  document.getElementById('doc-page-notes').style.display = 'none';
+  const wrap = document.getElementById('doc-pages-wrap');
+  if (wrap) {
+    wrap.innerHTML =
+      '<article class="as-page" id="doc-page" contenteditable="true" spellcheck="false">' +
+        '<div class="as-page__body" id="doc-page-body">' +
+          '<p class="as-page__empty" id="doc-page-empty">실행하면 이 자리에 ' +
+          (currentDocType === 'paper' ? '논문' : '『Ⅳ. 고찰』') +
+          '이 작성됩니다. 직접 써 넣으셔도 됩니다.</p>' +
+        '</div>' +
+        '<div class="as-page__notes" id="doc-page-notes" style="display:none;">' +
+          '<hr><ol id="doc-page-notes-list"></ol>' +
+        '</div>' +
+        '<div class="as-page__num" id="doc-page-num">- 1 -</div>' +
+      '</article>';
+  }
   lastRenderedText = '';
+  lastRenderedPagesCount = 1;
+}
+
+function getActivePageBody() {
+  const bodies = document.querySelectorAll('.as-page__body');
+  return bodies.length > 0 ? bodies[bodies.length - 1] : document.getElementById('doc-page-body');
 }
 
 function insertSampleTable() {
-  const body = document.getElementById('doc-page-body');
+  const body = getActivePageBody();
   const empty = document.getElementById('doc-page-empty');
   if (empty) empty.remove();
   body.insertAdjacentHTML('beforeend',
@@ -973,7 +1033,7 @@ function insertSampleTable() {
 }
 
 function insertSampleDiagram() {
-  const body = document.getElementById('doc-page-body');
+  const body = getActivePageBody();
   const empty = document.getElementById('doc-page-empty');
   if (empty) empty.remove();
   body.insertAdjacentHTML('beforeend',
@@ -987,8 +1047,10 @@ function insertSampleDiagram() {
 }
 
 function insertSampleFootnote() {
-  const notesBox = document.getElementById('doc-page-notes');
-  const list = document.getElementById('doc-page-notes-list');
+  const notesBoxes = document.querySelectorAll('.as-page__notes');
+  const notesBox = notesBoxes.length > 0 ? notesBoxes[notesBoxes.length - 1] : document.getElementById('doc-page-notes');
+  if (!notesBox) return;
+  const list = notesBox.querySelector('ol');
   notesBox.style.display = 'block';
   const nextNum = list.children.length + 1;
   list.insertAdjacentHTML('beforeend',
@@ -1002,13 +1064,104 @@ function findInDoc(q) {
 }
 
 /**
- * 마크다운 원고를 ARCHAEO STUDIO A4 양식(DocChapter, DocSection, DocPara, FootnoteRef, DocTable, 차트/모식도, References, 쪽 아래 각주)으로 실시간 조판
+ * DBpia AI 다각도 검색 요점(vetter_conversations) 및 실존 논문 서지·인용문(hovers) 실시간 현황판 렌더링
+ */
+function renderDbpiaLiveBoard(p) {
+  const board = document.getElementById('dbpia-live-board');
+  const bodyEl = document.getElementById('dbpia-board-body');
+  const titleEl = document.getElementById('dbpia-board-title');
+  const toggleBtn = document.getElementById('btn-toggle-dbpia-board');
+  if (!board || !bodyEl) return;
+
+  const feed = Array.isArray(p.liveResearchFeed) ? p.liveResearchFeed : [];
+  const papers = Array.isArray(p.collectedPapers) ? p.collectedPapers : [];
+  const isDbpiaPhase = Boolean(p.running && p.phase && p.phase.includes('DBPIA'));
+  const hasData = feed.length > 0 || papers.length > 0;
+
+  if (toggleBtn) {
+    toggleBtn.style.display = (hasData || isDbpiaPhase) ? 'inline-flex' : 'none';
+  }
+
+  if (!hasData && !isDbpiaPhase) {
+    board.style.display = 'none';
+    return;
+  }
+
+  // Auto-open during PHASE_2_DBPIA_LOOP unless manually closed; auto-collapse when writing starts unless manually opened
+  if (dbpiaBoardManualOverride === null) {
+    const liveMd = (p.latestManuscript && p.latestManuscript.trim()) || (p.liveStreamText && p.liveStreamText.trim()) || '';
+    const shouldShow = isDbpiaPhase || (hasData && !liveMd);
+    board.style.display = shouldShow ? 'block' : 'none';
+    if (toggleBtn) {
+      toggleBtn.textContent = shouldShow ? 'DBpia 검색 요점 · 수집 논문 닫기 ▴' : 'DBpia 검색 요점 · 수집 논문 보기 (' + papers.length + '편) ▾';
+    }
+  } else if (toggleBtn) {
+    toggleBtn.textContent = board.style.display !== 'none'
+      ? 'DBpia 검색 요점 · 수집 논문 닫기 ▴'
+      : 'DBpia 검색 요점 · 수집 논문 보기 (' + papers.length + '편) ▾';
+  }
+
+  const sig = JSON.stringify({
+    phase: p.phase,
+    step: p.stepDetail,
+    fLen: feed.length,
+    pLen: papers.length,
+    lastSumLen: feed.length ? (feed[feed.length - 1].summary || '').length : 0
+  });
+  if (sig === lastDbpiaSignature) return;
+  lastDbpiaSignature = sig;
+
+  if (titleEl) {
+    titleEl.textContent = isDbpiaPhase
+      ? '🔍 [DBpia AI 실시간 다각도 검색 진행 중] 학술 요점(vetter_conversations) 및 실존 논문 서지·인용문(hovers) 수집 현황 (' + papers.length + '편 확보)'
+      : '📚 DBpia AI 다각도 검색 요점(' + feed.length + '개 관점) 및 검증 완료 실존 학술논문 (' + papers.length + '편)';
+  }
+
+  let html = '';
+  if (isDbpiaPhase) {
+    html += '<div style="padding:8px 10px;border-radius:5px;background:var(--brass-soft);border:1px solid var(--brass-line);font-size:11.5px;color:var(--ink);">' +
+      '<strong>현재 DBpia AI 검색 상태:</strong> ' + escapeHtml(p.stepDetail || '다각도 학술 검색 중...') +
+    '</div>';
+  }
+
+  if (feed.length > 0) {
+    feed.forEach((item, idx) => {
+      const sumText = String(item.summary || '').trim();
+      html += '<div class="as-dbpia-feed-card">' +
+        '<div class="as-dbpia-feed-card__q">' +
+          '<span>[관점 ' + (idx + 1) + ' 검색어] "' + escapeHtml(item.query || '') + '"</span>' +
+          '<span class="as-tag as-tag--brass">요점 ' + sumText.length.toLocaleString() + '자 · 논문 ' + ((item.refs && item.refs.length) || 0) + '편</span>' +
+        '</div>' +
+        '<div class="as-dbpia-feed-card__sum">' + escapeHtml(sumText || '(DBpia AI 요점 응답 수신 완료)') + '</div>' +
+      '</div>';
+    });
+  }
+
+  if (papers.length > 0) {
+    html += '<div style="font-size:11.5px;font-weight:700;color:var(--ink);margin-top:4px;">✓ 서지 메타데이터 및 본문 인용구(hovers) 교차검증 완료 논문 (' + papers.length + '편)</div>';
+    html += '<div class="as-dbpia-papers-grid">';
+    papers.forEach((r, idx) => {
+      const cite = (r.author || '학술연구자') + ', ' + (r.year || '') + ', 「' + (r.title || '') + '」, 『' + (r.journal || '') + '』' + (r.pages ? ', ' + r.pages : '');
+      const quote = r.abstract ? String(r.abstract).trim() : '';
+      html += '<div class="as-dbpia-paper-item">' +
+        '<div class="as-dbpia-paper-item__cite">' + (idx + 1) + ') ' + escapeHtml(cite) + '</div>' +
+        (quote ? '<div class="as-dbpia-paper-item__quote">“' + escapeHtml(quote) + '”</div>' : '') +
+      '</div>';
+    });
+    html += '</div>';
+  }
+
+  bodyEl.innerHTML = html;
+}
+
+/**
+ * 마크다운 원고를 ARCHAEO STUDIO 다중 A4 페이지 양식(- 1 -, - 2 -, - 3 -... 자동 쪽 분할 및 쪽별 하단 각주 배치)으로 실시간 조판
  */
 function renderManuscriptOntoA4Page(rawMd, isRunning) {
-  const bodyEl = document.getElementById('doc-page-body');
-  const notesWrap = document.getElementById('doc-page-notes');
-  const notesList = document.getElementById('doc-page-notes-list');
-  if (!rawMd || !rawMd.trim()) return { footnotesCount: 0, refsCount: 0 };
+  const pagesWrap = document.getElementById('doc-pages-wrap');
+  if (!pagesWrap || !rawMd || !rawMd.trim()) {
+    return { footnotesCount: 0, refsCount: 0, pagesCount: 1 };
+  }
 
   let md = String(rawMd);
 
@@ -1061,6 +1214,7 @@ function renderManuscriptOntoA4Page(rawMd, isRunning) {
   const fnRegex = /(?:^|\\n)\\s*(?:#{1,6}\\s*)?(?:\\*{1,2}\\s*)?(?:【\\s*각\\s*주\\s*】|\\[\\s*각\\s*주\\s*\\]|각\\s*주)(?:\\s*\\*{1,2})?\\s*\\n([\\s\\S]*?)(?=(?:\\n\\s*(?:#{1,6}\\s*)?(?:\\*{1,2}\\s*)?(?:【\\s*참고\\s*문헌\\s*】|\\[\\s*참고\\s*문헌\\s*\\]|참고\\s*문헌|참고\\s*논문))|$)/i;
   const fnMatch = fnRegex.exec(md);
   const footnotes = [];
+  const fnByNum = new Map();
   if (fnMatch && fnMatch[1]) {
     let autoNum = 0;
     fnMatch[1].split(/\\r?\\n/).forEach(rawLine => {
@@ -1072,22 +1226,34 @@ function renderManuscriptOntoA4Page(rawMd, isRunning) {
         if (n > 0 && txt) {
           autoNum = Math.max(autoNum, n);
           footnotes.push({ n, text: txt });
+          fnByNum.set(n, txt);
         }
       } else if (l.length > 10 && (l.includes('「') || l.includes('『'))) {
         autoNum++;
         footnotes.push({ n: autoNum, text: l });
+        fnByNum.set(autoNum, l);
       }
     });
     md = md.slice(0, fnMatch.index) + '\\n' + md.slice(fnMatch.index + fnMatch[0].length);
   }
 
-  // 3) 줄 단위 파싱 (제목, 절, 표, 참고문헌, 본문 문단 + 위첨자 각주 1), 2))
+  // 3) 줄 단위 파싱 (블록별 가중치 계산하여 A4 다중 페이지 분할)
   const lines = md.split(/\\r?\\n/);
-  let htmlParts = [];
+  const blockItems = []; // { html, weight, fnNums }
   let inTable = false;
   let tableRows = [];
   let inRefs = false;
   let refItems = [];
+
+  function extractInlineFnNums(str) {
+    const nums = [];
+    const rx = /<sup class="as-fnref">(\\d+)\\)<\\/sup>/g;
+    let m;
+    while ((m = rx.exec(str)) !== null) {
+      nums.push(Number(m[1]));
+    }
+    return nums;
+  }
 
   function formatInline(s) {
     let out = escapeHtml(s);
@@ -1097,18 +1263,26 @@ function renderManuscriptOntoA4Page(rawMd, isRunning) {
     return out;
   }
 
+  function pushBlock(html, weight) {
+    blockItems.push({
+      html,
+      weight: Math.max(60, weight),
+      fnNums: extractInlineFnNums(html)
+    });
+  }
+
   function flushTable() {
     if (!inTable || tableRows.length === 0) return;
     inTable = false;
     const header = tableRows[0];
     const bodyRows = tableRows.slice(1).filter(r => !r.every(c => /^[:\\-\\s]+$/.test(c)));
-    htmlParts.push(
+    const tblHtml =
       '<figure class="as-doc-table"><table><thead><tr>' +
       header.map(c => '<th>' + formatInline(c) + '</th>').join('') +
       '</tr></thead><tbody>' +
       bodyRows.map(r => '<tr>' + r.map(c => '<td>' + formatInline(c) + '</td>').join('') + '</tr>').join('') +
-      '</tbody></table></figure>'
-    );
+      '</tbody></table></figure>';
+    pushBlock(tblHtml, 220 + bodyRows.length * 75);
     tableRows = [];
   }
 
@@ -1121,13 +1295,13 @@ function renderManuscriptOntoA4Page(rawMd, isRunning) {
     if (raw.startsWith('@@AS_CHART_')) {
       flushTable();
       const idx = Number(raw.replace(/@@AS_CHART_|@@/g, ''));
-      if (chartBlocks[idx]) htmlParts.push(chartBlocks[idx]);
+      if (chartBlocks[idx]) pushBlock(chartBlocks[idx], 360);
       continue;
     }
     if (raw.startsWith('@@AS_DIAG_')) {
       flushTable();
       const idx = Number(raw.replace(/@@AS_DIAG_|@@/g, ''));
-      if (diagBlocks[idx]) htmlParts.push(diagBlocks[idx]);
+      if (diagBlocks[idx]) pushBlock(diagBlocks[idx], 340);
       continue;
     }
     if (raw.startsWith('|') && raw.endsWith('|')) {
@@ -1151,42 +1325,106 @@ function renderManuscriptOntoA4Page(rawMd, isRunning) {
     }
 
     if (/^#\\s+/.test(raw)) {
-      htmlParts.push('<h1 class="as-doc-chapter">' + formatInline(raw.replace(/^#\\s+/, '')) + '</h1>');
+      pushBlock('<h1 class="as-doc-chapter">' + formatInline(raw.replace(/^#\\s+/, '')) + '</h1>', 180);
     } else if (/^##\\s+/.test(raw)) {
-      htmlParts.push('<h2 class="as-doc-section">' + formatInline(raw.replace(/^##\\s+/, '')) + '</h2>');
+      pushBlock('<h2 class="as-doc-section">' + formatInline(raw.replace(/^##\\s+/, '')) + '</h2>', 140);
     } else if (/^#{3,6}\\s+/.test(raw)) {
-      htmlParts.push('<h3 class="as-doc-subsec">' + formatInline(raw.replace(/^#{3,6}\\s+/, '')) + '</h3>');
+      pushBlock('<h3 class="as-doc-subsec">' + formatInline(raw.replace(/^#{3,6}\\s+/, '')) + '</h3>', 110);
     } else {
-      htmlParts.push('<p class="as-doc-para">' + formatInline(raw) + '</p>');
+      pushBlock('<p class="as-doc-para">' + formatInline(raw) + '</p>', raw.length + 45);
     }
   }
   flushTable();
 
-  if (isRunning && htmlParts.length > 0) {
-    const lastIdx = htmlParts.length - 1;
-    htmlParts[lastIdx] = htmlParts[lastIdx].replace(/<\\/p>$/, '<span class="as-caret" aria-hidden="true"></span></p>');
+  if (isRunning && blockItems.length > 0) {
+    const lastIdx = blockItems.length - 1;
+    blockItems[lastIdx].html = blockItems[lastIdx].html.replace(/<\\/p>$/, '<span class="as-caret" aria-hidden="true"></span></p>');
   }
 
+  // 4) A4 페이지 단위 분할 (페이지당 약 1,650 가중치 예산, 각주 수록 시 각주당 95 가중치 반영)
+  const MAX_PAGE_BUDGET = 1650;
+  const pages = []; // [{ blocks: [], fnNums: Set }]
+  let curPage = { blocks: [], fnNums: new Set(), weight: 0 };
+  const assignedFnNums = new Set();
+
+  for (let bIdx = 0; bIdx < blockItems.length; bIdx++) {
+    const blk = blockItems[bIdx];
+    const newFns = blk.fnNums.filter(n => fnByNum.has(n) && !assignedFnNums.has(n));
+    const fnWeight = newFns.length * 95;
+    if (curPage.blocks.length > 0 && (curPage.weight + blk.weight + fnWeight > MAX_PAGE_BUDGET)) {
+      pages.push(curPage);
+      curPage = { blocks: [], fnNums: new Set(), weight: 0 };
+    }
+    curPage.blocks.push(blk.html);
+    curPage.weight += blk.weight + fnWeight;
+    newFns.forEach(n => {
+      curPage.fnNums.add(n);
+      assignedFnNums.add(n);
+    });
+  }
+  if (curPage.blocks.length > 0 || pages.length === 0) {
+    pages.push(curPage);
+  }
+
+  // 본문 인라인에 매칭되지 않은 나머지 각주는 마지막 본문 페이지 하단에 배치
+  footnotes.forEach(f => {
+    if (!assignedFnNums.has(f.n)) {
+      pages[pages.length - 1].fnNums.add(f.n);
+      assignedFnNums.add(f.n);
+    }
+  });
+
+  // 【참고문헌】 섹션 배치 (현재 마지막 페이지 여유가 있으면 추가, 없으면 별도 A4 페이지로 분리)
   if (refItems.length > 0) {
-    htmlParts.push(
+    const refHtml =
       '<section class="as-doc-refs"><h2 class="as-doc-section">【참고문헌】</h2><ul>' +
       refItems.map(r => '<li>' + r + '</li>').join('') +
-      '</ul></section>'
-    );
+      '</ul></section>';
+    const refWeight = 180 + refItems.length * 75;
+    const lastP = pages[pages.length - 1];
+    if (lastP.weight + refWeight > MAX_PAGE_BUDGET + 250 && lastP.blocks.length > 2) {
+      pages.push({ blocks: [refHtml], fnNums: new Set(), weight: refWeight });
+    } else {
+      lastP.blocks.push(refHtml);
+      lastP.weight += refWeight;
+    }
   }
 
-  bodyEl.innerHTML = htmlParts.join('\\n');
+  // 5) 다중 A4 페이지 DOM 렌더링 (- 1 -, - 2 -, - 3 -...)
+  const currentZoom = String(ZOOMS[currentZoomIdx] || 0.9);
+  const runningHeaderTitle = currentDocType === 'paper'
+    ? '학술논문 · ARCHAEO STUDIO WordCraft A4 조판'
+    : '문화재발굴조사보고서 『Ⅳ. 고찰(考察)』 · ARCHAEO STUDIO WordCraft A4 조판';
 
-  if (footnotes.length > 0) {
-    notesWrap.style.display = 'block';
-    notesList.innerHTML = footnotes.map(f =>
-      '<li><span class="as-page__fnn">' + f.n + ')</span><span>' + escapeHtml(f.text) + '</span></li>'
-    ).join('');
-  } else {
-    notesWrap.style.display = 'none';
-  }
+  pagesWrap.innerHTML = pages.map((pg, idx) => {
+    const pageNum = idx + 1;
+    const pageFns = Array.from(pg.fnNums)
+      .sort((a, b) => a - b)
+      .map(n => ({ n, text: fnByNum.get(n) }))
+      .filter(f => f.text);
 
-  return { footnotesCount: footnotes.length, refsCount: refItems.length };
+    const notesHtml = pageFns.length > 0
+      ? '<div class="as-page__notes"><hr><ol>' +
+          pageFns.map(f => '<li><span class="as-page__fnn">' + f.n + ')</span><span>' + escapeHtml(f.text) + '</span></li>').join('') +
+        '</ol></div>'
+      : '';
+
+    const runningHead = pageNum > 1
+      ? '<div class="as-page__head-running"><span>' + escapeHtml(runningHeaderTitle) + '</span><span>' + pageNum + '쪽</span></div>'
+      : '';
+
+    return '<article class="as-page"' + (idx === 0 ? ' id="doc-page"' : '') + ' contenteditable="true" spellcheck="false" style="zoom:' + currentZoom + ';">' +
+      runningHead +
+      '<div class="as-page__body"' + (idx === 0 ? ' id="doc-page-body"' : '') + '>' +
+        pg.blocks.join('\\n') +
+      '</div>' +
+      notesHtml +
+      '<div class="as-page__num">- ' + pageNum + ' -</div>' +
+    '</article>';
+  }).join('\\n');
+
+  lastRenderedPagesCount = pages.length;
+  return { footnotesCount: footnotes.length, refsCount: refItems.length, pagesCount: pages.length };
 }
 
 function classifyLogEntry(rawLine) {
@@ -1331,7 +1569,10 @@ async function pollStatus() {
       logList.scrollTop = logList.scrollHeight;
     }
 
-    // 4) A4 문서 실시간 조판
+    // 4) DBpia 실시간 다각도 검색 요점 & 수집 논문 현황 보드 업데이트
+    renderDbpiaLiveBoard(p);
+
+    // 5) A4 다중 페이지 문서 실시간 조판
     const liveMd = (p.latestManuscript && p.latestManuscript.trim()) || (p.liveStreamText && p.liveStreamText.trim()) || '';
     let fnCount = (p.wordcraftInfo && p.wordcraftInfo.footnotesCount) || 0;
     let refCount = papersCount;
@@ -1340,20 +1581,21 @@ async function pollStatus() {
       const counts = renderManuscriptOntoA4Page(liveMd, running);
       if (counts.footnotesCount) fnCount = counts.footnotesCount;
       if (counts.refsCount) refCount = counts.refsCount;
+      if (counts.pagesCount) lastRenderedPagesCount = counts.pagesCount;
     }
 
-    // 5) 수집 띠 (CollectStrip)
+    // 6) 수집 띠 (CollectStrip)
     const collectLeft = document.getElementById('collect-left');
     const collectRightTime = document.getElementById('collect-right-time');
     const scoreBadgeText = gv ? (' · 교차검증 ' + gv.passedCount + '/8 (' + gv.score + '점)') : '';
-    if (!running && !done && !liveMd) {
+    if (!running && !done && !liveMd && papersCount === 0) {
       collectLeft.innerHTML = '<i class="as-collect__dot is-hollow"></i><span>실행 전 (/goal 8대 판단 기준 대기)</span>';
     } else if (done) {
       collectLeft.innerHTML =
         '<span class="as-collect__item"><i class="as-collect__dot is-ok"></i>DBpia 다각도 수집</span>' +
         '<span class="as-collect__num" style="margin-left:6px;">' + papersCount + '편</span>' +
         '<span class="as-collect__item" style="margin-left:10px;">교차검증 완료</span>' +
-        '<span class="as-collect__num" style="margin-left:6px;">각주 ' + fnCount + ' · 참고문헌 ' + refCount + scoreBadgeText + '</span>';
+        '<span class="as-collect__num" style="margin-left:6px;">' + lastRenderedPagesCount + '쪽 · 각주 ' + fnCount + ' · 참고문헌 ' + refCount + scoreBadgeText + '</span>';
       collectRightTime.textContent = 'WordCraft .docx 자동 저장됨';
     } else {
       collectLeft.innerHTML =
@@ -1364,22 +1606,22 @@ async function pollStatus() {
       collectRightTime.textContent = '실시간 교차검증 중';
     }
 
-    // 6) 상태줄 (StatusBar)
+    // 7) 상태줄 (StatusBar)
     const hintEl = document.getElementById('status-hint');
     if (!document.getElementById('scrim-dbpia').classList.contains('is-open') &&
         !document.getElementById('scrim-export').classList.contains('is-open')) {
       if (running) {
-        hintEl.textContent = '[/goal 루프] DBpia 다각도 서지 검증 및 제미나이 8대 기준 교차검증이 진행 중입니다.';
+        hintEl.textContent = '[/goal 루프] DBpia 다각도 서지·요점 검증 및 제미나이 8대 기준 교차검증이 진행 중입니다.';
       } else if (done) {
-        hintEl.textContent = '8대 기준 교차검증 및 WordCraft(.docx) 생성이 완료되었습니다. 바로 편집하거나 PDF로 내보내세요.';
+        hintEl.textContent = '8대 기준 교차검증 및 다중 A4 페이지(' + lastRenderedPagesCount + '쪽)·WordCraft(.docx) 생성이 완료되었습니다.';
       } else {
         hintEl.textContent = '요청과 자료를 넣고 실행하면 8대 기준 계획 수립 ➔ DBpia 다각도 수집 ➔ 교차검증 루프가 실행됩니다.';
       }
     }
 
-    const totalPages = (p.wordcraftInfo && p.wordcraftInfo.pages) || (liveMd ? Math.max(1, Math.ceil(liveMd.length / 1800)) : 1);
+    const totalPages = lastRenderedPagesCount || (p.wordcraftInfo && p.wordcraftInfo.pages) || (liveMd ? Math.max(1, Math.ceil(liveMd.length / 1650)) : 1);
     const totalChars = liveMd ? liveMd.length : Number(p.totalCharsWritten || 0);
-    document.getElementById('status-pages').textContent = '쪽 1 / ' + totalPages;
+    document.getElementById('status-pages').textContent = '쪽 1 / ' + totalPages + ' (총 ' + totalPages + '쪽)';
     document.getElementById('status-chars').textContent = '글자 ' + totalChars.toLocaleString();
   } catch (e) {}
 }

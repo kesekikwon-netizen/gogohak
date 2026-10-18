@@ -3322,19 +3322,54 @@ async function _askGeminiWebImpl({
         editor.scrollIntoView({ block: 'center' });
         editor.focus();
 
-        // CRITICAL FIX (TrustedHTML-Safe + Newline-Safe):
+        // CRITICAL FIX (TrustedHTML-Safe + Newline-Safe + Quill Blot-Tree Fast):
         // 1. Never pass multi-line text with '\\n' into document.execCommand('insertText') because Quill (.ql-editor)
         //    treats the first '\\n' as an Enter key press and immediately submits ONLY line 1!
         // 2. Never assign editor.innerHTML because gemini.google.com enforces CSP TrustedHTML!
-        // 3. Instead, build <p> DOM nodes via document.createElement('p') + p.textContent and append a single space ' '.
+        // 3. Never create 2,000+ individual <p> nodes for PDF line wraps, which freezes Quill's Parchment Blot tree
+        //    and causes 'CDP command timeout: Runtime.evaluate'. Instead, group consecutive lines into ~50-80
+        //    paragraph blocks (~700 chars each) and insert once via DocumentFragment!
         const rawText = String(${escapedPrompt} || '');
         while (editor.firstChild) editor.removeChild(editor.firstChild);
-        for (const line of rawText.split(/\\r?\\n/)) {
-          const p = document.createElement('p');
-          if (line) p.textContent = line;
-          else p.appendChild(document.createElement('br'));
-          editor.appendChild(p);
+        const rawLines = rawText.split(/\\r?\\n/);
+        const groupedBlocks = [];
+        let buf = [];
+        let bufLen = 0;
+        for (const rawLine of rawLines) {
+          const line = rawLine.trim();
+          if (!line) {
+            if (buf.length > 0) {
+              groupedBlocks.push(buf.join(' '));
+              buf = [];
+              bufLen = 0;
+            }
+            continue;
+          }
+          const isCodeOrFence = line.startsWith('\`\`\`') || (line.startsWith('{') && line.endsWith('}'));
+          const isBlockStart = isCodeOrFence || /^(?:#{1,6}\\s|\\d+[.)]|[-•*]|\\||【|▶|■|◈|[ⅠⅡⅢⅣⅤⅥⅦⅧ1-9][.\\s]|[가나다라마바사아][.\\s]|\\(\\d+\\)|\\[관점|\\[제공된)/.test(line);
+          if (isBlockStart || bufLen + line.length > 650) {
+            if (buf.length > 0) {
+              groupedBlocks.push(buf.join(' '));
+              buf = [];
+              bufLen = 0;
+            }
+          }
+          if (isCodeOrFence) {
+            groupedBlocks.push(line);
+          } else {
+            buf.push(line);
+            bufLen += line.length + 1;
+          }
         }
+        if (buf.length > 0) groupedBlocks.push(buf.join(' '));
+
+        const frag = document.createDocumentFragment();
+        for (const blk of groupedBlocks) {
+          const p = document.createElement('p');
+          p.textContent = blk;
+          frag.appendChild(p);
+        }
+        editor.appendChild(frag);
 
         const sel = window.getSelection();
         const range = document.createRange();
@@ -3350,7 +3385,8 @@ async function _askGeminiWebImpl({
           existingCount,
           lastPanelTextLen: lastPanelText.length,
           lastPanelHead: lastPanelText.slice(0, 120),
-          insertedLen: (editor.innerText || editor.textContent || '').length
+          insertedLen: (editor.innerText || editor.textContent || '').length,
+          blockCount: groupedBlocks.length
         };
       })()`,
       returnByValue: true,
@@ -3363,54 +3399,59 @@ async function _askGeminiWebImpl({
       insertedLen: 0,
     };
 
-    // Give Angular/Quill 250ms to digest the full multi-paragraph DOM before clicking Send
-    await new Promise((r) => setTimeout(r, 250));
+    // Give Angular/Quill 300ms to digest the DocumentFragment before clicking Send
+    await new Promise((r) => setTimeout(r, 300));
 
     // Verified Send Loop: ensures .ql-editor clears and submission starts
     for (let attempt = 0; attempt < 15; attempt++) {
       await waitWhilePausedOrAborted();
-      await new Promise((r) => setTimeout(r, 350));
-      const stepRes = await send("Runtime.evaluate", {
-        expression: `(() => {
-          const bd = document.querySelector('.cdk-overlay-backdrop');
-          if (bd) bd.click();
+      await new Promise((r) => setTimeout(r, 400));
+      let stepRes = null;
+      try {
+        stepRes = await send("Runtime.evaluate", {
+          expression: `(() => {
+            const bd = document.querySelector('.cdk-overlay-backdrop');
+            if (bd) bd.click();
 
-          const stopBtn = document.querySelector('button[aria-label*="중지"], button[aria-label*="Stop"], .send-button.stop button');
-          const editor = document.querySelector('.ql-editor, [contenteditable="true"]');
-          const editorText = editor ? (editor.textContent || '').trim() : '';
+            const stopBtn = document.querySelector('button[aria-label*="중지"], button[aria-label*="Stop"], .send-button.stop button');
+            const editor = document.querySelector('.ql-editor, [contenteditable="true"]');
+            const editorText = editor ? (editor.textContent || '').trim() : '';
 
-          if (stopBtn || editorText.length === 0) {
-            return { confirmed: true, reason: stopBtn ? 'stop_visible' : 'editor_cleared' };
-          }
-
-          const sendBtn = document.querySelector(
-            'button[aria-label="메시지 보내기"], button[aria-label="Send message"], button[aria-label="Send"], .send-button:not(.stop) button'
-          );
-          if (sendBtn && !sendBtn.disabled && sendBtn.getAttribute('aria-disabled') !== 'true') {
-            sendBtn.click();
-            return { confirmed: false, clicked: true };
-          }
-
-          if (editor) {
-            editor.focus();
-            const sel = window.getSelection();
-            const range = document.createRange();
-            range.selectNodeContents(editor);
-            range.collapse(false);
-            sel.removeAllRanges();
-            sel.addRange(range);
-            document.execCommand('insertText', false, ' ');
-            editor.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText', data: ' ' }));
-            if (sendBtn) sendBtn.click();
-            else {
-              editor.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true, cancelable: true }));
+            if (stopBtn || editorText.length === 0) {
+              return { confirmed: true, reason: stopBtn ? 'stop_visible' : 'editor_cleared' };
             }
-          }
-          return { confirmed: false, nudged: true };
-        })()`,
-        returnByValue: true,
-      });
-      if (stepRes.result?.value?.confirmed) {
+
+            const sendBtn = document.querySelector(
+              'button[aria-label="메시지 보내기"], button[aria-label="Send message"], button[aria-label="Send"], .send-button:not(.stop) button'
+            );
+            if (sendBtn && !sendBtn.disabled && sendBtn.getAttribute('aria-disabled') !== 'true') {
+              sendBtn.click();
+              return { confirmed: false, clicked: true };
+            }
+
+            if (editor) {
+              editor.focus();
+              const sel = window.getSelection();
+              const range = document.createRange();
+              range.selectNodeContents(editor);
+              range.collapse(false);
+              sel.removeAllRanges();
+              sel.addRange(range);
+              document.execCommand('insertText', false, ' ');
+              editor.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText', data: ' ' }));
+              if (sendBtn) sendBtn.click();
+              else {
+                editor.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true, cancelable: true }));
+              }
+            }
+            return { confirmed: false, nudged: true };
+          })()`,
+          returnByValue: true,
+        });
+      } catch (_) {
+        continue;
+      }
+      if (stepRes?.result?.value?.confirmed) {
         break;
       }
     }
@@ -3418,134 +3459,142 @@ async function _askGeminiWebImpl({
     let lastText = "";
     let lastSvgs = [];
     let stableTicks = 0;
-    const maxWaitSecs = 480;
+    const maxWaitSecs = 540;
+    const pollIntervalMs = 1200;
+    const maxLoops = Math.ceil((maxWaitSecs * 1000) / pollIntervalMs);
 
-    for (let i = 0; i < maxWaitSecs * 2; i++) {
+    for (let i = 0; i < maxLoops; i++) {
       await waitWhilePausedOrAborted();
-      await new Promise((r) => setTimeout(r, 500));
-      const poll = await send("Runtime.evaluate", {
-        expression: `(() => {
-          const baseCount = ${JSON.stringify(baseline.existingCount)};
-          const baseHead = ${JSON.stringify(baseline.lastPanelHead)};
-          const baseLen = ${JSON.stringify(baseline.lastPanelTextLen)};
+      await new Promise((r) => setTimeout(r, pollIntervalMs));
+      let poll = null;
+      try {
+        poll = await send("Runtime.evaluate", {
+          expression: `(() => {
+            const baseCount = ${JSON.stringify(baseline.existingCount)};
+            const baseHead = ${JSON.stringify(baseline.lastPanelHead)};
+            const baseLen = ${JSON.stringify(baseline.lastPanelTextLen)};
 
-          // Mid-poll watchdog: if prompt is still sitting in .ql-editor and not generating, click Send!
-          const stopBtn = document.querySelector('button[aria-label*="중지"], button[aria-label*="Stop"], .send-button.stop button');
-          const editor = document.querySelector('.ql-editor, [contenteditable="true"]');
-          if (!stopBtn && editor && (editor.textContent || '').trim().length > 25) {
-            const sendBtn = document.querySelector(
-              'button[aria-label="메시지 보내기"], button[aria-label="Send message"], button[aria-label="Send"], .send-button:not(.stop) button'
-            );
-            if (sendBtn && !sendBtn.disabled) {
-              sendBtn.click();
-            }
-          }
-
-          // Auto-approve '작업' mode plan confirmation buttons if shown
-          const confirmBtns = Array.from(document.querySelectorAll('button')).filter(b => {
-            const t = (b.textContent || '').trim();
-            return t === '계획 시작' || t === '작업 시작' || t === '실행' || t === '승인' || t === 'Start plan';
-          });
-          if (confirmBtns.length > 0) {
-            confirmBtns[confirmBtns.length - 1].click();
-          }
-
-          function htmlToMd(root) {
-            if (!root) return '';
-            const clone = root.cloneNode(true);
-            clone.querySelectorAll('model-thoughts, .thoughts-container').forEach(n => n.remove());
-            clone.querySelectorAll('sup').forEach(sup => {
-              const t = (sup.textContent || '').trim();
-              if (/^\\d+\\)?$/.test(t)) {
-                sup.textContent = t.endsWith(')') ? t : (t + ')');
-              }
-            });
-            clone.querySelectorAll('code-block, pre').forEach(block => {
-              const langEl = block.querySelector('.code-block-decoration span, .language-label');
-              let lang = langEl ? (langEl.textContent || '').trim() : '';
-              const codeEl = block.querySelector('code') || block;
-              const codeText = (codeEl.textContent || '').trim();
-              if (codeText.startsWith('{') && codeText.endsWith('}')) {
-                if (codeText.includes('"categories"') || codeText.includes('"series"')) lang = 'wc-chart';
-                else if (codeText.includes('"layout"') && codeText.includes('"items"')) lang = 'wc-diagram';
-              }
-              block.textContent = '\\n\`\`\`' + lang + '\\n' + codeText.replace(/\\n$/, '') + '\\n\`\`\`\\n';
-            });
-            clone.querySelectorAll('table').forEach(tbl => {
-              const rows = Array.from(tbl.querySelectorAll('tr')).map(tr =>
-                '| ' + Array.from(tr.querySelectorAll('th, td')).map(cell => (cell.textContent || '').replace(/\\r?\\n/g, ' ').trim()).join(' | ') + ' |'
+            // Mid-poll watchdog: if prompt is still sitting in .ql-editor and not generating, click Send!
+            const stopBtn = document.querySelector('button[aria-label*="중지"], button[aria-label*="Stop"], .send-button.stop button');
+            const editor = document.querySelector('.ql-editor, [contenteditable="true"]');
+            if (!stopBtn && editor && (editor.textContent || '').trim().length > 25) {
+              const sendBtn = document.querySelector(
+                'button[aria-label="메시지 보내기"], button[aria-label="Send message"], button[aria-label="Send"], .send-button:not(.stop) button'
               );
-              if (rows.length > 0) {
-                const colCount = tbl.querySelector('tr')?.querySelectorAll('th, td').length || 1;
-                const sep = '| ' + Array(colCount).fill('---').join(' | ') + ' |';
-                rows.splice(1, 0, sep);
-                tbl.textContent = '\\n' + rows.join('\\n') + '\\n';
-              }
-            });
-            clone.querySelectorAll('ol').forEach(ol => {
-              const start = Number(ol.getAttribute('start') || 1);
-              Array.from(ol.children).filter(c => c.tagName === 'LI').forEach((li, idx) => {
-                const t = (li.textContent || '').trim();
-                if (!/^(?:\\d+\\)|\\d+\\.|\\[\\^?\\d+\\])/.test(t)) {
-                  li.textContent = (start + idx) + ') ' + t + '\\n';
-                } else {
-                  li.textContent = t + '\\n';
-                }
-              });
-            });
-            clone.querySelectorAll('ul').forEach(ul => {
-              Array.from(ul.children).filter(c => c.tagName === 'LI').forEach(li => {
-                const t = (li.textContent || '').trim();
-                if (!/^[-*•]|^(?:\\d+\\)|\\d+\\.)/.test(t)) {
-                  li.textContent = '- ' + t + '\\n';
-                } else {
-                  li.textContent = t + '\\n';
-                }
-              });
-            });
-            clone.querySelectorAll('h1').forEach(h => { h.textContent = '\\n# ' + (h.textContent || '').trim() + '\\n'; });
-            clone.querySelectorAll('h2').forEach(h => { h.textContent = '\\n## ' + (h.textContent || '').trim() + '\\n'; });
-            clone.querySelectorAll('h3').forEach(h => { h.textContent = '\\n### ' + (h.textContent || '').trim() + '\\n'; });
-            clone.querySelectorAll('h4').forEach(h => { h.textContent = '\\n#### ' + (h.textContent || '').trim() + '\\n'; });
-            clone.querySelectorAll('p, li, tr, br').forEach(el => {
-              el.textContent = (el.textContent || '') + '\\n';
-            });
-            return (clone.textContent || '').replace(/\\n{3,}/g, '\\n\\n').trim();
-          }
-
-          const mrs = Array.from(document.querySelectorAll('model-response'));
-          let target = null;
-          if (mrs.length > baseCount) {
-            for (let k = mrs.length - 1; k >= baseCount; k--) {
-              const mc = mrs[k].querySelector('message-content') || mrs[k];
-              if ((mc.textContent || '').trim().length > 0) {
-                target = mc;
-                break;
+              if (sendBtn && !sendBtn.disabled) {
+                sendBtn.click();
               }
             }
-          } else if (mrs.length > 0 && mrs.length === baseCount) {
-            const cand = mrs[mrs.length - 1].querySelector('message-content') || mrs[mrs.length - 1];
-            const candText = (cand.textContent || '').trim();
-            if (candText.length > 0 && (candText.slice(0, 120) !== baseHead || Math.abs(candText.length - baseLen) > 30)) {
-              target = cand;
+
+            // Auto-approve '작업' mode plan confirmation buttons if shown
+            const confirmBtns = Array.from(document.querySelectorAll('button')).filter(b => {
+              const t = (b.textContent || '').trim();
+              return t === '계획 시작' || t === '작업 시작' || t === '실행' || t === '승인' || t === 'Start plan';
+            });
+            if (confirmBtns.length > 0) {
+              confirmBtns[confirmBtns.length - 1].click();
             }
-          }
 
-          const svgs = target
-            ? Array.from(target.querySelectorAll('svg')).map(s => s.outerHTML).filter(s => s.length > 200)
-            : [];
+            function htmlToMd(root) {
+              if (!root) return '';
+              const clone = root.cloneNode(true);
+              clone.querySelectorAll('model-thoughts, .thoughts-container').forEach(n => n.remove());
+              clone.querySelectorAll('sup').forEach(sup => {
+                const t = (sup.textContent || '').trim();
+                if (/^\\d+\\)?$/.test(t)) {
+                  sup.textContent = t.endsWith(')') ? t : (t + ')');
+                }
+              });
+              clone.querySelectorAll('code-block, pre').forEach(block => {
+                const langEl = block.querySelector('.code-block-decoration span, .language-label');
+                let lang = langEl ? (langEl.textContent || '').trim() : '';
+                const codeEl = block.querySelector('code') || block;
+                const codeText = (codeEl.textContent || '').trim();
+                if (codeText.startsWith('{') && codeText.endsWith('}')) {
+                  if (codeText.includes('"categories"') || codeText.includes('"series"')) lang = 'wc-chart';
+                  else if (codeText.includes('"layout"') && codeText.includes('"items"')) lang = 'wc-diagram';
+                }
+                block.textContent = '\\n\`\`\`' + lang + '\\n' + codeText.replace(/\\n$/, '') + '\\n\`\`\`\\n';
+              });
+              clone.querySelectorAll('table').forEach(tbl => {
+                const rows = Array.from(tbl.querySelectorAll('tr')).map(tr =>
+                  '| ' + Array.from(tr.querySelectorAll('th, td')).map(cell => (cell.textContent || '').replace(/\\r?\\n/g, ' ').trim()).join(' | ') + ' |'
+                );
+                if (rows.length > 0) {
+                  const colCount = tbl.querySelector('tr')?.querySelectorAll('th, td').length || 1;
+                  const sep = '| ' + Array(colCount).fill('---').join(' | ') + ' |';
+                  rows.splice(1, 0, sep);
+                  tbl.textContent = '\\n' + rows.join('\\n') + '\\n';
+                }
+              });
+              clone.querySelectorAll('ol').forEach(ol => {
+                const start = Number(ol.getAttribute('start') || 1);
+                Array.from(ol.children).filter(c => c.tagName === 'LI').forEach((li, idx) => {
+                  const t = (li.textContent || '').trim();
+                  if (!/^(?:\\d+\\)|\\d+\\.|\\[\\^?\\d+\\])/.test(t)) {
+                    li.textContent = (start + idx) + ') ' + t + '\\n';
+                  } else {
+                    li.textContent = t + '\\n';
+                  }
+                });
+              });
+              clone.querySelectorAll('ul').forEach(ul => {
+                Array.from(ul.children).filter(c => c.tagName === 'LI').forEach(li => {
+                  const t = (li.textContent || '').trim();
+                  if (!/^[-*•]|^(?:\\d+\\)|\\d+\\.)/.test(t)) {
+                    li.textContent = '- ' + t + '\\n';
+                  } else {
+                    li.textContent = t + '\\n';
+                  }
+                });
+              });
+              clone.querySelectorAll('h1').forEach(h => { h.textContent = '\\n# ' + (h.textContent || '').trim() + '\\n'; });
+              clone.querySelectorAll('h2').forEach(h => { h.textContent = '\\n## ' + (h.textContent || '').trim() + '\\n'; });
+              clone.querySelectorAll('h3').forEach(h => { h.textContent = '\\n### ' + (h.textContent || '').trim() + '\\n'; });
+              clone.querySelectorAll('h4').forEach(h => { h.textContent = '\\n#### ' + (h.textContent || '').trim() + '\\n'; });
+              clone.querySelectorAll('p, li, tr, br').forEach(el => {
+                el.textContent = (el.textContent || '') + '\\n';
+              });
+              return (clone.textContent || '').replace(/\\n{3,}/g, '\\n\\n').trim();
+            }
 
-          return {
-            foundNew: Boolean(target),
-            isGenerating: Boolean(stopBtn),
-            text: target ? htmlToMd(target) : '',
-            svgs
-          };
-        })()`,
-        returnByValue: true,
-      });
+            const mrs = Array.from(document.querySelectorAll('model-response'));
+            let target = null;
+            if (mrs.length > baseCount) {
+              for (let k = mrs.length - 1; k >= baseCount; k--) {
+                const mc = mrs[k].querySelector('message-content') || mrs[k];
+                if ((mc.textContent || '').trim().length > 0) {
+                  target = mc;
+                  break;
+                }
+              }
+            } else if (mrs.length > 0 && mrs.length === baseCount) {
+              const cand = mrs[mrs.length - 1].querySelector('message-content') || mrs[mrs.length - 1];
+              const candText = (cand.textContent || '').trim();
+              if (candText.length > 0 && (candText.slice(0, 120) !== baseHead || Math.abs(candText.length - baseLen) > 30)) {
+                target = cand;
+              }
+            }
 
-      const v = poll.result?.value || {};
+            const svgs = target
+              ? Array.from(target.querySelectorAll('svg')).map(s => s.outerHTML).filter(s => s.length > 200)
+              : [];
+
+            return {
+              foundNew: Boolean(target),
+              isGenerating: Boolean(stopBtn),
+              text: target ? htmlToMd(target) : '',
+              svgs
+            };
+          })()`,
+          returnByValue: true,
+        });
+      } catch (pollErr) {
+        // Resilient to transient Runtime.evaluate timeouts while Quill/Angular renders large DOM
+        continue;
+      }
+
+      const v = poll?.result?.value || {};
       if (v.foundNew && v.text && v.text.length > 10) {
         pipelineState.liveStreamText = v.text;
         if (
@@ -3558,7 +3607,7 @@ async function _askGeminiWebImpl({
         }
         if (!v.isGenerating && v.text === lastText) {
           stableTicks++;
-          if (stableTicks >= 4) {
+          if (stableTicks >= 3) {
             return captureSvgs
               ? { text: v.text, svgs: v.svgs || [] }
               : v.text;
@@ -3936,19 +3985,19 @@ async function extractLatestDbpiaAnswer() {
         const toggleBtns = Array.from(document.querySelectorAll('[class*="ReferenceSources_toggleButton__"][class*="ReferenceSources_collapsed__"]'));
         for (const btn of toggleBtns) {
           btn.click();
-          await sleep(220);
+          await sleep(180);
         }
 
         const mdNodes = Array.from(document.querySelectorAll('[class*="useMarkdownComponents_"]'));
-        const answerBoxes = [];
+        const topContainers = [];
         for (const node of mdNodes) {
-          const parent = node.parentElement;
-          if (parent && !answerBoxes.includes(parent)) {
-            answerBoxes.push(parent);
+          const msgWrap = node.closest('[class*="ChatMessage_"], [class*="Answer_"], [class*="markdown"], article') || node.parentElement;
+          if (msgWrap && !topContainers.includes(msgWrap)) {
+            topContainers.push(msgWrap);
           }
         }
-        const latestBox = answerBoxes.length > 0 ? answerBoxes[answerBoxes.length - 1] : null;
-        let answerText = latestBox ? (latestBox.innerText || '').trim() : '';
+        const latestContainer = topContainers.length > 0 ? topContainers[topContainers.length - 1] : null;
+        let answerText = latestContainer ? (latestContainer.innerText || '').trim() : '';
 
         const domRefs = Array.from(document.querySelectorAll('[class*="ReferenceSources_referenceItem__"]')).map(item => {
           const badge = (item.querySelector('[class*="ReferenceSources_badge__"]')?.innerText || '').trim();
@@ -3983,15 +4032,21 @@ async function extractLatestDbpiaAnswer() {
               const msgs = Array.isArray(data?.messages) ? data.messages : (Array.isArray(data?.vetter_messages) ? data.vetter_messages : []);
               const lastAssistant = [...msgs].reverse().find(m => m.role === 'assistant' || m.content || m.answer);
               if (lastAssistant) {
-                if (!answerText && (lastAssistant.content || lastAssistant.answer)) {
-                  answerText = String(lastAssistant.content || lastAssistant.answer).trim();
+                const apiFullContent = String(lastAssistant.content || lastAssistant.answer || '').trim();
+                if (apiFullContent.length > 0) {
+                  // ALWAYS prefer Vetter JSON API's complete markdown synthesis over partial DOM innerText
+                  answerText = apiFullContent;
                 }
                 const hovers = lastAssistant.hovers && typeof lastAssistant.hovers === 'object' ? lastAssistant.hovers : {};
-                const hoverByNode = {};
+                const hoverListByNode = {};
                 for (const [hKey, hVal] of Object.entries(hovers)) {
                   const baseId = String(hKey).split('_')[0];
-                  if (baseId && hVal && hVal.content && !hoverByNode[baseId]) {
-                    hoverByNode[baseId] = String(hVal.content).trim();
+                  const snippetText = hVal && typeof hVal === 'object' ? String(hVal.content || '').trim() : String(hVal || '').trim();
+                  if (baseId && snippetText) {
+                    if (!hoverListByNode[baseId]) hoverListByNode[baseId] = [];
+                    if (!hoverListByNode[baseId].includes(snippetText)) {
+                      hoverListByNode[baseId].push(snippetText);
+                    }
                   }
                 }
                 const apiRefs = lastAssistant.references || lastAssistant.sources || lastAssistant.nodes || [];
@@ -4009,6 +4064,7 @@ async function extractLatestDbpiaAnswer() {
                     const rawJournal = isKorean
                       ? (ar.node_plct_nm || ar.journal_title || ar.plct_nm || ar.node_iprd_nm || domFallback.journal || '')
                       : (ar.node_iprd_nm || ar.journal_title || ar.node_plct_nm || domFallback.journal || '');
+                    const joinedHovers = nid && hoverListByNode[nid] ? hoverListByNode[nid].join(' / ') : '';
                     return {
                       badge: String(idx + 1),
                       nodeId: nid,
@@ -4019,7 +4075,7 @@ async function extractLatestDbpiaAnswer() {
                       publisher: ar.node_iprd_nm || '',
                       kci: ar.dmst_lstd_info || ar.ovse_lstd_info || ar.kci_listed || domFallback.kci || '',
                       pages: ar.pages || ar.page_info || '',
-                      abstract: (ar.abstract || (nid && hoverByNode[nid]) || '').slice(0, 350)
+                      abstract: String(ar.abstract || joinedHovers || '').replace(/<[^>]+>/g, ' ').replace(/\\s+/g, ' ').trim().slice(0, 950)
                     };
                   }).filter(x => x.title);
                 }
@@ -4048,14 +4104,14 @@ async function extractLatestDbpiaAnswer() {
 function formatDbpiaResultForGemini(query, data) {
   const refLines = (data.refs || []).map(
     (r) =>
-      `- [${r.badge || "*"}] ${r.author || "연구자"} (${r.year || "최근"}), 「${r.title}」, 『${r.journal || "학술지"}』${r.pages ? `, ${String(r.pages).replace(/^pp?\.\s*/i, "").replace(/-/g, "~")}쪽` : ""}${r.kci ? ` [${r.kci}]` : ""}${r.nodeId ? ` (DBpia: ${r.nodeId})` : ""}${r.abstract ? `\n  · 초록 요지: ${r.abstract}` : ""}`
+      `- [${r.badge || "*"}] ${r.author || "연구자"} (${r.year || "최근"}), 「${r.title}」, 『${r.journal || "학술지"}』${r.pages ? `, ${String(r.pages).replace(/^pp?\.\s*/i, "").replace(/-/g, "~")}쪽` : ""}${r.kci ? ` [${r.kci}]` : ""}${r.nodeId ? ` (DBpia: ${r.nodeId})` : ""}${r.abstract ? `\n  · 논문 핵심 인용 및 요지: ${r.abstract}` : ""}`
   );
   const followLines = (data.followUps || []).map((f) => `  * ${f}`);
   return [
     `### 📚 [DBpia AI 학술 팩트 수집 결과] (질의: "${query}")`,
     data.answerText || "(본문 텍스트 없음)",
     "",
-    "#### 📌 [이 답변에 인용된 실제 DBpia 학술논문/보고서 서지정보]",
+    "#### 📌 [이 답변에 인용된 실제 DBpia 학술논문/보고서 서지정보 및 핵심 인용 단락]",
     refLines.length > 0 ? refLines.join("\n") : "- (인용 논문 목록 없음)",
     followLines.length > 0
       ? `\n#### 💡 [DBpia AI 추천 심화 후속 질문]\n${followLines.join("\n")}`
@@ -4127,34 +4183,36 @@ async function askDbpiaAi(query) {
 
     for (let tick = 0; tick < maxTicks; tick++) {
       await new Promise((r) => setTimeout(r, 1000));
-      const check = await send("Runtime.evaluate", {
-        expression: `(() => {
-          const bodyText = document.body ? (document.body.innerText || '') : '';
-          const isGenerating = bodyText.includes('답변을 생성하고 있습니다') || bodyText.includes('답변을 생성 중이에요');
-          const isCompleted = bodyText.includes('답변이 완료되었습니다');
-          const hasRefs = Boolean(document.querySelector('[class*="ReferenceSources_referenceItem__"]'));
-          const mdNodes = document.querySelectorAll('[class*="useMarkdownComponents_"]');
-          return {
-            isGenerating,
-            isCompleted,
-            hasRefs,
-            mdCount: mdNodes.length,
-            bodyLen: bodyText.length
-          };
-        })()`,
-        returnByValue: true,
-      });
+      try {
+        const check = await send("Runtime.evaluate", {
+          expression: `(() => {
+            const bodyText = document.body ? (document.body.innerText || '') : '';
+            const isGenerating = bodyText.includes('답변을 생성하고 있습니다') || bodyText.includes('답변을 생성 중이에요');
+            const isCompleted = bodyText.includes('답변이 완료되었습니다');
+            const hasRefs = Boolean(document.querySelector('[class*="ReferenceSources_referenceItem__"]'));
+            const mdNodes = document.querySelectorAll('[class*="useMarkdownComponents_"]');
+            return {
+              isGenerating,
+              isCompleted,
+              hasRefs,
+              mdCount: mdNodes.length,
+              bodyLen: bodyText.length
+            };
+          })()`,
+          returnByValue: true,
+        });
 
-      const v = check.result?.value || {};
-      if (v.isCompleted || (!v.isGenerating && v.mdCount > 0 && tick > 5)) {
-        if (v.bodyLen === lastLen) {
-          stableCount++;
-          if (stableCount >= 2) break;
-        } else {
-          stableCount = 0;
+        const v = check.result?.value || {};
+        if (v.isCompleted || (!v.isGenerating && v.mdCount > 0 && tick > 5)) {
+          if (v.bodyLen === lastLen) {
+            stableCount++;
+            if (stableCount >= 2) break;
+          } else {
+            stableCount = 0;
+          }
         }
-      }
-      lastLen = v.bodyLen || 0;
+        lastLen = v.bodyLen || 0;
+      } catch {}
     }
 
     const extracted = await extractLatestDbpiaAnswer();
@@ -4176,12 +4234,14 @@ async function askDbpiaAi(query) {
         });
       }
     }
+    const fullAnswerSummary = String(extracted.answerText || "").trim();
     pipelineState.liveResearchFeed.push({
       ts: new Date().toLocaleTimeString("ko-KR", { hour12: false }),
       query: cleanQuery,
-      summary: (extracted.answerText || "").slice(0, 700),
+      summary: fullAnswerSummary.slice(0, 4500),
       refs: newRefs,
     });
+    updateStudioUiState().catch(() => {});
     return {
       query: cleanQuery,
       ...extracted,
@@ -4929,32 +4989,149 @@ function extractDbpiaQueriesFromGeminiText(text) {
   return queries.slice(0, 5);
 }
 
-function buildMultiFacetedDbpiaQueries({
-  userFocus = "",
-  reportText = "",
-  docType = "report",
-  round = 1,
-  existingQueries = [],
-}) {
-  const combined = `${userFocus || ""}\n${(reportText || "").slice(0, 5000)}`;
-  const siteMatch =
-    /([가-힣]{2,5}\s+[가-힣0-9]+(?:동|리|읍|면|유적|고분군|산성|패총|사지))/.exec(
-      combined
-    );
-  const siteKeyword = siteMatch
-    ? siteMatch[1].replace(/\s+/g, " ").trim()
-    : "";
+/**
+ * Parses a full Korean archaeological excavation report (up to 100,000+ chars, e.g. 70-page PDF)
+ * into structured high-density sections without losing the back pages (Section III features,
+ * Section IV opinion/summary, and the Artifact Catalog at the end of the report).
+ * Also extracts accurate site/period/feature/artifact keywords specifically from the excavated
+ * features (Ⅲ. 조사내용 & Ⅳ. 조사결과) rather than the general regional history in Ⅱ. 주변 환경.
+ */
+function extractStructuredArchaeologyReportFacts(rawText = "") {
+  const full = String(rawText || "").trim();
+  if (!full) {
+    return {
+      structuredText: "",
+      siteName: "",
+      regionName: "",
+      primaryPeriods: [],
+      featureKeywords: [],
+      artifactKeywords: [],
+    };
+  }
 
-  const periodKeywords = [];
-  for (const kw of [
-    "구석기",
-    "신석기",
-    "청동기",
-    "무문토기",
-    "초기철기",
+  // Locate major Roman numeral sections in standard Korean excavation reports
+  // Avoid matching Table of Contents lines (which contain "····" or "...")
+  function findSectionIndex(patterns, minPos = 0) {
+    for (const rx of patterns) {
+      const g = new RegExp(rx.source, "gm");
+      g.lastIndex = minPos;
+      let m;
+      while ((m = g.exec(full)) !== null) {
+        const lineEnd = full.indexOf("\n", m.index);
+        const lineStr = full.slice(m.index, lineEnd >= 0 ? lineEnd : m.index + 80);
+        if (!/[·…]{3,}|\.{4,}/.test(lineStr)) {
+          return m.index;
+        }
+      }
+    }
+    return -1;
+  }
+
+  const idxSec1 = findSectionIndex([/(?:^|\n)\s*(?:Ⅰ|I)\.\s*조사\s*개요/, /(?:^|\n)\s*(?:Ⅰ|I)\.\s*머리말/], 200);
+  const idxSec2 = findSectionIndex([/(?:^|\n)\s*(?:Ⅱ|II)\.\s*(?:주변\s*환경|자연|지리|고고학적\s*환경)/], Math.max(500, idxSec1));
+  const idxSec3 = findSectionIndex([/(?:^|\n)\s*(?:Ⅲ|III)\.\s*조사\s*내용/, /(?:^|\n)\s*(?:Ⅲ|III)\.\s*유구\s*및\s*유물/], Math.max(1000, idxSec2 > 0 ? idxSec2 : 1000));
+  const idxSec4 = findSectionIndex([/(?:^|\n)\s*(?:Ⅳ|IV)\.\s*(?:조사\s*결과|고\s*찰|조사단\s*의견|맺음말)/, /(?:^|\n)\s*(?:Ⅴ|V)\.\s*(?:고\s*찰|조사\s*결과|맺음말)/], Math.max(2000, idxSec3 > 0 ? idxSec3 : 2000));
+  const idxCatalog = findSectionIndex([/(?:^|\n)\s*출토유물\s*목록/, /(?:^|\n)\s*유물\s*관찰표/], Math.max(3000, idxSec3 > 0 ? idxSec3 : 3000));
+  const idxPlates = findSectionIndex([/(?:^|\n)\s*사진\s*목차/, /(?:^|\n)\s*【도판】/, /(?:^|\n)\s*도\s*판\s*\n/], Math.max(4000, idxCatalog > 0 ? idxCatalog : 4000));
+
+  let structuredText = full;
+
+  // If this is a multi-section excavation report (e.g. > 15,000 chars with Roman numeral sections),
+  // preserve 100% of Section I (Overview), Section III (Excavated Features & Artifacts), Section IV (Summary/Opinion),
+  // and build a complete per-feature summary of the Artifact Catalog while compressing textbook Section II.
+  if (full.length > 15000 && idxSec3 > 0) {
+    const parts = [];
+
+    // 1. Header & Section I (조사 개요)
+    const sec1End = idxSec2 > idxSec1 && idxSec2 > 0 ? idxSec2 : idxSec3;
+    const overviewSlice = full.slice(0, Math.min(sec1End, 6500)).trim();
+    parts.push("#### [1. 발굴조사 개요 및 표제 정보 (원문 추출)]\n" + overviewSlice);
+
+    // 2. Compressed Section II (고고학적 주변 환경 핵심 유적만 발췌)
+    if (idxSec2 > 0 && idxSec3 > idxSec2) {
+      const envRaw = full.slice(idxSec2, idxSec3);
+      const archEnvIdx = envRaw.search(/고고학적\s*환경|주변\s*유적/);
+      const envExcerpt = archEnvIdx >= 0
+        ? envRaw.slice(archEnvIdx, archEnvIdx + 2200)
+        : envRaw.slice(0, 1500);
+      parts.push("#### [2. 주변 고고학적 환경 핵심 요약]\n" + envExcerpt.trim());
+    }
+
+    // 3. Full Section III (Ⅲ. 조사내용 — 유구별 평면·규모·내부시설·토층·중복관계·출토유물 100% 보존)
+    const sec3End = idxSec4 > idxSec3 ? idxSec4 : idxCatalog > idxSec3 ? idxCatalog : full.length;
+    const sec3Content = full.slice(idxSec3, sec3End).trim();
+    parts.push("#### [3. Ⅲ. 조사내용 전 유구·유물 상세 기술 (원문 100% 보존)]\n" + sec3Content.slice(0, 18000));
+
+    // 4. Full Section IV (Ⅳ. 조사결과 및 조사단 의견 100% 보존)
+    if (idxSec4 > 0) {
+      const sec4End = idxCatalog > idxSec4 ? idxCatalog : idxPlates > idxSec4 ? idxPlates : full.length;
+      const sec4Content = full.slice(idxSec4, sec4End).trim();
+      parts.push("#### [4. Ⅳ. 조사결과 및 조사단 의견 (원문 100% 보존)]\n" + sec4Content.slice(0, 5000));
+    }
+
+    // 5. Structured Artifact Catalog Summary (출토유물 목록 — 유구별 출토유물 전수 집계 및 대표 유물 속성)
+    if (idxCatalog > 0) {
+      const catEnd = idxPlates > idxCatalog ? idxPlates : full.length;
+      const catRaw = full.slice(idxCatalog, catEnd).trim();
+      // Group catalog entries by feature name (e.g., 1호주거지, 2호주거지, 3호주거지, 3-1호주거지, 4호주거지, 5호주거지, 삼국1호주거지, 지표수습)
+      const catLines = catRaw.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+      const featureCounts = new Map();
+      for (const l of catLines) {
+        const fm = /^((?:철기|삼국|청동기)?\s*\d+(?:-\d+)?호\s*(?:주거지|수혈|석곽묘|유구)|지표수습)/.exec(l);
+        if (fm) {
+          const key = fm[1].replace(/\s+/g, "");
+          featureCounts.set(key, (featureCounts.get(key) || 0) + 1);
+        }
+      }
+      const countSummary = featureCounts.size > 0
+        ? "▶ 출토유물 목록 유구별 수록 현황: " +
+          Array.from(featureCounts.entries())
+            .map(([k, v]) => `${k}(${v}건)`)
+            .join(", ") +
+          "\n"
+        : "";
+      parts.push(
+        "#### [5. 출토유물 목록 및 유물 관찰표 핵심 발췌]\n" +
+          countSummary +
+          catRaw.slice(0, 4500)
+      );
+    }
+
+    structuredText = parts.join("\n\n");
+  } else {
+    structuredText = full.slice(0, 32000);
+  }
+
+  // Extract accurate archaeological keywords from Core Excavated Text (Section I + III + IV),
+  // NOT from Section II (which mentions Paleolithic/Neolithic/Bronze Age background history of the city).
+  const coreExcavatedText =
+    idxSec3 > 0
+      ? full.slice(0, Math.min(idxSec2 > 0 ? idxSec2 : 4000, 4000)) +
+        "\n" +
+        full.slice(idxSec3, idxCatalog > idxSec3 ? idxCatalog : full.length)
+      : full.slice(0, 15000);
+
+  // Extract site name (handle parentheses like "강릉 병산동(277-12번지)")
+  let siteName = "";
+  let regionName = "";
+  const cleanedForSite = coreExcavatedText.replace(/\([^)]*\)/g, " ");
+  const siteRx =
+    /([가-힣]{2,4}(?:시|군)?\s+[가-힣]{2,5}(?:동|리|읍|면)(?:\s*유적|\s*고분군|\s*산성|\s*패총|\s*사지)?)/;
+  const sm = siteRx.exec(cleanedForSite);
+  if (sm) {
+    siteName = sm[1].replace(/\s+/g, " ").trim();
+    regionName = siteName.split(" ")[0].replace(/(?:시|군)$/, "");
+  }
+
+  // Rank period keywords by frequency in coreExcavatedText (Section III & IV)
+  const periodCandidates = [
     "철기시대",
+    "초기철기",
     "원삼국",
     "삼국시대",
+    "청동기시대",
+    "청동기",
+    "무문토기",
     "신라",
     "백제",
     "가야",
@@ -4963,36 +5140,110 @@ function buildMultiFacetedDbpiaQueries({
     "발해",
     "고려",
     "조선",
-  ]) {
-    if (combined.includes(kw) && periodKeywords.length < 2) {
-      periodKeywords.push(kw);
+    "신석기",
+    "구석기",
+  ];
+  const periodScores = [];
+  for (const pk of periodCandidates) {
+    const matches = coreExcavatedText.split(pk).length - 1;
+    if (matches > 0) {
+      periodScores.push({ kw: pk, count: matches });
+    }
+  }
+  periodScores.sort((a, b) => b.count - a.count);
+  const primaryPeriods = [];
+  for (const item of periodScores) {
+    if (primaryPeriods.length >= 2) break;
+    // Avoid adding both "철기시대" and "초기철기" if redundant
+    if (
+      !primaryPeriods.some(
+        (existing) => existing.includes(item.kw) || item.kw.includes(existing)
+      )
+    ) {
+      primaryPeriods.push(item.kw);
     }
   }
 
-  const featureKeywords = [];
-  for (const fk of [
+  // Extract specific feature & structure terms from coreExcavatedText
+  const featureCandidates = [
+    "凸자형 주거지",
+    "철자형 주거지",
+    "여(呂)자형 주거지",
     "주거지",
+    "아궁이",
+    "부뚜막",
+    "구들",
+    "노지",
     "수혈",
+    "저장공",
+    "주공",
     "목곽묘",
     "석곽묘",
     "석실분",
-    "옹관묘",
-    "고분",
-    "구들",
-    "부뚜막",
-    "노지",
+    "주구",
     "가마",
-    "제철",
-    "토기",
-    "철기",
-    "석기",
-    "기와",
-    "자기",
-  ]) {
-    if (combined.includes(fk) && featureKeywords.length < 3) {
+  ];
+  const featureKeywords = [];
+  for (const fk of featureCandidates) {
+    if (coreExcavatedText.includes(fk) && featureKeywords.length < 4) {
       featureKeywords.push(fk);
     }
   }
+
+  // Extract specific artifact terms from coreExcavatedText
+  const artifactCandidates = [
+    "경질무문토기",
+    "타날문토기",
+    "심발형토기",
+    "외반구연호",
+    "단경호",
+    "시루",
+    "고배",
+    "장란형토기",
+    "두형토기",
+    "점토대토기",
+    "방추차",
+    "어망추",
+    "철부",
+    "철겸",
+    "철정",
+    "석부",
+    "석촉",
+  ];
+  const artifactKeywords = [];
+  for (const ak of artifactCandidates) {
+    if (coreExcavatedText.includes(ak) && artifactKeywords.length < 4) {
+      artifactKeywords.push(ak);
+    }
+  }
+
+  return {
+    structuredText,
+    siteName,
+    regionName,
+    primaryPeriods,
+    featureKeywords,
+    artifactKeywords,
+  };
+}
+
+function buildMultiFacetedDbpiaQueries({
+  userFocus = "",
+  reportText = "",
+  docType = "report",
+  round = 1,
+  existingQueries = [],
+}) {
+  const structured = extractStructuredArchaeologyReportFacts(
+    `${userFocus || ""}\n${reportText || ""}`
+  );
+  const combined = `${userFocus || ""}\n${structured.structuredText.slice(0, 12000)}`;
+
+  const siteKeyword = structured.siteName || "";
+  const regionOnly = structured.regionName || (siteKeyword ? siteKeyword.split(" ")[0] : "");
+  const periodKeywords = structured.primaryPeriods || [];
+  const featureKeywords = structured.featureKeywords || [];
+  const artifactKeywords = structured.artifactKeywords || [];
 
   const cleanFocus = (userFocus || "")
     .replace(/발굴조사보고서\s*고찰\s*작성/g, "")
@@ -5004,7 +5255,7 @@ function buildMultiFacetedDbpiaQueries({
 
   const isAiOrDigitalTopic =
     /인공지능|\bAI\b|자비스|디지털|머신러닝|딥러닝|자동분류|데이터베이스|3D|GIS/i.test(
-      combined
+      userFocus || ""
     );
 
   const candidates = [];
@@ -5023,22 +5274,30 @@ function buildMultiFacetedDbpiaQueries({
         `디지털 고고학 3차원 스캔 정량적 속성 분석 및 상대편년 교차검증`
       );
     }
-  } else if (siteKeyword || periodKeywords.length > 0 || featureKeywords.length > 0) {
+  } else if (
+    siteKeyword ||
+    periodKeywords.length > 0 ||
+    featureKeywords.length > 0 ||
+    artifactKeywords.length > 0
+  ) {
     const regionOrSite = siteKeyword || cleanFocus.slice(0, 35) || "한국 고고학";
-    const regionOnly = siteKeyword ? siteKeyword.split(" ")[0] : regionOrSite;
-    const periodStr = periodKeywords.join(" ") || "고고학";
-    const featStr = featureKeywords.slice(0, 2).join(" ") || "유구 출토유물";
+    const reg = regionOnly || regionOrSite;
+    const periodStr = periodKeywords.join(" ") || "철기 삼국시대";
+    const featStr =
+      featureKeywords.slice(0, 3).join(" ") || "주거지 유구 내부시설";
+    const artStr =
+      artifactKeywords.slice(0, 3).join(" ") || "출토유물 토기";
 
     if (round === 1) {
       candidates.push(
-        `${regionOrSite} ${periodStr} ${featStr} 구조 및 축조기법 연구`,
-        `${regionOnly} ${periodStr} 출토유물 형식분류 및 상대편년 단계 설정`,
-        `${regionOnly} 주변 비교유적 ${featStr} 시공간적 전개와 취락·사회적 성격`
+        `${regionOrSite} ${periodStr} ${featStr} 평면구조 및 축조기법 연구`,
+        `${reg} 지역 ${periodStr} ${artStr} 형식분류 및 상대편년 단계 설정`,
+        `${reg} 주변 비교유적 ${periodStr} 주거지 취락 전개와 고고학적 성격`
       );
     } else {
       candidates.push(
-        `${regionOnly} ${periodStr} 유구 중복관계 층위 및 절대연대 교차검증`,
-        `${periodStr} ${featStr} 지역 간 교류 양상과 고고학적 의의`
+        `${reg} ${periodStr} 주거지 중복관계 층위 및 절대연대 편년 교차검증`,
+        `${periodStr} ${featStr} ${artStr} 지역 간 교류 양상과 학술적 의의`
       );
     }
   } else {
@@ -5614,8 +5873,9 @@ function buildAdaptiveMasterPrompt({
 
   const materialBlocks = [];
   if (reportText && reportText.trim()) {
+    const structuredReport = extractStructuredArchaeologyReportFacts(reportText);
     materialBlocks.push(
-      `### [제공된 발굴조사보고서·기초조사 원자료 텍스트]\n${reportText.trim().slice(0, 35000)}`
+      `### [제공된 발굴조사보고서·기초조사 구조화 원자료 (Ⅰ.개요 · Ⅲ.조사내용 전 유구 · Ⅳ.조사결과 · 출토유물 목록 전수 반영)]\n${structuredReport.structuredText.slice(0, 34000)}`
     );
   }
   if (datingText && datingText.trim()) {
@@ -5643,7 +5903,7 @@ function buildAdaptiveMasterPrompt({
     materialBlocks.length > 0 ? materialBlocks.join("\n\n") + "\n" : "",
     "#### [1. 자료 유무에 따른 엄격한 작성 원칙 ('없는 자료는 없는 대로 결과 도출')]",
     hasReport
-      ? "1) **제공된 보고서·조사 자료 최우선 반영**: 위 `[제공된 발굴조사보고서·기초조사 원자료 텍스트]`의 유구 규모(장축×단축·면적), 평면형태, 내부시설(노지·부뚜막·구들·주공), **유구 간 중복(파괴·선후) 관계 및 토층 층위 관계**, 출토유물 조합을 빠짐없이 추출하여 상대편년과 단계 설정의 1차 근거로 삼으십시오."
+      ? "1) **제공된 보고서·조사 자료 최우선 반영**: 위 `[제공된 발굴조사보고서·기초조사 구조화 원자료]`의 유구 규모(장축×단축·면적), 평면형태, 내부시설(노지·부뚜막·아궁이·구들·주공), **유구 간 중복(파괴·선후) 관계 및 토층 층위 관계**, 출토유물 조합을 빠짐없이 추출하여 상대편년과 단계 설정의 1차 근거로 삼으십시오."
       : "1) **보고서 원자료 미입력 상태 대응**: 별도의 유구 원자료가 없으므로 가상의 유구 번호나 허구 실측치를 절대 지어내지 말고, 요청 주제와 아래 DBpia 수집 논문·선행연구 데이터를 바탕으로 심층 논증하십시오.",
     hasDating
       ? "2) **연대분석 자료 교차검증**: 입력된 연대분석(AMS 탄소연대·OSL 등) 수치를 유구 중복관계 및 유물 형식 편년과 교차검증하여 서술하십시오."
@@ -5717,16 +5977,16 @@ function formatCollectedDbpiaBlock(collectedPapers = [], liveResearchFeed = []) 
     verifiedList.forEach((r, idx) => {
       lines.push(`${idx + 1}) ${formatVerifiedCitationLine(r)}`);
       if (r.abstract) {
-        lines.push(`   - 핵심 초록/요지: ${String(r.abstract).slice(0, 260)}`);
+        lines.push(`   - 논문 본문 핵심 인용/초록 발췌: ${String(r.abstract).slice(0, 850)}`);
       }
     });
   }
 
   if (Array.isArray(liveResearchFeed) && liveResearchFeed.length > 0) {
-    lines.push("\n#### [DBpia AI 다각도 검색별 학술 종합 분석 요약]");
+    lines.push("\n#### [DBpia AI 다각도 검색별 학술 종합 분석 요점 (전문 수록)]");
     liveResearchFeed.forEach((item, i) => {
       lines.push(
-        `- [관점 ${i + 1}: "${item.query}"]\n  ${String(item.summary || "").slice(0, 900)}`
+        `- [관점 ${i + 1}: "${item.query}"]\n  ${String(item.summary || "").slice(0, 3800)}`
       );
     });
   }
@@ -5800,7 +6060,7 @@ async function runArchaeologyDiscussionPipeline({
             if (parsed.extractedText) {
               craftExtractedReportText = [
                 craftExtractedReportText,
-                `[${parsed.engine} 추출 파일: ${uf.name || path.basename(uf.path)} (${parsed.pages}쪽)]\n${parsed.extractedText.slice(0, 30000)}`,
+                `[${parsed.engine} 추출 파일: ${uf.name || path.basename(uf.path)} (${parsed.pages}쪽)]\n${parsed.extractedText}`,
               ]
                 .filter(Boolean)
                 .join("\n\n");

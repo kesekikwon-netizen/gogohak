@@ -387,3 +387,18 @@ $Shortcut.Save()
 ### 6.2 `PdfCraft` 한글 UI 폰트 깨짐(`□□□`) 해결 패치 (`patches/pdfcraft/`에 원본 보관)
 - `crates/ui-egui/src/system_fonts.rs`: `korean_fallback()` 함수를 추가하여 `C:\Windows\Fonts\malgun.ttf`를 `SYSTEM_KOREAN_FALLBACK`으로 로드.
 - `crates/ui-egui/src/theme.rs`: `install_fonts()`에서 `SYSTEM_KOREAN_FALLBACK`을 `Proportional`, `Monospace`, `serif`, `sans-serif` 모든 폰트 패밀리의 최우선 CJK 폴백으로 등록하여 PdfCraft 실행 시 모든 한글 메뉴·메타데이터가 선명하게 표시되도록 해결.
+
+---
+
+## 7. 대용량 발굴조사보고서 구조화 파서 · DBpia AI 요점/다중 인용문 · CDP 안정화 및 A4 다중 쪽 조판 (상세: `3_ARCHAEO_STUDIO_데이터수집_및_안정화_개선플랜.md`)
+
+1. **모듈 1 — 발굴조사보고서 장·절 구조화 파서 (`extractStructuredArchaeologyReportFacts`)**:
+   - 50~150쪽 분량의 발굴조사보고서 PDF를 단순 앞부분 절단(`.slice(0, 30000)`)하지 않고, `Ⅰ. 조사개요`, `Ⅱ. 자연·지리적 환경`(핵심 입지 2,200자 압축), `Ⅲ. 조사내용`(유구·층위·내부시설 최대 18,000자 우선 보존), `출토유물 목록·종합고찰·결론`(최대 10,000자 보존)으로 지능형 재조합합니다.
+   - 유적의 실제 중심 시대는 `Ⅱ. 역사적 배경`의 연혁 설명이 아니라 **`Ⅲ. 조사내용`의 유구·유물 본문 빈도**에서 추출합니다.
+2. **모듈 2 — DBpia AI `vetter_conversations` 전체 요점(`lastAssistant.content`) 및 다중 인용문(`hovers`) 무손실 수집**:
+   - `extractLatestDbpiaAnswer()`에서 DOM의 마지막 `<li>` 단편(160자)이 아니라 `vetter_conversations/{convId}`의 `lastAssistant.content` 전체 학술 요점(1,700~4,500자)과 `hovers`(`NODE..._0`, `_1`, `_2`) 다중 원문 발췌문(최대 950자/편)을 결합하여 수집합니다.
+3. **모듈 3 — Gemini Web Quill `.ql-editor` `DocumentFragment` 청크 주입 및 CDP 폴링 예외 방어**:
+   - 대용량 프롬프트 주입 시 수천 개의 `<p>` 노드를 개별 생성하지 않고 30줄 단위로 묶은 `DocumentFragment`(50~80개 `<p>`)로 단일 트랜잭션 삽입하여 `Runtime.evaluate` 타임아웃을 근절합니다.
+4. **모듈 4 — 스튜디오 캔버스 DBpia 실시간 현황 보드(`#dbpia-live-board`) 및 A4 다중 쪽(`- 1 -`, `- 2 -`, `- 3 -`...) 자동 분할 조판**:
+   - `PHASE_2_DBPIA_LOOP` 진행 중 우측 캔버스 상단에 실시간 검색어·학술 요점·수집 논문 카드를 즉시 표시하고, 원고 작성 시 블록 높이를 계산하여 독립된 A4 시트(`.as-page`) 여러 장으로 자동 페이지네이션하며 각 쪽 하단에 해당 쪽의 반괄호 각주(`.as-page__notes`)를 분리 배치합니다.
+
