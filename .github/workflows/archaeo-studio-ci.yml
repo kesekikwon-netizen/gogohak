@@ -9,7 +9,7 @@ on:
 
 jobs:
   verify-archaeo-studio:
-    name: Verify ARCHAEO STUDIO Server, UI & Academic Standards
+    name: Verify ARCHAEO STUDIO Server, UI, Visual Enricher & Skills
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -20,21 +20,52 @@ jobs:
         with:
           node-version: "20"
 
-      - name: Check JavaScript syntax (MCP Bridge Server & Studio UI)
+      - name: Check JavaScript syntax (MCP Bridge Server, Studio UI & Visual Enricher)
         run: |
           node --check scripts/gemini_mcp_server.js
           node --check scripts/standalone_studio_app.js
+          node --check scripts/archaeology_visuals_enricher.js
 
-      - name: Verify Blueprint Documents & Academic Specification Integrity
+      - name: Verify Browser Inline Script Syntax & Multi-Visual Enricher
+        run: |
+          node -e '
+            const fs = require("fs");
+            const vm = require("vm");
+            const { getStandaloneStudioHtml } = require("./scripts/standalone_studio_app.js");
+            const { ensureRichArchaeologyVisualsAndTables } = require("./scripts/archaeology_visuals_enricher.js");
+
+            const html = getStandaloneStudioHtml();
+            const scriptMatch = /<script>([\s\S]*?)<\/script>/i.exec(html);
+            if (!scriptMatch) throw new Error("Missing <script> in getStandaloneStudioHtml()");
+            new vm.Script(scriptMatch[1]);
+            console.log("[PASS] Browser inline <script> compiled with zero syntax errors (" + scriptMatch[1].length + " bytes)");
+
+            const sampleMd = "# Ⅳ. 고찰\n### 1. 머리말\n개요 서술.\n### 2. 유구 구조\n| 구분 | 규모 | 특징 |\n|---|---|---|\n| 1호 주거지 | 4.3×2.9m | 방형 |\n### 3. 출토유물 및 편년\n출토유물 분석.\n### 4. 주변 유적 비교\n| 유적명 | 구조 | 시기 |\n|---|---|---|\n| 병산동 유적 | 방형 | 삼국 |\n#### 3) 맺음말\n요약.\n### 【각주】\n1) 이창현, 2010, 「영동지방 삼국시대 주거지 시론」, 『문물연구』.\n### 【참고문헌】\n- 이창현, 2010.";
+            const enriched = ensureRichArchaeologyVisualsAndTables(sampleMd, [
+              { author: "이창현·신유리", year: "2010", title: "영동지방 삼국시대 주거지 시론", journal: "문물연구" },
+              { author: "지현병", year: "2004", title: "경포호 주변의 철기 및 신라시대의 주거문화", journal: "문화사학" }
+            ], { docType: "report", userFocus: "강릉 병산동 277-12번지" });
+
+            const charts = (enriched.match(/```wc-chart/g) || []).length;
+            const diags = (enriched.match(/```wc-diagram/g) || []).length;
+            const tables = (enriched.match(/(?:^|\n)\|[^\n]+\|\r?\n\|[\s:\-|]+\|/g) || []).length;
+            if (charts < 3 || diags < 3 || tables < 4) {
+              throw new Error(`Enricher count check failed: charts=${charts}, diags=${diags}, tables=${tables}`);
+            }
+            console.log(`[PASS] Visual & Table Enricher verified: charts=${charts}, diagrams=${diags}, tables=${tables}`);
+          '
+
+      - name: Verify Blueprint Documents, Skills & Academic Specification Integrity
         run: |
           node -e '
             const fs = require("fs");
             const requiredDocs = [
               "1_ARCHAEO_STUDIO_전체개발방법_설계도.md",
-              "2_프롬프트_및_제미나이_결과생성_시스템_명세서.md",
+              "2_ARCHAEO_STUDIO_타컴퓨터이식_및_향후확장_설계도.md",
               "3_ARCHAEO_STUDIO_데이터수집_및_안정화_개선플랜.md",
               "4_매장유산_발굴조사보고서_고찰과_학술논문_양식비교_및_DBpia_AI_전략.md",
-              "skills/gemini-web/SKILL.md"
+              "skills/gemini-web/SKILL.md",
+              "skills/archaeo-studio-pro/SKILL.md"
             ];
             for (const doc of requiredDocs) {
               if (!fs.existsSync(doc)) {
@@ -56,7 +87,9 @@ jobs:
               "createDocumentFragment",
               "매장유산 보호 및 조사에 관한 법률",
               "사료 세포",
-              "evaluateArchaeologyManuscriptQuality"
+              "evaluateArchaeologyManuscriptQuality",
+              "control-key.local-7981",
+              "ensureRichArchaeologyVisualsAndTables"
             ];
             for (const pat of requiredServerPatterns) {
               if (!serverCode.includes(pat)) {
@@ -69,7 +102,8 @@ jobs:
               "renderDbpiaLiveBoard",
               "dbpia-live-board",
               "doc-pages-wrap",
-              "renderManuscriptOntoA4Page"
+              "renderManuscriptOntoA4Page",
+              "svgParts"
             ];
             for (const pat of requiredUiPatterns) {
               if (!uiCode.includes(pat)) {

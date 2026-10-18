@@ -771,10 +771,10 @@ function buildClientSideEngineeredPrompt() {
     isPaper
       ? '구성: 국문제목 · 국문초록·주제어 · Ⅰ. 머리말(문제 제기+비판적 연구사 정리) · Ⅱ~Ⅳ. 본론(사료 세포[표제어·출처·수집/가공정보] 재분류 및 개념어·논지 도출) · Ⅴ. 맺음말 · 영문초록 · 각주 · 참고문헌'
       : '구성: Ⅳ. 고찰 (1. 머리말[조사경위·학술자문회의·연구사] · 2. 유구 고찰[층위·중복 분기·기초/내부시설·자북 주축·해발고도] · 3. 출토유물 및 편년[일련번호 1:1 매칭·잔존치 ( )·상하한 연대] · 4. 주변 비교유적 및 맺음말[정비·복원 제언]) · 각주 · 참고문헌',
-    '표·도면: <표 1>(유구·유물/사료세포 속성표) · <표 2>(주변 핵심유적 대비표) · wc-chart 및 wc-diagram 포함',
+    '표·차트·모식도: <표 1>~<표 4>(유구·유물·주변유적·선행연구 비교표 4종+) · wc-chart 비교차트 3종+ · wc-diagram 모식도 3종+',
     '서지(DBpia AI 하이브리드): vetter_conversations 전체 요점 + hovers 원문 인용구 기반 실제 저자·연도·「논문명」·『학술지』·쪽수 1:1 교차검증 (저자미상 0건)',
     '원칙: ' + (datingText ? '입력된 연대분석·자연과학 자료 융합 고찰 반영' : '미입력 연대분석(BP) 수치 날조 금지 · 상대편년 논증')
-  ].join('\n• ');
+  ].join('\\n• ');
 }
 
 async function refreshEngineeredPrompt() {
@@ -1167,9 +1167,10 @@ function renderManuscriptOntoA4Page(rawMd, isRunning) {
 
   let md = String(rawMd);
 
-  // 1) 차트 및 모식도 코드블록을 A4 도면 박스로 변환 (wc-chart, wc-diagram, json, 코드 스니펫 모두 지원)
+  // 1) 차트 및 모식도 코드블록을 A4 도면 박스로 변환 (SVG 비교차트 + 데이터표 + 시각적 모식도 렌더링)
   const chartBlocks = [];
   const diagBlocks = [];
+  const palette = ['#2563eb', '#0d9488', '#d97706', '#7c3aed', '#dc2626'];
   md = md.replace(/\`\`\`([^\\n]*)\\r?\\n([\\s\\S]*?)\`\`\`/gi, (full, langRaw, j) => {
     const lang = String(langRaw || '').trim().toLowerCase();
     const body = String(j || '').trim();
@@ -1180,31 +1181,82 @@ function renderManuscriptOntoA4Page(rawMd, isRunning) {
         const idx = chartBlocks.length;
         const cats = (spec.data && spec.data.categories) || spec.categories || [];
         const series = (spec.data && spec.data.series) || spec.series || [];
+        let maxVal = 1;
+        series.forEach(s => (s.values || []).forEach(v => { if (Number(v) > maxVal) maxVal = Number(v); }));
+        const svgW = 620, svgH = 215, padL = 44, padR = 18, padT = 24, padB = 46;
+        const plotW = svgW - padL - padR, plotH = svgH - padT - padB;
+        let svgParts = ['<svg viewBox="0 0 ' + svgW + ' ' + svgH + '" style="width:100%;height:auto;display:block;margin:6px 0 8px 0;background:#f8fafc;border:1px solid #cbd5e1;border-radius:4px;">'];
+        for (let g = 0; g <= 4; g++) {
+          const gy = padT + plotH - (plotH * g / 4);
+          const gVal = Math.round((maxVal * g) / 4 * 10) / 10;
+          svgParts.push('<line x1="' + padL + '" y1="' + gy + '" x2="' + (svgW - padR) + '" y2="' + gy + '" stroke="#e2e8f0" stroke-width="1"/>');
+          svgParts.push('<text x="' + (padL - 6) + '" y="' + (gy + 3) + '" text-anchor="end" font-size="9.5" fill="#475569">' + gVal + '</text>');
+        }
+        const catCount = Math.max(1, cats.length);
+        const sCount = Math.max(1, series.length);
+        const groupW = plotW / catCount;
+        const barW = Math.min(28, Math.max(8, (groupW * 0.68) / sCount));
+        cats.forEach((c, cIdx) => {
+          const gx = padL + cIdx * groupW + (groupW - barW * sCount) / 2;
+          series.forEach((s, sIdx) => {
+            const val = Number((s.values && s.values[cIdx]) || 0);
+            const bh = Math.max(2, (val / maxVal) * plotH);
+            const bx = gx + sIdx * barW;
+            const by = padT + plotH - bh;
+            const col = palette[sIdx % palette.length];
+            svgParts.push('<rect x="' + bx.toFixed(1) + '" y="' + by.toFixed(1) + '" width="' + Math.max(4, barW - 2).toFixed(1) + '" height="' + bh.toFixed(1) + '" fill="' + col + '" rx="2"/>');
+            if (val > 0) {
+              svgParts.push('<text x="' + (bx + (barW - 2) / 2).toFixed(1) + '" y="' + (by - 4).toFixed(1) + '" text-anchor="middle" font-size="8.5" font-weight="700" fill="#1e293b">' + val + '</text>');
+            }
+          });
+          const labelShort = String(c).length > 14 ? String(c).slice(0, 14) + '…' : String(c);
+          svgParts.push('<text x="' + (padL + cIdx * groupW + groupW / 2).toFixed(1) + '" y="' + (padT + plotH + 15) + '" text-anchor="middle" font-size="9.5" font-weight="600" fill="#1e293b">' + escapeHtml(labelShort) + '</text>');
+        });
+        series.forEach((s, sIdx) => {
+          const lx = padL + sIdx * 145;
+          const ly = svgH - 10;
+          const col = palette[sIdx % palette.length];
+          svgParts.push('<rect x="' + lx + '" y="' + (ly - 8) + '" width="9" height="9" fill="' + col + '" rx="2"/>');
+          svgParts.push('<text x="' + (lx + 13) + '" y="' + ly + '" font-size="9.5" font-weight="600" fill="#334155">' + escapeHtml(s.name || ('계열 ' + (sIdx + 1))) + '</text>');
+        });
+        svgParts.push('</svg>');
         let rowsHtml = '';
         cats.forEach((c, cIdx) => {
           const vals = series.map(s => (s.values && s.values[cIdx] != null ? s.values[cIdx] : '-'));
           rowsHtml += '<tr><td>' + escapeHtml(c) + '</td>' + vals.map(v => '<td>' + escapeHtml(String(v)) + '</td>').join('') + '</tr>';
         });
         chartBlocks.push(
-          '<figure class="as-doc-table"><figcaption>차트. ' + escapeHtml(spec.title || '유구·유물 정량 분포 차트') + '</figcaption>' +
+          '<figure class="as-doc-table"><figcaption>&lt;그림 ' + (idx + 1) + '&gt; ' + escapeHtml(spec.title || '유구·유물 정량 분포 비교 차트') + '</figcaption>' +
+          svgParts.join('') +
           '<table><thead><tr><th>구분</th>' + series.map(s => '<th>' + escapeHtml(s.name || '') + '</th>').join('') + '</tr></thead>' +
           '<tbody>' + rowsHtml + '</tbody></table></figure>'
         );
         return '\\n@@AS_CHART_' + idx + '@@\\n';
       }
-      if (lang.includes('wc-diagram') || (spec.layout && Array.isArray(spec.items))) {
+      if (lang.includes('wc-diagram') || (spec.layout && Array.isArray(spec.items)) || Array.isArray(spec.items)) {
         const items = Array.isArray(spec.items) ? spec.items : [];
         const groups = [];
         items.forEach(it => {
-          if ((it.level || 0) === 0) groups.push({ title: it.text || '', subs: [] });
-          else if (groups.length > 0) groups[groups.length - 1].subs.push(it.text || '');
+          const itemObj = typeof it === 'string' ? { text: it, level: 0 } : it;
+          if ((itemObj.level || 0) === 0) groups.push({ title: itemObj.text || '', subs: [] });
+          else if (groups.length > 0) groups[groups.length - 1].subs.push(itemObj.text || '');
+          else groups.push({ title: itemObj.text || '', subs: [] });
         });
         const idx = diagBlocks.length;
+        const diagTitle = spec.title || '단계별 유구·출토유물 및 학술 논증 구조 모식도';
+        const stepsHtml = groups.map((g, gIdx) => {
+          const arrowHtml = gIdx < groups.length - 1
+            ? '<div style="text-align:center;color:#2563eb;font-size:13px;font-weight:800;line-height:1;margin:2px 0;">▼</div>'
+            : '';
+          const subsList = g.subs.length > 0
+            ? '<div style="margin-top:3px;padding-left:8px;border-left:2px solid #93c5fd;color:#334155;font-size:9.2pt;">• ' + g.subs.map(s => escapeHtml(s)).join('<br>• ') + '</div>'
+            : '';
+          return '<div class="as-doc-diagram__step" style="background:#f8fafc;border:1px solid #94a3b8;border-left:4px solid #1d4ed8;padding:7px 11px;border-radius:4px;">' +
+            '<strong style="color:#0f172a;font-size:9.8pt;">[' + (gIdx + 1) + '단계] ' + escapeHtml(g.title) + '</strong>' + subsList + '</div>' + arrowHtml;
+        }).join('');
         diagBlocks.push(
-          '<div class="as-doc-diagram"><div class="as-doc-diagram__title">모식도. 단계별 유구·출토유물 및 논증 구조 모식도</div>' +
-          '<div class="as-doc-diagram__steps">' +
-          groups.map(g => '<div class="as-doc-diagram__step"><strong>' + escapeHtml(g.title) + '</strong>' + escapeHtml(g.subs.join(' · ')) + '</div>').join('') +
-          '</div></div>'
+          '<div class="as-doc-diagram"><div class="as-doc-diagram__title">&lt;모식도 ' + (idx + 1) + '&gt; ' + escapeHtml(diagTitle) + '</div>' +
+          '<div class="as-doc-diagram__steps">' + stepsHtml + '</div></div>'
         );
         return '\\n@@AS_DIAG_' + idx + '@@\\n';
       }

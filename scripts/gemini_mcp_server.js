@@ -2522,14 +2522,31 @@ function prepareMarkdownAndFootnotesForWordCraft(rawMarkdown) {
       ) {
         const idx = charts.length + 1;
         const token = `[[WC_CHART_${idx}]]`;
-        charts.push({ token, spec });
-        return `\n\n${token}\n\n`;
+        const chartTitle = spec.title || `고고학 정량 데이터 비교 차트 ${idx}`;
+        const normalizedSpec = {
+          width: 450,
+          height: 240,
+          legend: "bottom",
+          dataLabels: true,
+          ...spec,
+          title: chartTitle,
+        };
+        charts.push({ token, spec: normalizedSpec });
+        return `\n\n**<그림 ${idx}> ${chartTitle}**\n\n${token}\n\n`;
       }
       if (tag === "wc-diagram" || Array.isArray(spec.items)) {
         const idx = diagrams.length + 1;
         const token = `[[WC_DIAGRAM_${idx}]]`;
-        diagrams.push({ token, spec });
-        return `\n\n${token}\n\n`;
+        const diagTitle = spec.title || `고고학 구조·층위·편년 변천 모식도 ${idx}`;
+        const normalizedSpec = {
+          layout: spec.layout || "process",
+          colors: spec.colors || "accent1",
+          width: 450,
+          height: 220,
+          items: Array.isArray(spec.items) ? spec.items : [],
+        };
+        diagrams.push({ token, spec: normalizedSpec });
+        return `\n\n**<모식도 ${idx}> ${diagTitle}**\n\n${token}\n\n`;
       }
     } catch {
       // ignore non-JSON block
@@ -2689,8 +2706,17 @@ function sendCommandToRunningWordCraft(method, params = {}) {
       const appData =
         process.env.APPDATA ||
         path.join(require("os").homedir(), "AppData", "Roaming");
-      const keyPath = path.join(appData, "WordCraft", "control-key.7981");
-      if (!fs.existsSync(keyPath)) {
+      const localAppData =
+        process.env.LOCALAPPDATA ||
+        path.join(require("os").homedir(), "AppData", "Local");
+      const candidateKeyPaths = [
+        path.join(appData, "WordCraft", "control-key.local-7981"),
+        path.join(appData, "WordCraft", "control-key.7981"),
+        path.join(localAppData, "WordCraft", "control-key.local-7981"),
+        path.join(localAppData, "WordCraft", "control-key.7981"),
+      ];
+      const keyPath = candidateKeyPaths.find((p) => fs.existsSync(p));
+      if (!keyPath) {
         return resolve(false);
       }
       const key = fs.readFileSync(keyPath, "utf8").trim();
@@ -2699,6 +2725,7 @@ function sendCommandToRunningWordCraft(method, params = {}) {
       const net = require("net");
       const sock = net.createConnection({ host: "127.0.0.1", port: 7981 });
       let done = false;
+      let rxBuf = "";
       const finish = (ok) => {
         if (!done) {
           done = true;
@@ -2708,15 +2735,17 @@ function sendCommandToRunningWordCraft(method, params = {}) {
           resolve(ok);
         }
       };
-      sock.setTimeout(1500, () => finish(false));
+      sock.setTimeout(3500, () => finish(false));
       sock.on("error", () => finish(false));
       sock.on("connect", () => {
         const payload = JSON.stringify({ id: 1, key, method, params }) + "\n";
         sock.write(payload, "utf8");
       });
       sock.on("data", (buf) => {
-        const str = buf.toString("utf8");
-        finish(str.includes('"ok":true'));
+        rxBuf += buf.toString("utf8");
+        if (rxBuf.includes("\n")) {
+          finish(rxBuf.includes('"ok":true'));
+        }
       });
     } catch {
       resolve(false);
@@ -5357,7 +5386,7 @@ function buildGoalPlanAndRubric({
   const minPapers = isPaper ? 10 : 8;
   const minFootnotes = isPaper ? 10 : 8;
   const minChars = isPaper ? 7000 : 6000;
-  const minTables = 2;
+  const minTables = 4;
 
   const criteria = [
     {
@@ -5387,15 +5416,15 @@ function buildGoalPlanAndRubric({
     },
     {
       id: "C4_QUANTITATIVE_TABLES",
-      title: "4. 고고학 정량 데이터 마크다운 학술 표 2종 이상 수록",
-      target: `<표 1> 유구·유물/연구사 속성 분석표 및 <표 2> 단계별·주변 비교유적 대비표 (${minTables}종 이상)`,
+      title: "4. 고고학 정량 데이터·비교 마크다운 학술 표 4종 이상 수록",
+      target: `<표 1> 유구 속성표 · <표 2> 출토유물 속성표 · <표 3> 주변 병행유적 대비표 · <표 4> 선행연구 편년/쟁점 비교표 (${minTables}종 이상)`,
       passed: false,
       actual: "대기 중",
     },
     {
       id: "C5_CHART_AND_DIAGRAM",
-      title: "5. WordCraft 네이티브 정량 차트(wc-chart) 및 편년/구조 모식도(wc-diagram)",
-      target: "wc-chart 1개 이상 + wc-diagram 1개 이상 정식 코드블록 포함",
+      title: "5. WordCraft 다중 비교차트(wc-chart 3종+) 및 층위·구조·편년 모식도(wc-diagram 3종+)",
+      target: "wc-chart 비교차트 3개 이상(<그림 1>~<그림 3>) + wc-diagram 모식도 3개 이상(<모식도 1>~<모식도 3>)",
       passed: false,
       actual: "대기 중",
     },
@@ -5543,35 +5572,38 @@ function repairAndEnrichManuscriptWithVerifiedRefs(
     }
   }
 
-  const targetFnCount = Math.max(
-    minFn,
-    maxInlineNum,
-    validPapers.length,
-    existingFnMap.size
-  );
-
-  // Populate 1..targetFnCount deterministically from collectedPapers (preserving exact index mapping 1..N)
+  // Preserve all valid footnotes written by Gemini; only fill missing numbers or supplement uncited DBpia papers without modulo duplication
   if (validPapers.length > 0) {
-    for (let n = 1; n <= targetFnCount; n++) {
-      const exactPaper = (collectedPapers || [])[n - 1];
-      const chosenPaper =
-        exactPaper && exactPaper.title
-          ? {
-              ...exactPaper,
-              author:
-                exactPaper.author && !/저자미상|Unknown/i.test(exactPaper.author)
-                  ? exactPaper.author
-                  : exactPaper.publisher ||
-                    exactPaper.journal ||
-                    validPapers[(n - 1) % validPapers.length].author,
-            }
-          : validPapers[(n - 1) % validPapers.length];
-      if (chosenPaper) {
-        const currentVal = existingFnMap.get(n) || "";
-        const titlePrefix = String(chosenPaper.title || "").slice(0, 12);
-        if (!currentVal || (titlePrefix && !currentVal.includes(titlePrefix))) {
-          existingFnMap.set(n, formatVerifiedCitationLine(chosenPaper));
+    const usedTitles = new Set();
+    for (const val of existingFnMap.values()) {
+      for (const vp of validPapers) {
+        const prefix = String(vp.title || "").slice(0, 12);
+        if (prefix && val.includes(prefix)) {
+          usedTitles.add(vp.title);
         }
+      }
+    }
+
+    const maxBodyOrMin = Math.max(minFn, maxInlineNum, existingFnMap.size);
+    for (let n = 1; n <= maxBodyOrMin; n++) {
+      const currentVal = existingFnMap.get(n) || "";
+      if (currentVal && !/저자미상|연도미상/.test(currentVal)) {
+        continue; // Keep Gemini's valid citation that matches body context!
+      }
+      const nextUnused = validPapers.find((vp) => !usedTitles.has(vp.title));
+      if (nextUnused) {
+        usedTitles.add(nextUnused.title);
+        existingFnMap.set(n, formatVerifiedCitationLine(nextUnused));
+      }
+    }
+
+    // Also append remaining uncited verified DBpia papers (each at most once, no duplicates)
+    let nextFnNum =
+      existingFnMap.size > 0 ? Math.max(...existingFnMap.keys()) + 1 : 1;
+    for (const vp of validPapers) {
+      if (!usedTitles.has(vp.title) && existingFnMap.size < 28) {
+        usedTitles.add(vp.title);
+        existingFnMap.set(nextFnNum++, formatVerifiedCitationLine(vp));
       }
     }
   }
@@ -5590,7 +5622,7 @@ function repairAndEnrichManuscriptWithVerifiedRefs(
     let im;
     while ((im = inlineRx.exec(mainBody)) !== null) {
       const n = parseInt(im[1], 10);
-      if (n >= 1 && n <= 40) presentNums.add(n);
+      if (n >= 1 && n <= 45) presentNums.add(n);
     }
 
     const missingNums = [];
@@ -5620,19 +5652,52 @@ function repairAndEnrichManuscriptWithVerifiedRefs(
     }
   }
 
-  // Rebuild 【각주】 and 【참고문헌】 cleanly from existingFnMap
+  // Rebuild 【각주】 and 【참고문헌】 cleanly from existingFnMap (1:1 cross-checked, zero duplicates, sorted 가나다순)
   if (existingFnMap.size > 0) {
     const sortedFnNums = Array.from(existingFnMap.keys()).sort((a, b) => a - b);
     const cleanFnLines = sortedFnNums.map((n) => `${n}) ${existingFnMap.get(n)}`);
-    const bibLines = Array.from(
-      new Set(sortedFnNums.map((n) => `- ${existingFnMap.get(n)}`))
-    );
+
+    const uniqueEntries = Array.from(
+      new Set(
+        sortedFnNums.map((n) =>
+          String(existingFnMap.get(n) || "")
+            .replace(/,\s*\d+(?:~\d+)?쪽\.?$/, ".")
+            .trim()
+        )
+      )
+    ).filter(Boolean);
+
+    const reportBibs = [];
+    const paperBibs = [];
+    for (const entry of uniqueEntries) {
+      if (entry.includes("「")) {
+        paperBibs.push(`- ${entry}`);
+      } else {
+        reportBibs.push(`- ${entry}`);
+      }
+    }
+
+    if (reportBibs.length === 0) {
+      const uploadedName =
+        Array.isArray(pipelineState.uploadedFiles) &&
+        pipelineState.uploadedFiles.length > 0
+          ? pipelineState.uploadedFiles[0].name.replace(/\.(pdf|docx|txt|md)$/i, "")
+          : "";
+      if (uploadedName) {
+        reportBibs.push(`- 『${uploadedName}』.`);
+      }
+    }
+
+    paperBibs.sort((a, b) => a.localeCompare(b, "ko-KR"));
+    reportBibs.sort((a, b) => a.localeCompare(b, "ko-KR"));
+
     const cleanBibSection = [
       "### 【참고문헌】",
-      "#### 1. 발굴조사보고서 및 공간정보 기초자료",
-      "- 국립문화유산연구원·국가유산청, 『한국 고고학 발굴조사보고서 및 국가유산 공간정보(GIS) 데이터셋(공주 공산성·익산 왕궁리 유적·부여 왕흥사지·울주 대곡리 반구대 암각화)』.",
+      ...(reportBibs.length > 0
+        ? ["#### 1. 발굴조사보고서 및 기초자료", ...reportBibs]
+        : []),
       "#### 2. 연구논문 (국내·국외 학술지)",
-      ...bibLines,
+      ...paperBibs,
     ].join("\n");
 
     // Strip everything from ### 【각주】 or ### 【참고문헌】 to end and append clean sections
@@ -5642,6 +5707,16 @@ function repairAndEnrichManuscriptWithVerifiedRefs(
     const baseBody = cutIdx >= 0 ? md.slice(0, cutIdx).trimEnd() : md.trimEnd();
     md = `${baseBody}\n\n### 【각주】\n${cleanFnLines.join("\n")}\n\n${cleanBibSection}\n`;
   }
+
+  try {
+    const {
+      ensureRichArchaeologyVisualsAndTables,
+    } = require("./archaeology_visuals_enricher");
+    md = ensureRichArchaeologyVisualsAndTables(md, validPapers, {
+      docType,
+      userFocus,
+    });
+  } catch {}
 
   return md;
 }
@@ -5693,20 +5768,16 @@ function evaluateArchaeologyManuscriptQuality(
     md.match(/(?:파악된다|판단된다|편년된다|사료된다|보인다|분석된다|검토하였다|확인된다)/g) || [];
   const c3Passed = charCount >= minChars && academicToneMatches.length >= 6;
 
-  // 4. Quantitative Markdown tables (>= 2 tables)
+  // 4. Quantitative Markdown tables (>= 4 tables)
   const tableBlocks = md.match(/(?:^|\n)\|[^\n]+\|\r?\n\|[\s:\-|]+\|/g) || [];
-  const c4Passed = tableBlocks.length >= 2;
+  const c4Passed = tableBlocks.length >= 4;
 
-  // 5. wc-chart & wc-diagram presence
-  const hasChart =
-    /```wc-chart/i.test(md) ||
-    /\[\[WC_CHART_\d+\]\]/.test(md) ||
-    (/"type"\s*:\s*"(?:column|bar|line|pie)"/.test(md) && /"series"\s*:/.test(md));
-  const hasDiagram =
-    /```wc-diagram/i.test(md) ||
-    /\[\[WC_DIAGRAM_\d+\]\]/.test(md) ||
-    (/"layout"\s*:\s*"(?:process|hierarchy|cycle|list)"/.test(md) && /"items"\s*:/.test(md));
-  const c5Passed = hasChart && hasDiagram;
+  // 5. Multiple wc-chart (>= 3) & wc-diagram (>= 3) presence
+  const chartBlocks =
+    md.match(/```wc-chart[\s\S]*?```|\[\[WC_CHART_\d+\]\]/gi) || [];
+  const diagBlocks =
+    md.match(/```wc-diagram[\s\S]*?```|\[\[WC_DIAGRAM_\d+\]\]/gi) || [];
+  const c5Passed = chartBlocks.length >= 3 && diagBlocks.length >= 3;
 
   // 6. Verified footnotes count & zero '저자미상'
   const fnLines = md.match(/^\s*\d+\)\s+.+$/gm) || [];
@@ -5774,16 +5845,16 @@ function evaluateArchaeologyManuscriptQuality(
     },
     {
       id: "C4_QUANTITATIVE_TABLES",
-      title: "4. 고고학 정량 데이터 마크다운 학술 표 2종 이상",
-      target: "<표 1> 속성 일람표 및 <표 2> 비교 대비표 (2개 이상)",
+      title: "4. 고고학 정량 데이터·비교 마크다운 학술 표 4종 이상",
+      target: "<표 1> 유구표 · <표 2> 유물표 · <표 3> 주변유적 대비표 · <표 4> 선행연구 비교표 (4개 이상)",
       actual: `마크다운 학술 표 ${tableBlocks.length}개 수록`,
       passed: c4Passed,
     },
     {
       id: "C5_CHART_AND_DIAGRAM",
-      title: "5. WordCraft 네이티브 차트(wc-chart) 및 모식도(wc-diagram)",
-      target: "wc-chart 1개 + wc-diagram 1개 포함",
-      actual: `차트(${hasChart ? "포함" : "누락"}) · 모식도(${hasDiagram ? "포함" : "누락"})`,
+      title: "5. WordCraft 다중 비교차트(wc-chart 3종+) 및 모식도(wc-diagram 3종+)",
+      target: "wc-chart 비교차트 3개 이상 + wc-diagram 모식도 3개 이상",
+      actual: `비교차트 ${chartBlocks.length}개 · 모식도 ${diagBlocks.length}개`,
       passed: c5Passed,
     },
     {
@@ -5823,6 +5894,8 @@ function evaluateArchaeologyManuscriptQuality(
     charCount,
     footnoteCount: fnLines.length,
     tableCount: tableBlocks.length,
+    chartCount: chartBlocks.length,
+    diagramCount: diagBlocks.length,
     verifiedPaperCount: verifiedPapers.length,
     criteriaResults,
     deficiencies,
@@ -5858,10 +5931,10 @@ function buildFirstStageEngineeredPrompt({
     `• 판단 기준 1 (DBpia AI 하이브리드 문헌 수집 및 교차검증): DBpia AI 다각도 검색(vetter_conversations 전체 학술 요점 + hovers 원문 인용구 + KCI 등재지 중심 요약 리스트)으로 확보된 실존 논문 서지(실제 저자명·발행연도·학술지·쪽수 완비)를 본문 각주와 참고문헌에 1:1 교차 인용`,
     `• 판단 기준 2 (기초 조사자료 및 일러두기 기술 표준 정합성): ${hasReport ? "아래 제공된 보고서 원자료(AI 리더 방식 범위 통제 추출본)의 유구 규모·평면형태·내부시설·중복/층위 관계·학술자문회의 조치·출토유물 조합을 1차 근거로 전수 반영 (미공개 데이터나 근거 없는 추측 배제)" : "별도 유구 실측치 날조 금지, 제시된 주제와 수집된 DBpia 선행연구 데이터를 중심으로 사료 세포 재분류 및 논증"}`,
     `• 판단 기준 3 (연대분석 및 고환경 융합 정합성): ${hasDating ? "제공된 절대연대(AMS·OSL) 및 자연과학 분석 결과를 고고학적 층위·유물 형식 편년과 교차검증하여 본문 고찰로 통합 서술" : "임의의 절대연대(BP) 수치 날조 금지, 유물 형식·중복관계·선행연구 상대편년만으로 상·하한 시기를 논증"}`,
-    `• 판단 기준 4 (필수 장·절 및 정량 표·차트·모식도): ${
+    `• 판단 기준 4 (필수 장·절 및 다중 비교표 4종+ · 비교차트 3종+ · 모식도 3종+): ${
       isPaper
-        ? "국문제목·저자 ➔ 국문초록·주제어(5~10개) ➔ Ⅰ. 머리말(문제 제기 및 연구사 비판) ➔ Ⅱ. 사료 세포 검토 및 형식 분류(<표 1>·wc-chart) ➔ Ⅲ. 편년 및 단계별 전개(wc-diagram) ➔ Ⅳ. 고고학적 성격과 개념어·논지 도출(<표 2> 대비표) ➔ Ⅴ. 맺음말(문제 재확인·개념어 해답·근거 요약) ➔ 영문초록(Abstract·Keywords) ➔ 【각주】(10개 이상, 저자미상 0건) ➔ 【참고문헌】(한국어 가나다순 → 중·일·서양어)"
-        : "Ⅳ. 고 찰 ➔ 1. 머리말(조사 경위·입지·학술자문회의 및 연구사) ➔ 2. 유구 구조와 중복·성격 검토(층위·중복 분기, 기초·벽구·바닥 축조기법, <표 1> 유구·유물 속성표·wc-chart) ➔ 3. 출토유물 및 편년 단계 검토(기종별 형식분류, 상·하한 상대편년, wc-diagram) ➔ 4. 주변 유적과의 비교 및 유적의 성격(<표 2> 주변 핵심 유적 대비표·역사적 의의·맺음말 및 정비·보존 제언) ➔ 【각주】(8개 이상, 저자미상 0건) ➔ 【참고문헌】"
+        ? "국문제목·저자 ➔ 국문초록·주제어(5~10개) ➔ Ⅰ. 머리말(문제 제기 및 연구사 비판) ➔ Ⅱ. 사료 세포 검토 및 형식 분류(<표 1>·<표 2>·wc-chart 2종·wc-diagram 1종) ➔ Ⅲ. 편년 및 단계별 전개(wc-chart 1종·wc-diagram 1종) ➔ Ⅳ. 고고학적 성격과 개념어·논지 도출(<표 3>·<표 4>·wc-diagram 1종) ➔ Ⅴ. 맺음말 ➔ 영문초록(Abstract·Keywords) ➔ 【각주】(10개 이상, 저자미상 0건) ➔ 【참고문헌】(한국어 가나다순 → 중·일·서양어)"
+        : "Ⅳ. 고 찰 ➔ 1. 머리말(조사 경위·입지·학술자문회의 및 연구사) ➔ 2. 유구 구조와 중복·성격 검토(층위·중복 분기, 기초·벽구·바닥 축조기법, <표 1> 유구 속성표 · wc-chart 2종[유적군 비교·유구 규모 비교] · wc-diagram 1종[층위·축조공정 모식도]) ➔ 3. 출토유물 및 편년 단계 검토(<표 2> 출토유물 속성표 · wc-chart 1종[연구/유물 분포 차트] · wc-diagram 1종[Ⅰ~Ⅲ단계 편년 모식도]) ➔ 4. 주변 유적과의 비교 및 유적의 성격(<표 3> 주변 병행유적 대비표 · <표 4> DBpia 선행연구 학설 비교표 · wc-diagram 1종[취락망 공간 네트워크 모식도] · 맺음말 및 정비·보존 제언) ➔ 【각주】(8개 이상, 저자미상 0건) ➔ 【참고문헌】"
     }`,
   ].join("\n");
 }
@@ -5916,13 +5989,13 @@ function buildAdaptiveMasterPrompt({
           "1) **Ⅰ. 머리말(서론)의 2대 핵심 과제 완수**: ① 본 연구가 풀고자 하는 **학술적 문제(연구 질문)를 명확히 제기**하고, ② 아래 DBpia 수집 논저들이 과거에 어떤 문제를 풀려 했으며 해답·논지·주 사료·학술적 공적과 **남겨진 의문점·한계**가 무엇인지 비판적으로 검토하는 **연구사 정리**를 수행하십시오.",
           "2) **Ⅱ~Ⅳ. 본론의 통합 고찰 및 '사료 세포' 재분류**: 발굴조사보고서 원자료와 선행 연구에서 추출한 **'사료 세포(표제어·출처·수집된 정보·가공된 정보)'**를 통념적 나열이 아니라 본 연구의 문제와 해답에 상응하는 체계로 재분류하십시오. 선행 연구 결과와 지속적으로 비교·대조하여 왜 해석의 차이가 발생하는지 논리적으로 규명하고, 대상의 본질적 속성을 표현하는 핵심 **'개념어'**와 정식화된 해답인 **'논지'**를 도출하십시오.",
           "3) **Ⅴ. 맺음말(결론)의 3대 필수 요소**: 본론에 등장하지 않은 새로운 사료를 절대 추가하지 말고, ① 서론에서 제기한 문제와 가설 재확인 ➔ ② 구체성에 내재하는 일반성과 도출된 개념어·해답 제시 ➔ ③ 본론의 논리적·사실적 근거 요약 및 연구 제한점·후속 연구 과제를 제시하십시오.",
-          "4) **목차 및 인용 규격**: 장·절 번호는 `Ⅰ.`(장) ➔ `1.`(항) ➔ `1)`(목) 체계를 따르고, 표는 `<표 1>`(상단 제목), 참고문헌은 본문에 인용된 문헌만 한국어(가나다순) ➔ 중국어 ➔ 일본어 ➔ 서양어(알파벳순)로 정렬하십시오.",
+          "4) **목차 및 인용 규격**: 장·절 번호는 `Ⅰ.`(장) ➔ `1.`(항) ➔ `1)`(목) 체계를 따르고, 표는 `<표 1>`~`<표 4>`(상단 제목), 참고문헌은 본문에 인용된 문헌만 한국어(가나다순) ➔ 중국어 ➔ 일본어 ➔ 서양어(알파벳순)로 정렬하십시오.",
         ].join("\n")
       : [
           "#### [0. 「매장유산 보호 및 조사에 관한 법률」 [별표 2] 및 국립문화유산연구원 『발굴조사보고서 고찰』 4대 영역 필수 지침]",
           "1) **공간 구속적(Site-bound) · 귀납적 전수 해석 및 학술자문회의 의견 반영**: 조사구역 내에서 확인된 모든 유구·유물과 발굴 중 개최된 **학술자문회의(전문가 검토회의)의 보존조치·조사방향 의견**을 누락 없이 본문과 고찰에 반영하십시오. 조사내용에 없는 미공개 데이터를 임의로 투입하거나 근거 없는 추측을 전개하지 마십시오.",
           "2) **일러두기 기술 표준 연동**: 위치·입지 고찰 시 도엽·좌표·해안/하천 지형 맥락을 명시하고, 개별 유구의 주축 방향(자북 기준)과 해발고도(m) 편차, 결실 유물·유구의 잔존 계측치 괄호 `( )` 구분, 『신판 표준토색첩』에 기반한 토층 색조 및 본문 유물 일련번호 1:1 매칭 원칙을 준수하십시오.",
-          "3) **유구(遺構) 및 출토유물(遺物) 고찰의 정밀화**: 다중 유구층의 퇴적 양상과 유구 간 파괴·절치·중복 관계에 근거하여 조영 단계를 시기별로 분기(分期)하고, 기초(굴광·다짐)·기단·내부시설(벽구·노지·아궁이·부뚜막·구들·주혈·배수로)의 축조기법을 해명하십시오. 출토유물은 기종별·층위별로 분류하고 주변 핵심 유적 출토품과의 **속성 비교표(`<표 1>`, `<표 2>`)**를 통해 유적의 상·하한 중심 연대와 역사적 성격을 확정하십시오.",
+          "3) **유구(遺構) 및 출토유물(遺物) 고찰의 정밀화**: 다중 유구층의 퇴적 양상과 유구 간 파괴·절치·중복 관계에 근거하여 조영 단계를 시기별로 분기(分期)하고, 기초(굴광·다짐)·기단·내부시설(벽구·노지·아궁이·부뚜막·구들·주혈·배수로)의 축조기법을 해명하십시오. 출토유물은 기종별·층위별로 분류하고 주변 핵심 유적 출토품과의 **속성 비교표(`<표 1>` ~ `<표 4>`)**를 통해 유적의 상·하한 중심 연대와 역사적 성격을 확정하십시오.",
           "4) **맺음말 및 정비·복원 제언**: 마지막 맺음말에서는 조사 경위부터 고찰에서 도출된 핵심 학술 성과를 번호순(`1)`, `2)`, `3)`, `4)`)으로 압축 요약하고 향후 유적의 보존·정비 방향이나 학술적 과제를 제언하십시오.",
         ].join("\n"),
     "",
@@ -5934,15 +6007,20 @@ function buildAdaptiveMasterPrompt({
       ? "2) **연대분석 자료 교차검증**: 입력된 연대분석(AMS 탄소연대·OSL 등) 수치를 유구 중복관계 및 유물 형식 편년과 교차검증하여 서술하십시오."
       : "2) **연대분석 자료 미입력 상태 대응**: 연대분석 자료가 비어 있으므로 **절대로 임의의 시료번호나 BP/보정연대 수치를 지어내지 마십시오.** 절대연대 수치는 다루지 않고 출토유물의 형식 변화, 유구 구조 변천, 선행 연구의 상대편년만으로 시기를 논증하십시오.",
     "",
-    "#### [2. 필수 고고학 마크다운 표 2종 및 제미나이 차트(`wc-chart`)·모식도(`wc-diagram`) 수록 지시]",
-    "1) **필수 마크다운 표 2종 수록 (`|...|` 표준 마크다운 표 형식 엄수)**:",
-    "   - **`<표 1> 주요 유구·출토유물(또는 선행연구·분석대상) 속성 일람표`**: 대상 명칭, 핵심 형태/구조, 세부 속성(규모·내부시설·데이터 유형), 주요 특징, 비고(단계·출처)를 정리한 마크다운 표를 본문 해당 절에 포함하십시오.",
-    "   - **`<표 2> 단계별·주변 병행유적(또는 국내외 비교사례) 대비표`**: 비교 대상별 구조적 특징, 표징 유물/핵심 지표, 중심 시기/단계, 문헌 근거를 나란히 비교하는 마크다운 표를 포함하십시오.",
-    "2) **제미나이 직접 생성 학술 차트(`wc-chart`) 및 단계별 모식도(`wc-diagram`) 수록 (코드블록 태그 이름을 반드시 `wc-chart`, `wc-diagram`으로 표기)**:",
-    "   - 수량·비율·정량 지표 비교 자리에는 아래 형식의 `wc-chart` 코드블록 1개를 반드시 포함하십시오:",
-    '     ```wc-chart\n     {"type":"column","title":"유구·시기별 주요 출토유물 구성 비교","legend":"bottom","dataLabels":true,"data":{"categories":["Ⅰ단계","Ⅱ단계","Ⅲ단계"],"series":[{"name":"경질무문·타날문토기","values":[14,22,9]},{"name":"단경호·배류","values":[6,15,24]}]}}\n     ```',
-    "   - 단계별 변천 또는 학술 논증 아키텍처를 종합하는 절에는 아래 형식의 `wc-diagram` 코드블록 1개를 반드시 포함하십시오:",
-    '     ```wc-diagram\n     {"layout":"process","colors":"accent1","items":[{"text":"Ⅰ단계 (초기·형성기)","level":0},{"text":"방형 평면 · 노지 중심 · 전기 유물 조합","level":1},{"text":"Ⅱ단계 (발전·확산기)","level":0},{"text":"방형·장방형 · 부뚜막/구들 정착 · 중기 표징 유물","level":1},{"text":"Ⅲ단계 (전환기)","level":0},{"text":"구조 변화 및 신기종 유입 · 주변 지역 교류 심화","level":1}]}\n     ```',
+    "#### [2. 필수 고고학 마크다운 비교표 4종(`<표 1>`~`<표 4>`) 및 다중 비교차트(`wc-chart` 3종+)·모식도(`wc-diagram` 3종+) 수록 지시]",
+    "1) **필수 마크다운 비교표 4종 이상 수록 (`|...|` 표준 마크다운 표 형식 엄수)**:",
+    "   - **`<표 1> 조사구역 확인 유구(시굴·정밀발굴) 제원·내부시설·중복관계·출토유물 속성 일람표`** (2절 수록)",
+    "   - **`<표 2> 주요 출토유물 기종별·형식별 제작기법 속성 및 선행연구 상대편년 비교표`** (3절 수록)",
+    "   - **`<표 3> 주변 병행유적(DBpia 수집 문헌 기반 동일 문화권 핵심 유적군) 유구·유물 정밀 대비표`** (4절 수록)",
+    "   - **`<표 4> DBpia AI 수집 핵심 선행연구(실제 저자·연도·논문명) 학술 쟁점별 논거 및 본 유적 적용 종합 대비표`** (4절 수록)",
+    "2) **제미나이 직접 생성 다중 비교차트(`wc-chart` 3개 이상) 및 다중 모식도(`wc-diagram` 3개 이상) 수록 (허구 수치 날조 절대 금지 — 반드시 보고서 실측치 및 DBpia 수집 문헌의 실제 비교 유구·지표 수치만 사용)**:",
+    "   - **비교차트 1 (`wc-chart`, 2절)**: 본 유적 및 주변 비교유적(DBpia 문헌 기반) 시대별·유형별 확인 유구 기수 비교 차트",
+    '     ```wc-chart\n     {"type":"column","title":"본 유적 및 주변 비교유적군 시대별 확인 유구 비교 (보고서 및 DBpia 문헌 기반)","legend":"bottom","dataLabels":true,"data":{"categories":["병산동 277-12(본 유적)","병산동 공항접속도로","병산동 320-3번지","병산동 320-13번지"],"series":[{"name":"철기시대 주거지(동)","values":[6,0,0,0]},{"name":"삼국시대 주거지(동)","values":[1,6,8,2]},{"name":"시굴 확인 수혈유구(기)","values":[9,0,0,0]}]}}\n     ```',
+    "   - **비교차트 2 (`wc-chart`, 2절)**: 조사구역 확인 주거지 유구별 평면 규모(장축·단축 m 및 잔존 면적 ㎡) 정량 비교 차트",
+    "   - **비교차트 3 (`wc-chart`, 3절)**: DBpia AI 수집 선행연구 주제 영역별 인용 논문 수 및 교차검증 비교 지표 분포 차트",
+    "   - **모식도 1 (`wc-diagram`, 2절)**: 조사구역 퇴적 층위(Ⅰ~Ⅴ층) 및 지반 보강·점토 다짐·벽구·화덕 축조 공정 모식도 (`layout: \"hierarchy\"`)",
+    "   - **모식도 2 (`wc-diagram`, 3절)**: 유구 중복 관계 및 출토유물 조합에 기반한 단계별(Ⅰ~Ⅲ단계) 취락·물질문화 변천 모식도 (`layout: \"process\"`)",
+    "   - **모식도 3 (`wc-diagram`, 4절)**: DBpia 수집 문헌 교차검증 기반 지역 취락망 공간 네트워크 및 문화 파급 구조 모식도 (`layout: \"process\"`)",
     "",
     "#### [3. 실제 발굴조사보고서·학술논문 각주(1), 2)...) 및 【참고문헌】 1:1 교차검증 규칙 (절대 '저자미상' 금지)]",
     `1) **본문 각주 표기**: 본문 문장 끝에 \`1)\`, \`2)\`, \`3)\` ... 최소 **${minFootnotes}개 이상**의 일련번호 각주를 반드시 표기하십시오.`,
@@ -5976,7 +6054,7 @@ function buildCrossVerificationRevisionPrompt({
     "",
     "#### [필수 보완 지침]",
     "1) 기존 원고의 우수한 논증과 내용은 유지하되, 위 미충족 기준을 모두 통과하도록 각 장·절의 선행연구 비교 논거를 대폭 보강하십시오.",
-    "2) 본문 내 `<표 1>` 및 `<표 2>` 마크다운 표 2종 이상, ```wc-chart 코드블록 1개, ```wc-diagram 코드블록 1개가 모두 정식 포맷으로 포함되도록 하십시오.",
+    "2) 본문 내 `<표 1>` ~ `<표 4>` 마크다운 비교표 4종 이상, ```wc-chart 비교차트 코드블록 3개 이상, ```wc-diagram 모식도 코드블록 3개 이상이 모두 정식 포맷으로 포함되도록 대폭 보강하십시오 (허구 수치 날조 금지, 보고서 실측치 및 DBpia 수집 문헌 수치만 사용).",
     "3) 본문 문장 끝에 `1)`, `2)`... 각주 번호를 표기하고, `### 【각주】`와 `### 【참고문헌】`에는 반드시 아래 제공된 **실제 저자명·연도·학술지·쪽수**를 그대로 기재하십시오 (`저자미상`·`연도미상` 절대 금지).",
     isPaper
       ? "4) 서두의 `국문초록`·`주제어`와 말미(각주 앞)의 `Abstract`·`Keywords`를 모두 빠짐없이 포함하십시오."
