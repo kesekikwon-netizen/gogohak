@@ -6433,6 +6433,191 @@ function startOpenAiBridgeServer() {
       return;
     }
 
+    if (req.url.startsWith("/v2/")) {
+      const parsedUrl = new URL(req.url, `http://127.0.0.1:${BRIDGE_PORT}`);
+      const pathname = parsedUrl.pathname;
+      const v2Index = require("./v2/index.js");
+      const { createEvidenceStore } = require("./v2/evidence_store.js");
+
+      if (req.method === "GET" && pathname === "/v2/selftest") {
+        const { runSelftest } = require("./v2/harness/selftest.js");
+        const litMode = parsedUrl.searchParams.get("literatureMode") || "dbpia";
+        runSelftest({
+          getCdpPort,
+          ensureEmbeddedGeminiWebview,
+          withCdpSession,
+          ensureArgonHighAndWorkMode,
+          getDbpiaLoginStatus,
+          literatureMode: litMode,
+        })
+          .then((result) => {
+            res.writeHead(200, { "Content-Type": "application/json; charset=utf-8" });
+            res.end(JSON.stringify(result));
+          })
+          .catch((err) => {
+            res.writeHead(500, { "Content-Type": "application/json; charset=utf-8" });
+            res.end(JSON.stringify({ ok: false, error: err.message }));
+          });
+        return;
+      }
+
+      if (req.method === "GET" && pathname === "/v2/state") {
+        const jobId = parsedUrl.searchParams.get("jobId") || undefined;
+        const st = v2Index.getV2State(jobId);
+        res.writeHead(200, { "Content-Type": "application/json; charset=utf-8" });
+        res.end(JSON.stringify(st));
+        return;
+      }
+
+      if (req.method === "GET" && pathname === "/v2/metrics") {
+        const jobId = parsedUrl.searchParams.get("jobId") || undefined;
+        const m = v2Index.getV2Metrics(jobId);
+        res.writeHead(200, { "Content-Type": "application/json; charset=utf-8" });
+        res.end(JSON.stringify(m));
+        return;
+      }
+
+      if (req.method === "GET" && pathname === "/v2/evidence") {
+        const jobId = parsedUrl.searchParams.get("jobId") || undefined;
+        const type = parsedUrl.searchParams.get("type") || "facts";
+        const st = v2Index.getV2State(jobId);
+        if (!st.ok || !st.jobDir) {
+          res.writeHead(404, { "Content-Type": "application/json; charset=utf-8" });
+          res.end(JSON.stringify({ ok: false, error: "작업을 찾을 수 없습니다." }));
+          return;
+        }
+        const store = createEvidenceStore(st.jobDir);
+        const items = type === "literature" ? store.loadLiterature() : store.loadFacts();
+        res.writeHead(200, { "Content-Type": "application/json; charset=utf-8" });
+        res.end(JSON.stringify({ ok: true, jobId: st.jobId, type, items }));
+        return;
+      }
+
+      if (req.method === "GET" && pathname === "/v2/verify") {
+        const jobId = parsedUrl.searchParams.get("jobId") || undefined;
+        const section = parsedUrl.searchParams.get("section") || "S1";
+        const st = v2Index.getV2State(jobId);
+        if (!st.ok || !st.jobDir) {
+          res.writeHead(404, { "Content-Type": "application/json; charset=utf-8" });
+          res.end(JSON.stringify({ ok: false, error: "작업을 찾을 수 없습니다." }));
+          return;
+        }
+        const store = createEvidenceStore(st.jobDir);
+        const matrix = store.loadLatestVerifyMatrix(section);
+        res.writeHead(200, { "Content-Type": "application/json; charset=utf-8" });
+        res.end(JSON.stringify({ ok: true, jobId: st.jobId, section, matrix }));
+        return;
+      }
+
+      if (req.method === "GET" && pathname === "/v2/crosswalk") {
+        const jobId = parsedUrl.searchParams.get("jobId") || undefined;
+        const st = v2Index.getV2State(jobId);
+        if (!st.ok || !st.jobDir) {
+          res.writeHead(404, { "Content-Type": "application/json; charset=utf-8" });
+          res.end(JSON.stringify({ ok: false, error: "작업을 찾을 수 없습니다." }));
+          return;
+        }
+        const cwPath = path.join(st.jobDir, "crosswalk.md");
+        const nhPath = path.join(st.jobDir, "needs_human.md");
+        res.writeHead(200, { "Content-Type": "application/json; charset=utf-8" });
+        res.end(
+          JSON.stringify({
+            ok: true,
+            jobId: st.jobId,
+            crosswalkMd: fs.existsSync(cwPath) ? fs.readFileSync(cwPath, "utf8") : "",
+            needsHumanMd: fs.existsSync(nhPath) ? fs.readFileSync(nhPath, "utf8") : "",
+          })
+        );
+        return;
+      }
+
+      if (req.method === "GET" && pathname === "/v2/dbpia-review") {
+        const jobId = parsedUrl.searchParams.get("jobId") || undefined;
+        const st = v2Index.getV2State(jobId);
+        if (!st.ok || !st.jobDir) {
+          res.writeHead(404, { "Content-Type": "application/json; charset=utf-8" });
+          res.end(JSON.stringify({ ok: false, error: "작업을 찾을 수 없습니다." }));
+          return;
+        }
+        const revJsonPath = path.join(st.jobDir, "dbpia_review.json");
+        const revMdPath = path.join(st.jobDir, "dbpia_review.md");
+        res.writeHead(200, { "Content-Type": "application/json; charset=utf-8" });
+        res.end(
+          JSON.stringify({
+            ok: true,
+            jobId: st.jobId,
+            review: fs.existsSync(revJsonPath) ? JSON.parse(fs.readFileSync(revJsonPath, "utf8")) : null,
+            reviewMd: fs.existsSync(revMdPath) ? fs.readFileSync(revMdPath, "utf8") : "",
+          })
+        );
+        return;
+      }
+
+      if (req.method === "POST") {
+        let body = "";
+        req.on("data", (chunk) => (body += chunk));
+        req.on("end", async () => {
+          try {
+            const payload = JSON.parse(body || "{}");
+            if (pathname === "/v2/run") {
+              const out = await v2Index.runPipelineV2(payload);
+              res.writeHead(200, { "Content-Type": "application/json; charset=utf-8" });
+              res.end(JSON.stringify(out));
+              return;
+            }
+            if (pathname === "/v2/resume") {
+              const out = await v2Index.resumePipelineV2(payload.jobId, payload);
+              res.writeHead(200, { "Content-Type": "application/json; charset=utf-8" });
+              res.end(JSON.stringify(out));
+              return;
+            }
+            if (pathname === "/v2/outline/approve") {
+              const out = await v2Index.approveOutlineV2(payload.jobId, payload.outline, payload);
+              res.writeHead(200, { "Content-Type": "application/json; charset=utf-8" });
+              res.end(JSON.stringify(out));
+              return;
+            }
+            if (pathname === "/v2/gate/continue") {
+              const out = await v2Index.continueGateV2(payload.jobId, payload.gate, payload);
+              res.writeHead(200, { "Content-Type": "application/json; charset=utf-8" });
+              res.end(JSON.stringify(out));
+              return;
+            }
+            if (pathname === "/v2/handoff/export") {
+              const { exportHandoff } = require("./v2/handoff.js");
+              const jobDir = v2Index.resolveJobDir(payload.jobId);
+              const out = exportHandoff(jobDir, payload);
+              res.writeHead(200, { "Content-Type": "application/json; charset=utf-8" });
+              res.end(JSON.stringify(out));
+              return;
+            }
+            if (pathname === "/v2/handoff/import") {
+              const { importHandoff } = require("./v2/handoff.js");
+              const jobDir = v2Index.resolveJobDir(payload.jobId);
+              const out = await importHandoff(jobDir, payload);
+              res.writeHead(200, { "Content-Type": "application/json; charset=utf-8" });
+              res.end(JSON.stringify(out));
+              return;
+            }
+            if (pathname === "/v2/dbpia-review") {
+              const { handleDbpiaReviewAction } = require("./v2/verify/dbpia_review.js");
+              const jobDir = v2Index.resolveJobDir(payload.jobId);
+              const out = await handleDbpiaReviewAction(jobDir, payload);
+              res.writeHead(200, { "Content-Type": "application/json; charset=utf-8" });
+              res.end(JSON.stringify(out));
+              return;
+            }
+            res.writeHead(404, { "Content-Type": "application/json; charset=utf-8" });
+            res.end(JSON.stringify({ ok: false, error: "Unknown v2 endpoint" }));
+          } catch (err) {
+            res.writeHead(500, { "Content-Type": "application/json; charset=utf-8" });
+            res.end(JSON.stringify({ ok: false, error: err.message }));
+          }
+        });
+        return;
+      }
+    }
+
     res.writeHead(404, { "Content-Type": "application/json" });
     res.end(JSON.stringify({ error: "Not found" }));
   });
@@ -6570,6 +6755,22 @@ const TOOLS = [
           type: "number",
           description:
             "Maximum autonomous Gemini ↔ DBpia AI research rounds (default: 3).",
+        },
+        engine: {
+          type: "string",
+          enum: ["v1", "v2"],
+          description:
+            "Pipeline engine selection: 'v1' (default) or 'v2' (ARCHAEO STUDIO 6.1 harness & cross-verification engine).",
+        },
+        autoApproveOutline: {
+          type: "boolean",
+          description:
+            "For v2 engine: automatically approve outline at Gate G3 (default: true for MCP).",
+        },
+        resumeJobId: {
+          type: "string",
+          description:
+            "For v2 engine: resume a paused or interrupted job by its jobId.",
         },
       },
     },
@@ -6738,6 +6939,28 @@ async function handleJsonRpcMessage(msg) {
       }
 
       if (toolName === "archaeology_auto_discussion") {
+        if (args.engine === "v2" || args.resumeJobId) {
+          const v2Index = require("./v2/index.js");
+          const v2Res = args.resumeJobId
+            ? await v2Index.resumePipelineV2(args.resumeJobId, {
+                userFocus: args.user_focus || "",
+                targetPath: args.output_dir || path.join(os.homedir(), "archaeology_reports"),
+                autoApproveOutline: args.autoApproveOutline !== undefined ? Boolean(args.autoApproveOutline) : true,
+              })
+            : await v2Index.runPipelineV2({
+                userFocus: args.user_focus || "",
+                targetPath: args.output_dir || path.join(os.homedir(), "archaeology_reports"),
+                autoApproveOutline: args.autoApproveOutline !== undefined ? Boolean(args.autoApproveOutline) : true,
+              });
+          sendMcpResponse({
+            jsonrpc: "2.0",
+            id,
+            result: {
+              content: [{ type: "text", text: JSON.stringify(v2Res, null, 2) }],
+            },
+          });
+          return;
+        }
         const res = await runArchaeologyDiscussionPipeline({
           runMode: args.run_mode || "phd_consolidate",
           userFocus: args.user_focus || "",
@@ -7023,7 +7246,26 @@ async function runCliControlMode() {
 }
 
 if (require.main === module) {
-  if (
+  if (process.argv.includes("--selftest")) {
+    const { runSelftest } = require("./v2/harness/selftest.js");
+    const literatureMode = process.argv.includes("--literature-manual") ? "manual" : "dbpia";
+    runSelftest({
+      getCdpPort,
+      ensureEmbeddedGeminiWebview,
+      withCdpSession,
+      ensureArgonHighAndWorkMode,
+      getDbpiaLoginStatus,
+      literatureMode,
+    })
+      .then((result) => {
+        console.log(JSON.stringify(result, null, 2));
+        process.exit(result.ok ? 0 : 1);
+      })
+      .catch((err) => {
+        console.error(JSON.stringify({ ok: false, error: err.message }, null, 2));
+        process.exit(1);
+      });
+  } else if (
     process.argv.includes("--off") ||
     process.argv.includes("--on") ||
     process.argv.includes("--toggle") ||
@@ -7062,4 +7304,26 @@ module.exports = {
   buildAdaptiveMasterPrompt,
   repairAndEnrichManuscriptWithVerifiedRefs,
   prepareMarkdownAndFootnotesForWordCraft,
+  extractStructuredArchaeologyReportFacts,
+  withCdpSession,
+  getCdpPort,
+  ensureEmbeddedGeminiWebview,
+  ensureArgonHighAndWorkMode,
+  getGeminiStatus,
+  resetGeminiChat,
+  injectTextIntoGeminiEditor,
+  askGeminiWeb,
+  hardStopGeminiAndPipeline,
+  getDbpiaLoginStatus,
+  askDbpiaAi,
+  extractLatestDbpiaAnswer,
+  enrichDbpiaReferencesMetadata,
+  extractTextAndInfoWithCraft,
+  buildMultiFacetedDbpiaQueries,
+  parseJsonFromGeminiReply,
+  formatVerifiedCitationLine,
+  exportManuscriptToWordCraftAndPdfCraft,
+  addPipelineLog,
+  waitWhilePausedOrAborted,
+  pipelineState,
 };

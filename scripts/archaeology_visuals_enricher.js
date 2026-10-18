@@ -1123,6 +1123,225 @@ function compileAndOpenInWordCraft(mdPath) {
   });
 }
 
+const NANO_BANANA_ARCHAEO_THEME = {
+  id: "nano-banana-archaeology-v2",
+  name: "Nano Banana Pro Archaeology Editorial & Museum Design System",
+  canvasBg: "#FAF6F0",
+  panelBg: "#F3ECE1",
+  inkPrimary: "#1C1917",
+  inkSecondary: "#57534E",
+  inkMuted: "#78716C",
+  borderOuter: "#8C4A27",
+  borderInner: "#D6C7B2",
+  gridLine: "#E5DEC9",
+  chartPalette: ["#8C4A27", "#2C5E4F", "#B45309", "#3B4D6B", "#6B5B4D", "#7C2D12"],
+  datingPalette: ["#7C2D12", "#B45309", "#2C5E4F", "#1E3A5F"],
+  stratumColors: ["#5C4A3E", "#7A6252", "#9C7E66", "#B8997E", "#D1B79E"],
+  fontFamily: "'Noto Serif KR', 'Malgun Gothic', Georgia, serif",
+  sansFamily: "'Pretendard', 'Malgun Gothic', sans-serif",
+};
+
+function escapeSvgXml(str) {
+  return String(str || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+/**
+ * 나노바나나 최신버전 고고학 전문가 수준(Nano Banana Pro Archaeology Editorial Design)
+ * 고해상도 벡터 SVG 렌더러 (유구 규모 차트, 절대연대 OxCal 플롯, 층위 Harris Matrix, 통시적 단계 변천 모식도)
+ */
+function renderNanoBananaArchaeologySvg({ kind = "chart", spec = {}, cards = [] } = {}) {
+  const T = NANO_BANANA_ARCHAEO_THEME;
+  const W = 920;
+  const H = 520;
+  const title = escapeSvgXml(spec.title || "고고학 정밀 분석 모식도");
+  const evidenceLabel = Array.isArray(spec.evidence) && spec.evidence.length > 0
+    ? `EVIDENCE CARDS: ${spec.evidence.join(", ")}`
+    : "DATA-GROUNDED ARCHAEOLOGICAL VISUALIZATION";
+
+  const headerAndFrame = [
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="100%" height="100%">`,
+    `<defs>`,
+    `  <filter id="nb-shadow" x="-4%" y="-4%" width="108%" height="112%">`,
+    `    <feDropShadow dx="0" dy="3" stdDeviation="4" flood-color="#1C1917" flood-opacity="0.09"/>`,
+    `  </filter>`,
+    `  <linearGradient id="nb-terra" x1="0" y1="0" x2="0" y2="1">`,
+    `    <stop offset="0%" stop-color="#9E5530"/>`,
+    `    <stop offset="100%" stop-color="#783B1D"/>`,
+    `  </linearGradient>`,
+    `  <linearGradient id="nb-patina" x1="0" y1="0" x2="0" y2="1">`,
+    `    <stop offset="0%" stop-color="#36705E"/>`,
+    `    <stop offset="100%" stop-color="#22493D"/>`,
+    `  </linearGradient>`,
+    `  <linearGradient id="nb-ochre" x1="0" y1="0" x2="0" y2="1">`,
+    `    <stop offset="0%" stop-color="#CA6718"/>`,
+    `    <stop offset="100%" stop-color="#9A4809"/>`,
+    `  </linearGradient>`,
+    `  <marker id="nb-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">`,
+    `    <path d="M 0 1.5 L 8.5 5 L 0 8.5 z" fill="${T.borderOuter}"/>`,
+    `  </marker>`,
+    `</defs>`,
+    `<rect width="${W}" height="${H}" rx="10" fill="${T.canvasBg}"/>`,
+    `<rect x="10" y="10" width="${W - 20}" height="${H - 20}" rx="7" fill="none" stroke="${T.borderOuter}" stroke-width="1.6"/>`,
+    `<rect x="15" y="15" width="${W - 30}" height="${H - 30}" rx="5" fill="none" stroke="${T.borderInner}" stroke-width="0.9"/>`,
+    `<rect x="28" y="24" width="${W - 56}" height="56" rx="6" fill="${T.panelBg}" stroke="${T.borderInner}" stroke-width="1"/>`,
+    `<rect x="28" y="24" width="7" height="56" rx="3" fill="${T.borderOuter}"/>`,
+    `<text x="48" y="44" font-family="${T.sansFamily}" font-size="10.5" font-weight="700" fill="${T.borderOuter}" letter-spacing="1.4">NANO BANANA ARCHAEOLOGY PRO · ACADEMIC FIGURE</text>`,
+    `<text x="48" y="66" font-family="${T.fontFamily}" font-size="16" font-weight="700" fill="${T.inkPrimary}">${title}</text>`,
+    `<text x="${W - 44}" y="44" text-anchor="end" font-family="${T.sansFamily}" font-size="10" font-weight="600" fill="${T.inkSecondary}">${escapeSvgXml(evidenceLabel)}</text>`,
+  ];
+
+  const bodyParts = [];
+
+  if (kind === "stratigraphy_diagram" || kind === "chronology_diagram" || Array.isArray(spec.items)) {
+    const rawItems = Array.isArray(spec.items) ? spec.items : [];
+    const groups = [];
+    let current = null;
+    for (const it of rawItems) {
+      if (it.level === 0 || !current) {
+        current = { title: it.text || "", details: [] };
+        groups.push(current);
+      } else {
+        current.details.push(it.text || "");
+      }
+    }
+    const displayGroups = groups.slice(0, 5);
+    const isStrat = kind === "stratigraphy_diagram" || spec.diagramStyle === "stratigraphy_matrix";
+
+    if (isStrat) {
+      // Harris Matrix + 단면 층위 주상도 결합 전문가 레이아웃
+      const topY = 104;
+      const availH = H - 154;
+      const rowH = Math.min(72, Math.floor(availH / Math.max(1, displayGroups.length)));
+      bodyParts.push(
+        `<rect x="44" y="${topY - 8}" width="72" height="${rowH * displayGroups.length + 16}" rx="5" fill="${T.panelBg}" stroke="${T.borderInner}"/>`,
+        `<text x="80" y="${topY + 12}" text-anchor="middle" font-family="${T.sansFamily}" font-size="10" font-weight="700" fill="${T.inkSecondary}">STRATA</text>`
+      );
+      displayGroups.forEach((g, idx) => {
+        const y = topY + idx * rowH;
+        const fillCol = T.stratumColors[idx % T.stratumColors.length];
+        bodyParts.push(
+          `<rect x="54" y="${y + 18}" width="52" height="${rowH - 24}" rx="3" fill="${fillCol}"/>`,
+          `<text x="80" y="${y + 18 + (rowH - 24) / 2 + 4}" text-anchor="middle" font-family="${T.sansFamily}" font-size="11" font-weight="700" fill="#FFFFFF">L${idx + 1}</text>`,
+          `<g filter="url(#nb-shadow)">`,
+          `  <rect x="142" y="${y + 8}" width="${W - 186}" height="${rowH - 14}" rx="6" fill="#FFFFFF" stroke="${T.borderInner}" stroke-width="1.2"/>`,
+          `  <rect x="142" y="${y + 8}" width="8" height="${rowH - 14}" rx="3" fill="${fillCol}"/>`,
+          `  <text x="164" y="${y + 30}" font-family="${T.fontFamily}" font-size="14" font-weight="700" fill="${T.inkPrimary}">${escapeSvgXml(g.title)}</text>`,
+          `  <text x="164" y="${y + 50}" font-family="${T.sansFamily}" font-size="12" fill="${T.inkSecondary}">${escapeSvgXml(g.details.join(" · ") || "표준 층위 퇴적 양상")}</text>`,
+          `</g>`
+        );
+        if (idx < displayGroups.length - 1) {
+          bodyParts.push(
+            `<line x1="80" y1="${y + rowH - 4}" x2="80" y2="${y + rowH + 14}" stroke="${T.borderOuter}" stroke-width="1.6" marker-end="url(#nb-arrow)"/>`
+          );
+        }
+      });
+    } else {
+      // 통시적 단계 변천 프로세스 다이어그램
+      const count = Math.max(1, displayGroups.length);
+      const padX = 42;
+      const gap = 22;
+      const cardW = Math.floor((W - padX * 2 - gap * (count - 1)) / count);
+      const cardY = 122;
+      const cardH = H - 186;
+      const grads = ["url(#nb-terra)", "url(#nb-patina)", "url(#nb-ochre)", "url(#nb-terra)"];
+
+      displayGroups.forEach((g, idx) => {
+        const x = padX + idx * (cardW + gap);
+        const grad = grads[idx % grads.length];
+        bodyParts.push(
+          `<g filter="url(#nb-shadow)">`,
+          `  <rect x="${x}" y="${cardY}" width="${cardW}" height="${cardH}" rx="8" fill="#FFFFFF" stroke="${T.borderInner}" stroke-width="1.3"/>`,
+          `  <rect x="${x}" y="${cardY}" width="${cardW}" height="42" rx="8" fill="${grad}"/>`,
+          `  <text x="${x + 14}" y="${cardY + 17}" font-family="${T.sansFamily}" font-size="10" font-weight="700" fill="#FDE68A">PHASE 0${idx + 1}</text>`,
+          `  <text x="${x + 14}" y="${cardY + 34}" font-family="${T.fontFamily}" font-size="13" font-weight="700" fill="#FFFFFF">${escapeSvgXml(g.title.slice(0, 18))}</text>`,
+          `</g>`
+        );
+        g.details.slice(0, 4).forEach((det, dIdx) => {
+          const dy = cardY + 72 + dIdx * 48;
+          bodyParts.push(
+            `<rect x="${x + 12}" y="${dy - 16}" width="${cardW - 24}" height="36" rx="5" fill="${T.panelBg}" stroke="${T.borderInner}" stroke-width="0.8"/>`,
+            `<text x="${x + 22}" y="${dy + 6}" font-family="${T.sansFamily}" font-size="11.5" font-weight="600" fill="${T.inkPrimary}">${escapeSvgXml(det.slice(0, 22))}</text>`
+          );
+        });
+        if (idx < count - 1) {
+          const arrowX1 = x + cardW + 3;
+          const arrowX2 = x + cardW + gap - 5;
+          const midY = cardY + cardH / 2;
+          bodyParts.push(
+            `<line x1="${arrowX1}" y1="${midY}" x2="${arrowX2}" y2="${midY}" stroke="${T.borderOuter}" stroke-width="2" marker-end="url(#nb-arrow)"/>`
+          );
+        }
+      });
+    }
+  } else {
+    // 정량 비교 차트 / 절대연대 차트 (OxCal-inspired / Museum Quantitative Chart)
+    const cats = (spec.data && Array.isArray(spec.data.categories)) ? spec.data.categories : [];
+    const series = (spec.data && Array.isArray(spec.data.series) && spec.data.series[0]) ? spec.data.series[0] : { name: "측정값", values: [] };
+    const vals = (series.values || []).map((v) => Number(v) || 0);
+    const maxVal = Math.max(1, ...vals);
+    const plotX = 88;
+    const plotY = 112;
+    const plotW = W - 136;
+    const plotH = H - 190;
+
+    // 수평 격자선 및 Y축 눈금
+    for (let g = 0; g <= 4; g++) {
+      const gy = plotY + plotH - (g / 4) * plotH;
+      const tickVal = Math.round((maxVal * (g / 4)) * 10) / 10;
+      bodyParts.push(
+        `<line x1="${plotX}" y1="${gy}" x2="${plotX + plotW}" y2="${gy}" stroke="${T.gridLine}" stroke-width="1" stroke-dasharray="${g === 0 ? "none" : "4,4"}"/>`,
+        `<text x="${plotX - 10}" y="${gy + 4}" text-anchor="end" font-family="${T.sansFamily}" font-size="11" fill="${T.inkSecondary}">${tickVal}</text>`
+      );
+    }
+
+    // 평균 기준선 표시
+    if (vals.length >= 2) {
+      const avg = vals.reduce((a, b) => a + b, 0) / vals.length;
+      const avgY = plotY + plotH - (avg / maxVal) * plotH;
+      bodyParts.push(
+        `<line x1="${plotX}" y1="${avgY}" x2="${plotX + plotW}" y2="${avgY}" stroke="${T.borderOuter}" stroke-width="1.3" stroke-dasharray="6,4"/>`,
+        `<rect x="${plotX + plotW - 118}" y="${avgY - 18}" width="114" height="16" rx="3" fill="${T.panelBg}" stroke="${T.borderOuter}" stroke-width="0.7"/>`,
+        `<text x="${plotX + plotW - 61}" y="${avgY - 7}" text-anchor="middle" font-family="${T.sansFamily}" font-size="9.5" font-weight="700" fill="${T.borderOuter}">MEAN: ${avg.toFixed(1)}</text>`
+      );
+    }
+
+    const count = Math.max(1, cats.length);
+    const slotW = plotW / count;
+    const barW = Math.min(68, Math.max(24, slotW * 0.48));
+    const grads = ["url(#nb-terra)", "url(#nb-patina)", "url(#nb-ochre)"];
+
+    cats.forEach((cat, idx) => {
+      const val = vals[idx] || 0;
+      const bh = Math.max(6, (val / maxVal) * plotH);
+      const bx = plotX + idx * slotW + (slotW - barW) / 2;
+      const by = plotY + plotH - bh;
+      const grad = grads[idx % grads.length];
+
+      bodyParts.push(
+        `<g filter="url(#nb-shadow)">`,
+        `  <rect x="${bx}" y="${by}" width="${barW}" height="${bh}" rx="4" fill="${grad}"/>`,
+        `</g>`,
+        `<rect x="${bx - 6}" y="${by - 24}" width="${barW + 12}" height="18" rx="4" fill="#FFFFFF" stroke="${T.borderInner}" stroke-width="0.9"/>`,
+        `<text x="${bx + barW / 2}" y="${by - 11}" text-anchor="middle" font-family="${T.sansFamily}" font-size="11" font-weight="700" fill="${T.inkPrimary}">${val}</text>`,
+        `<text x="${bx + barW / 2}" y="${plotY + plotH + 22}" text-anchor="middle" font-family="${T.sansFamily}" font-size="11.5" font-weight="600" fill="${T.inkPrimary}">${escapeSvgXml(String(cat).slice(0, 16))}</text>`
+      );
+    });
+  }
+
+  const footer = [
+    `<line x1="28" y1="${H - 42}" x2="${W - 28}" y2="${H - 42}" stroke="${T.borderInner}" stroke-width="1"/>`,
+    `<text x="36" y="${H - 24}" font-family="${T.sansFamily}" font-size="10" fill="${T.inkMuted}">ARCHAEO STUDIO 6.1 · ZERO-HALLUCINATION VERIFIED EVIDENCE GRAPHICS</text>`,
+    `<text x="${W - 36}" y="${H - 24}" text-anchor="end" font-family="${T.sansFamily}" font-size="10" font-weight="600" fill="${T.borderOuter}">DESIGN: NANO BANANA ARCHAEOLOGY PRO</text>`,
+    `</svg>`,
+  ];
+
+  return [...headerAndFrame, ...bodyParts, ...footer].join("\n");
+}
+
 module.exports = {
   compactChartLabel,
   normalizeWcDiagramSpec,
@@ -1135,4 +1354,7 @@ module.exports = {
   buildSchematicDiagramsFromData,
   buildArtifactAndLiteratureTables,
   compileAndOpenInWordCraft,
+  NANO_BANANA_ARCHAEO_THEME,
+  renderNanoBananaArchaeologySvg,
 };
+

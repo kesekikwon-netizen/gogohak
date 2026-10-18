@@ -1,26 +1,23 @@
-# 🏛️ ARCHAEO STUDIO 5.0 (gogohak)
-**한국 고고학 발굴조사보고서 『Ⅳ. 고찰(考察)』 · 학술지 투고 『논문』 자동 집필·조판 워크스테이션**  
-*(WordCraft 네이티브 통합 × Google Gemini '작업' 모드 × DBpia AI × PdfCraft 필요시 변환)*
+# 🏛️ ARCHAEO STUDIO 6.1 (gogohak)
+**한국 고고학 발굴조사보고서 『Ⅳ. 고찰(考察)』 · 학술지 투고 『논문』 자동 집필·검증·조판 워크스테이션**  
+*(하네스 감독기 × 근거 저장소(F/R/D) × Gemini 4 Argon High '작업' 모드 × DBpia AI × 독립 교차검증(V1~V8·X1~X4) × Claude 2차 인계 × WordCraft/PdfCraft 네이티브 통합)*
 
 ---
 
 ## ✨ 핵심 특징
 
-1. **안티그라비티(Antigravity) 코딩 토큰 0% 소모**
-   - 안티그라비티 내부의 **Google Gemini 웹 세션(`https://gemini.google.com/app`, '작업' 모드 / 4 Argon High)** 및 **DBpia AI**를 직접 구동하여 수백 쪽의 고찰·논문을 작성해도 에이전트 코딩 쿼터가 전혀 줄어들지 않습니다.
-2. **좌측 ARCHAEO STUDIO (Step 01~06) × 우측 WordCraft(`.docx`) 일체형 작업**
-   - **방식 A (네이티브 통합)**: `WordCraft`(`wordcraft.exe`)를 켜면 좌측에 **ARCHAEO STUDIO 도킹 패널**이 바로 열리고, 우측 A4 캔버스에서 실시간으로 `.docx` 원고·표·각주·차트·모식도를 편집합니다.
-   - **방식 B (전용 웹 스튜디오)**: `ARCHAEOLOGY_STUDIO_실행.bat` 실행 시 테라코타·한지 학술 테마가 적용된 풀스크린 스튜디오(`http://127.0.0.1:18787/studio`)와 `WordCraft`가 연동됩니다.
-   - **PDF 변환(`PdfCraft`)**: 평소 모든 작업은 `WordCraft(.docx)` 중심으로 진행하며, 완성 후 **[PDF로 내보내기]** 버튼을 누를 때만 PDF로 변환됩니다.
-3. **고고학 발굴조사보고서 『Ⅳ. 고찰』 · 『논문』 6대 핵심 품질 보증**
-   - **1차 가공(프롬프트 엔지니어링)**: 조사개요·유구·유물 메모를 고고학 논증 구조 지시문으로 1차 가공 후 검토 가능
-   - **없는 자료 날조 절대 금지(`없는 자료는 없는 대로`)**: 절대연대(AMS)·자연과학분석 자료가 없으면 임의 수치를 지어내지 않고 상대편년·형식학 논증에 집중
-   - **유구 중복관계·층위 선후관계 최우선 논증**: 물리적 파괴·중복 및 층위 관계를 제1절 편년의 최우선 근거로 서술
-   - **필수 학술 표 2종 자동 편성**: `<표 1> 주요 유구·출토유물 속성 일람표`, `<표 2> 주변 병행유적 비교 대비표`
-   - **Gemini 직접 생성 네이티브 차트(`wc-chart`) & 분기·계통 모식도(`wc-diagram`)**: `.docx` 내부에 편집 가능한 진짜 OOXML 차트·다이어그램 개체로 자동 삽입
-   - **한국 고고학 표준 반괄호 하단 각주 `1)`, `2)` & `【참고문헌】` 1:1 검증**: 본문 인용 각주를 페이지 하단 분리선 아래 진짜 각주로 변환하고 `『보고서/학술지』`, `「논문」`, `00~00쪽` 규격 및 1:1 일치 검증 수행
-4. **한글 폰트 깨짐(`□□□`) 완벽 해결**
-   - `.docx` 테마 폰트(`Malgun Gothic`) 자동 고정 및 `WordCraft` / `PdfCraft` 시스템 한글 폰트 폴백 탑재 완료.
+1. **안티그라비티(Antigravity) 코딩 토큰 0% 소모 & 하네스(Supervisor) 감독 계층 (`scripts/v2/harness/`)**
+   - 안티그라비티 내부의 **Google Gemini 웹 세션(`https://gemini.google.com/app`, '작업' 모드 / 4 Argon High)** 및 **DBpia AI**를 직접 구동하여 에이전트 코딩 쿼터 소모가 0%입니다.
+   - 모든 외부 도구 호출(Gemini·DBpia·PdfCraft·WordCraft)을 **하네스 감독기(`supervisor.js`)**가 감싸 시간 초과·재시도·체크포인트 재개(`checkpoint.js`)·화면 구조 변화 감지(`dom_Contract.js`)·사전 자가진단(`preflight.js`)·구조화 로그(`run_logger.js`)를 보장합니다.
+2. **근거 중심 9단계 파이프라인 (`P1~P9`, `scripts/v2/`) — 원자료 날조 원천 차단**
+   - **쪽 보존 추출(`page_extractor.js`) & 사실표 추출(`fact_extractor.js`)**: 보고서 PDF를 쪽 단위로 분리하고 모든 유구·유물·수치·연대를 `F-0001`(근거 쪽·원문 인용 포함)로, 비교 문헌을 `R-001`로, 연대 시료를 `D-01`로 근거 저장소(`evidence_store.js`)에 등록합니다.
+   - **절 단위 분할 집필(`section_writer.js`) & 근거 표지(`markers.js`)**: 모든 정량 수치 뒤에는 `[F-xxxx]`, 모든 문헌 주장 뒤에는 `[R-xxx]` 표지를 강제하며, 근거 없는 수치는 생성 단계에서 거부합니다.
+3. **결정적 검사(`V1~V8`) × 독립 교차검증 대화 3종(`X1~X3`) × 합의 규칙(`X4`) × 최종 DBpia AI 문헌 검수(`P7.5`)**
+   - **결정적 검사(`verify/deterministic.js`)**: 미등록 표지(`V1`), 본문 수치-사실표 대조(`V2`), 연대 날조(`V3`), 각주-참고문헌 1:1(`V4`), 표·차트·모식도 원본 일치(`V5`), 금지 구문(`V6`), 절 분량·종결어미(`V7`), 원문 문장 대조(`V8`).
+   - **독립 교차검증(`verify/cross_verifier.js`)**: 집필 대화와 완전히 분리된 새 Gemini 대화 3개(`X1` 사실 대조, `X2` 인용·논지 검증, `X3` 심사위원 동료심사)를 열고 `X4` 합의 규칙(`verify/consensus.js`)으로 판정합니다.
+   - **Claude 2차 다듬기 인계(`handoff.js`, `G6`) & 최종 DBpia AI 문헌 검수(`verify/dbpia_review.js`, `G7`)**: 1차 원고와 근거 묶음을 내보내고 Claude 2차 원고를 재검증(`V1~V8`)한 뒤, 최종 원고의 핵심 주장을 DBpia AI에 재질의해 학계 정설 위배(`contradicted`)나 누락 필독 문헌(`missing_must_cite`)을 최종 점검합니다.
+4. **Nano Banana 최신 버전 전문가 디자이너급 고고학 모식도(`wc-diagram`) · 차트(`wc-chart`) 렌더러 (`archaeology_visuals_enricher.js`)**
+   - 사실표(`F-*`)와 문헌 카드(`R-*`)에서 직접 도출된 데이터만으로 차트·모식도·비교표를 생성하며(`visuals_from_facts.js`), Studio A4 캔버스와 WordCraft(`.docx`)에 전문가 학술 출판 수준의 Nano Banana Pro 고고학 팔레트·그라데이션·드롭섀도·정밀 타이포그래피 SVG 및 OOXML 개체로 렌더링합니다.
 
 ---
 
@@ -33,11 +30,16 @@
    cd gogohak
    .\새컴퓨터_자동설정.bat
    ```
-3. **실행**:
+3. **실행 및 검증**:
    - 바탕화면에 생성된 **`ARCHAEO_STUDIO_실행.bat`** 더블클릭 (또는 `bin\wordcraft\wordcraft-0.7.0-windows-x64-portable\wordcraft.exe` 실행)
+   - 파이프라인 버전 선택: 기본 `v2` (6.1 하네스·교차검증 파이프라인) 또는 `--pipeline=v1` (`ARCHAEO_PIPELINE=v1`)으로 레거시 전환 가능
+   - 로컬 검증 관문 실행: `node scripts/v2/tools/check.js` (단위 테스트 33종 + 문법 검사 + 금지 패턴 검사 + 스킬 동기화 검사)
 
 ---
 
 ## 📘 상세 설계도 문서
-- **[1_ARCHAEO_STUDIO_전체개발방법_설계도.md](./1_ARCHAEO_STUDIO_전체개발방법_설계도.md)**: 전체 아키텍처, REA 역공학 기법, Gemini×DBpia×WordCraft 연동 원리, 각주·차트·모식도·한글 폰트 해결 방법 총정리
+- **[ARCHAEO_STUDIO_6.1_Antigravity_구현명세서_하네스_교차검증.md](./ARCHAEO_STUDIO_6.1_Antigravity_구현명세서_하네스_교차검증.md)**: ARCHAEO STUDIO 6.1 전체 아키텍처, 하네스, 근거 저장소, V1~V8 / X1~X4 교차검증, Claude 2차 인계, 최종 DBpia AI 문헌 검수, 14장 개발 절차(SDLC) 명세서
+- **[1_ARCHAEO_STUDIO_전체개발방법_설계도.md](./1_ARCHAEO_STUDIO_전체개발방법_설계도.md)**: 전체 아키텍처, REA 역공학 기법, Gemini×DBpia×WordCraft 연동 원리, 각주·차트·모식도·한글 폰트·6.1 하네스/교차검증 총정리
 - **[2_ARCHAEO_STUDIO_타컴퓨터이식_및_향후확장_설계도.md](./2_ARCHAEO_STUDIO_타컴퓨터이식_및_향후확장_설계도.md)**: 타 PC 이식 절차 및 향후 학술 DB·도판 자동 삽입 확장 가이드
+- **[docs/v6_평가결과.md](./docs/v6_평가결과.md)**: 가상 보고서 3종에 대한 `v1` 대 `v2` 정량 비교 평가 결과
+
