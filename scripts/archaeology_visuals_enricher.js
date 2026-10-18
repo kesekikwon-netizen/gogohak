@@ -9,62 +9,124 @@
  *   2) The verified DBpia AI literature (`collectedPapers` + `liveResearchFeed`)
  */
 
-function compactSmartArtLabel(raw) {
-  let s = String(raw || "").replace(/\s+/g, " ").trim();
-  if (s.length <= 28) return s;
-  // Strip verbose parenthetical details cleanly (including nested parens) if string is long
-  const withoutParens = s
+function splitIntoShortChunks(str, maxLen = 12, maxChunks = 2) {
+  const clean = String(str || "")
     .replace(/\s*\([^()]*(?:\([^()]*\)[^()]*)*\)/g, "")
-    .replace(/[()]+$/g, "")
+    .replace(/[()[\]]+/g, "")
+    .replace(/\s+/g, " ")
     .trim();
-  if (withoutParens.length >= 6 && withoutParens.length <= 28) {
-    return withoutParens;
+  if (!clean) return [];
+  if (clean.length <= maxLen) return [clean];
+  const chunks = [];
+  let rem = clean;
+  while (rem.length > 0 && chunks.length < maxChunks) {
+    if (rem.length <= maxLen) {
+      chunks.push(rem);
+      break;
+    }
+    let cut = rem.lastIndexOf(" ", maxLen);
+    if (cut < 4) cut = rem.lastIndexOf("·", maxLen);
+    if (cut < 4) cut = maxLen;
+    chunks.push(rem.slice(0, cut).replace(/^[:·\-\s]+|[:·\-\s]+$/g, ""));
+    rem = rem.slice(cut).replace(/^[:·\-\s]+/, "");
   }
-  return (withoutParens || s).slice(0, 27).replace(/[()]+$/g, "").trim();
+  return chunks.filter(Boolean);
+}
+
+function normalizeSmartArtItems(rawItems = []) {
+  const flat = rawItems
+    .map((it) =>
+      typeof it === "string"
+        ? { text: it.trim(), level: 0 }
+        : {
+            text: String(it.text || it.label || it.name || it.title || "").trim(),
+            level: Number(it.level || 0),
+          }
+    )
+    .filter((it) => it.text);
+
+  // Ensure we have 3 or 4 level-0 boxes so SmartArt renders balanced multi-box columns
+  let roots = flat.filter((it) => it.level === 0);
+  let grouped = [];
+  if (roots.length >= 2 && roots.length <= 4) {
+    let curGroup = null;
+    for (const it of flat) {
+      if (it.level === 0) {
+        curGroup = { title: it.text, children: [] };
+        grouped.push(curGroup);
+      } else if (curGroup) {
+        curGroup.children.push(it.text);
+      }
+    }
+  } else {
+    // Regroup flat items into 3 balanced boxes
+    const groupCount = Math.min(3, Math.max(2, Math.ceil(flat.length / 2)));
+    const perGroup = Math.ceil(flat.length / groupCount);
+    for (let g = 0; g < groupCount; g++) {
+      const slice = flat.slice(g * perGroup, (g + 1) * perGroup);
+      if (slice.length === 0) continue;
+      grouped.push({
+        title: slice[0].text,
+        children: slice.slice(1).map((x) => x.text),
+      });
+    }
+  }
+
+  const out = [];
+  for (const grp of grouped.slice(0, 4)) {
+    const rawTitle = grp.title;
+    const colonIdx = rawTitle.indexOf(":");
+    let boxHeader = "";
+    let extraChild = "";
+    if (colonIdx > 0 && colonIdx <= 10) {
+      boxHeader = rawTitle.slice(0, colonIdx).trim();
+      extraChild = rawTitle.slice(colonIdx + 1).trim();
+    } else {
+      const titleChunks = splitIntoShortChunks(rawTitle, 9, 2);
+      boxHeader = titleChunks[0] || rawTitle.slice(0, 9);
+      extraChild = titleChunks.slice(1).join(" ");
+    }
+    out.push({ text: boxHeader.slice(0, 9), level: 0 });
+    const allChildren = [extraChild, ...grp.children].filter(Boolean);
+    const childLines = [];
+    for (const ch of allChildren) {
+      for (const line of splitIntoShortChunks(ch, 11, 2)) {
+        if (childLines.length < 3) childLines.push(line);
+      }
+    }
+    for (const cl of childLines) {
+      out.push({ text: cl, level: 1 });
+    }
+  }
+  return out;
 }
 
 function normalizeWcDiagramSpec(spec) {
   if (!spec || typeof spec !== "object") return null;
   if (Array.isArray(spec.items) && spec.items.length > 0) {
-    const items = spec.items
-      .map((it) =>
-        typeof it === "string"
-          ? { text: compactSmartArtLabel(it), level: 0 }
-          : {
-              text: compactSmartArtLabel(it.text || it.label || it.name || it.title || ""),
-              level: Number(it.level || 0),
-            }
-      )
-      .filter((it) => it.text);
-    const rootCount = items.filter((it) => it.level === 0).length;
-    const layout =
-      (spec.layout || "process") === "hierarchy" && rootCount > 3
-        ? "process"
-        : spec.layout || "process";
-    return {
-      layout,
-      colors: spec.colors || "accent1",
-      title: spec.title || "고고학 구조·층위·편년 변천 모식도",
-      items,
-    };
+    const items = normalizeSmartArtItems(spec.items);
+    if (items.length > 0) {
+      return {
+        layout: "process",
+        colors: spec.colors || "accent1",
+        title: spec.title || "고고학 구조·층위·편년 변천 모식도",
+        items,
+      };
+    }
   }
   const rawNodes = spec.nodes || spec.steps || spec.stages;
   if (Array.isArray(rawNodes) && rawNodes.length > 0) {
-    const items = rawNodes
-      .map((n, idx) => {
-        if (typeof n === "string") {
-          return { text: compactSmartArtLabel(n), level: idx === 0 ? 0 : 1 };
-        }
-        const label = String(n.label || n.text || n.name || n.title || "").trim();
-        const desc = String(n.description || n.detail || n.subtext || "").trim();
-        const fullText = desc && !label.includes(desc) ? `${label}: ${desc}` : label;
-        const level = typeof n.level === "number" ? n.level : idx === 0 ? 0 : 1;
-        return { text: compactSmartArtLabel(fullText), level };
-      })
-      .filter((it) => it.text);
+    const rawItems = rawNodes.map((n) => {
+      if (typeof n === "string") return { text: n, level: 0 };
+      const label = String(n.label || n.text || n.name || n.title || "").trim();
+      const desc = String(n.description || n.detail || n.subtext || "").trim();
+      const fullText = desc && !label.includes(desc) ? `${label}: ${desc}` : label;
+      return { text: fullText, level: typeof n.level === "number" ? n.level : 0 };
+    });
+    const items = normalizeSmartArtItems(rawItems);
     if (items.length > 0) {
       return {
-        layout: items.length > 5 ? "process" : spec.layout || "hierarchy",
+        layout: "process",
         colors: spec.colors || "accent1",
         title: spec.title || "고고학 구조·층위·편년 변천 모식도",
         items,
@@ -353,7 +415,11 @@ function buildSchematicDiagramsFromData(
     ],
   };
 
-  return [diag1Spec, diag2Spec, diag3Spec];
+  return [
+    normalizeWcDiagramSpec(diag1Spec),
+    normalizeWcDiagramSpec(diag2Spec),
+    normalizeWcDiagramSpec(diag3Spec),
+  ];
 }
 
 function buildArtifactAndLiteratureTables(
@@ -647,8 +713,8 @@ function replaceInlineFootnoteSafely(bodyText, num, token, supNum) {
     new RegExp(`(\\[\\^${num}\\])`, "g"),
     new RegExp(`(\\[${num}\\])`, "g"),
     new RegExp(`(${supNum}\\))`, "g"),
-    new RegExp(`([.다됨함음임”"'\\])])[ \\t]*(?<![0-9(])(${num}\\))(?!\\s*[가-힣A-Za-z])`, "g"),
-    new RegExp(`([가-힣a-zA-Z.”"'\\])])[ \\t]*(?<![0-9(])(${num}\\))(?!\\s*[가-힣A-Za-z])`, "g"),
+    new RegExp(`((?:(?<![0-9])\\.|[다됨함음임”"'\\])]))[ \\t]*(?<![0-9.(])(${num}\\))(?!\\s*[가-힣A-Za-z])`, "g"),
+    new RegExp(`([가-힣a-zA-Z”"'\\])])[ \\t]*(?<![0-9.(])(${num}\\))(?!\\s*[가-힣A-Za-z])`, "g"),
   ];
 
   for (const pat of inlinePatterns) {
