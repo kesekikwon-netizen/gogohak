@@ -402,3 +402,43 @@ $Shortcut.Save()
 4. **모듈 4 — 스튜디오 캔버스 DBpia 실시간 현황 보드(`#dbpia-live-board`) 및 A4 다중 쪽(`- 1 -`, `- 2 -`, `- 3 -`...) 자동 분할 조판**:
    - `PHASE_2_DBPIA_LOOP` 진행 중 우측 캔버스 상단에 실시간 검색어·학술 요점·수집 논문 카드를 즉시 표시하고, 원고 작성 시 블록 높이를 계산하여 독립된 A4 시트(`.as-page`) 여러 장으로 자동 페이지네이션하며 각 쪽 하단에 해당 쪽의 반괄호 각주(`.as-page__notes`)를 분리 배치합니다.
 
+---
+
+## 8. ARCHAEO STUDIO 6.1 (`scripts/v2/`) — 하네스 감독기 · 근거 저장소 · 독립 교차검증 · Claude 2차 인계 · 최종 DBpia AI 검수 · Nano Banana Pro 고고학 도면 엔진
+
+### 8.1 하네스(Harness) 감독 계층 (`scripts/v2/harness/`)
+- **사전 자가진단 (`preflight.js`)**: 파이프라인 시작 전 CDP 포트(`9223`/`DevToolsActivePort`), Gemini 탭(`4 Argon High` + `'작업'` 모드 잠금 여부), DBpia AI 로그인 세션, `pdfcraft-cli.exe` / `wordcraft-cli.exe` 바이너리 및 작업 폴더 쓰기 권한을 점검합니다.
+- **화면 요소 계약 (`dom_Contract.js`)**: Gemini 입력창·전송 버튼·스트리밍 완료 상태·모델/모드 선택기와 DBpia 입력창·Vetter API 경로를 버전 관리되는 계약 객체로 분리하여 DOM 변경 시 즉시 원인을 진단합니다.
+- **호출 감독기 (`supervisor.js`) & 체크포인트 (`checkpoint.js`)**:
+  - 모든 외부 호출(`gemini_ask`, `dbpia_ask`, `pdfcraft_extract`, `wordcraft_compile`)에 시간 초과·지수 백오프 재시도·출력 파서 검증을 적용합니다.
+  - Gemini 호출 전 `ensureGeminiEffortLock`으로 `4 Argon High` + `'작업'` 모드를 설정 후 다시 읽어 검증하며, 응답 끝 표식(`<<<END>>>` 또는 JSON 닫힘)이 없으면 잘림(`output_truncated`)으로 판정해 이어받기 호출을 수행합니다.
+  - 각 단계(`P1`~`P9`) 완료 시 `<작업폴더>/checkpoint.json`에 원자적으로 저장하여 중단 시 마지막 완료 단계 다음부터 즉시 재개합니다.
+
+### 8.2 근거 저장소 (`evidence_store.js`) 및 9단계 파이프라인 (`P1~P9`)
+1. **`P1` 쪽 보존 추출 (`page_extractor.js`) & 사실표 추출 (`fact_extractor.js`, 관문 `G1`)**:
+   - 업로드된 보고서/자료를 쪽 단위로 보존 추출하고, 모든 유구 제원·출토유물·층위·중복관계·연대 시료를 `F-0001`(근거 쪽 `source_page` 및 원문 인용 `verbatim_quote` 필수), `D-01`로 구조화합니다.
+2. **`P2` 결정적 DBpia 검색어 생성 (`query_builder.js`) & 문헌 카드화 (`literature_cards.js`, 관문 `G2`)**:
+   - 사실표(`F-*`)의 집계 빈도에서 시대·유구·유물·지역 키워드를 도출하여 3개 관점 질의를 생성하고, 수집된 논문을 `R-001`(저자·연도·제목·학술지·쪽수·원문 발췌 `verbatim_quotes`·핵심 주장 `claims`)로 정규화합니다.
+3. **`P3` 절별 논증 계획 (`outline_planner.js`, 관문 `G3`)**:
+   - 각 절(`S1`~`S5`)이 사용할 사실 ID(`fact_ids`), 문헌 ID(`ref_ids`), 필수 표·차트·모식도 배정을 확정합니다.
+4. **`P4` 절 단위 분할 집필 (`section_writer.js`) & 표·도면 생성 (`visuals_from_facts.js`, 관문 `G4`)**:
+   - 한 번의 Gemini 호출에 한 절만 작성하며 해당 절에 배정된 `F-*`/`R-*`/`D-*` 카드만 전달합니다.
+   - 모든 수치 뒤에는 `[F-xxxx]`, 모든 문헌 인용 뒤에는 `[R-xxx]` 표지를 강제합니다 (`markers.js`).
+   - 표(`표 1`~`표 4`), 차트(`wc-chart`), 모식도(`wc-diagram`)는 LLM 자유 생성이 아니라 `visuals_from_facts.js`가 사실표(`F-*`)와 문헌 카드(`R-*`)에서 결정론적으로 생성합니다.
+5. **`P5~P6` 결정적 검사 (`V1~V8`, `verify/deterministic.js`) × 독립 교차검증 대화 3종 (`X1~X3`, `verify/cross_verifier.js`) × 합의 규칙 (`X4`, `verify/consensus.js`, 관문 `G5`)**:
+   - **`V1~V8`**: 미등록 표지(`V1`), 무표지 수치(`V2`), 연대 날조(`V3`), 각주-참고문헌 1:1(`V4`), 표·도면 원본 대조(`V5`), 금지 구문(`V6`), 절 분량·종결어미(`V7`), 원문 문장 대조(`V8`).
+   - **`X1~X3` 독립 검증 대화**: 집필 대화와 분리된 새 Gemini 대화 3개를 열어 사실 대조(`X1`), 인용·논지 검증(`X2`), 학술 심사(`X3`)를 수행하고 `X4` 합의 규칙으로 판정합니다.
+6. **`P7` Claude 2차 다듬기 인계 (`handoff.js`, 관문 `G6`)**:
+   - `handoff/` 폴더에 `01_draft_marked.md`, `02_facts.json`, `03_references.json`, `04_verification_report.json`, `05_claude_instructions.md`를 내보내고, Claude가 다듬은 `06_claude_revised_marked.md`를 가져와 `V1~V8` 재검증을 수행합니다 (`POST /local-action` `v2-handoff-export` / `v2-handoff-import`).
+7. **`P7.5` 최종 DBpia AI 문헌 검수 (`verify/dbpia_review.js`, 관문 `G7`)**:
+   - 모든 작성이 끝난 최종 원고에서 절별 핵심 주장과 인용 논지를 추출해 DBpia AI에 검증 질의를 보내고, 학계 문헌과 정면 충돌하는 주장(`contradicted`)이나 빠진 필독 문헌(`missing_must_cite`)을 검출합니다.
+8. **`P8~P9` 조립 (`assembler.js`) 및 WordCraft(`.docx`) / PdfCraft(`.pdf`) 조판**:
+   - 모든 관문 통과 후 `[F-xxxx]`는 제거하고 `[R-xxx]`는 등장 순서대로 반괄호 각주 `1)`, `2)` 및 가나다순 `【참고문헌】`으로 변환하여 `.docx`를 생성합니다.
+
+### 8.3 Nano Banana 최신 버전 전문가 디자이너급 고고학 모식도·차트·그래프 렌더러 (`scripts/archaeology_visuals_enricher.js`)
+- `renderPublicationGradeChartSvg` 및 `renderPublicationGradeDiagramSvg`는 **Nano Banana Pro Archaeological Design System**을 적용하여:
+  - 다층 SVG `<defs>` 그라데이션(`nbTerracottaGrad`, `nbBronzeGrad`, `nbSageGrad`, `nbSlateGrad`, `nbCanvasGrad`), 미세 방안 그리드 패턴(`nbGridPattern`), 정밀 드롭섀도 필터(`nbCardShadow`, `nbNodeShadow`),
+  - 상단 아키텍처 헤더 배너(`NANO BANANA PRO · ARCHAEOLOGICAL DESIGN SYSTEM`), 정밀 데이터 포인트 배지, 양방향 베지어/직교 화살표 커넥터, 단계별 계층 카드(Phase Badge + Sub-attribute Nodes)를 렌더링하여 학술 단행본 및 등재학술지 출판 수준의 시각 품질을 제공합니다.
+
+### 8.4 14장 개발 절차(SDLC) 및 기계적 강제 관문 (`scripts/v2/tools/check.js`)
+- `node scripts/v2/tools/check.js` (및 `.githooks/pre-commit`, `.github/workflows/v6-check.yml`)가 4종 구문/단위 테스트, 2종 CI 인라인 검증, 보호 경로(`bin/`, `patches/`, `factory/`) 변경 차단, 금지 패턴(하드코딩 유적 분기, 사용자 경로, `innerHTML`, 금지 키워드) 검사, `skills/` ↔ `skills_backup/` 동일성 검사를 기계적으로 강제합니다.
