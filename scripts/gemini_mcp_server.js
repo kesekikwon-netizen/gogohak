@@ -112,7 +112,7 @@ const pipelineState = {
   totalCharsWritten: 0,
   chaptersCompleted: 0,
   totalChapters: 4,
-  outputDir: "D:/phone/archaeology_reports",
+  outputDir: path.join(require("os").homedir(), "archaeology_reports").replace(/\\/g, "/"),
   lastSavedHtmlPath: null,
   lastSavedMdPath: null,
   latestDocxPath: null,
@@ -785,6 +785,11 @@ async function _ensureEmbeddedGeminiWebviewImpl(options = {}) {
         !t.url.includes("drive.google.com")
     );
     if (wvTarget && dbpiaTarget) {
+      if (wvTarget.url.includes("gemini.google.com")) {
+        withCdpSession(wvTarget.webSocketDebuggerUrl, (send) =>
+          ensureArgonHighAndWorkMode(send)
+        ).catch(() => {});
+      }
       return { port, wvTarget, dbpiaTarget };
     }
     await new Promise((res) => setTimeout(res, 450));
@@ -792,6 +797,11 @@ async function _ensureEmbeddedGeminiWebviewImpl(options = {}) {
 
   if (!wvTarget) {
     throw new Error("Timed out waiting for embedded Gemini webview target.");
+  }
+  if (wvTarget.url.includes("gemini.google.com")) {
+    withCdpSession(wvTarget.webSocketDebuggerUrl, (send) =>
+      ensureArgonHighAndWorkMode(send)
+    ).catch(() => {});
   }
   return { port, wvTarget, dbpiaTarget };
 }
@@ -862,14 +872,23 @@ async function ensureArgonHighAndWorkMode(send) {
 
       const workSeg = document.querySelector('gem-segmented-button[data-value="40"]') ||
         Array.from(document.querySelectorAll('gem-segmented-button')).find(el => (el.textContent || '').trim() === '작업');
+      const chatSeg = document.querySelector('gem-segmented-button[data-value="0"]');
       let workModeActive = false;
       if (workSeg) {
-        if (!workSeg.classList.contains('gem-segmented-button-selected')) {
+        for (let attempt = 0; attempt < 3; attempt++) {
+          const isWorkSelected = workSeg.classList.contains('gem-segmented-button-selected') ||
+            workSeg.getAttribute('aria-checked') === 'true' ||
+            workSeg.querySelector('button')?.getAttribute('aria-pressed') === 'true';
+          const isChatSelected = chatSeg && chatSeg.classList.contains('gem-segmented-button-selected');
+          if (isWorkSelected && !isChatSelected) break;
           const btn = workSeg.querySelector('button, .mdc-segmented-button__segment, [role="button"]') || workSeg;
           btn.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
           btn.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
           btn.click();
-          await sleep(280);
+          if (btn !== workSeg) {
+            workSeg.click();
+          }
+          await sleep(220);
         }
         workModeActive = workSeg.classList.contains('gem-segmented-button-selected') || Boolean(document.querySelector('.is-remy-mode, .remy-plan-pill'));
       } else {
@@ -2170,7 +2189,8 @@ async function _askGeminiWebImpl({
             continue;
           }
           const isCodeOrFence = line.startsWith('\`\`\`') || (line.startsWith('{') && line.endsWith('}'));
-          const isBlockStart = isCodeOrFence || /^(?:#{1,6}\\s|\\d+[.)]|[-•*]|\\||【|▶|■|◈|[ⅠⅡⅢⅣⅤⅥⅦⅧ1-9][.\\s]|[가나다라마바사아][.\\s]|\\(\\d+\\)|\\[관점|\\[제공된)/.test(line);
+          const isTableRow = line.startsWith('|');
+          const isBlockStart = isCodeOrFence || isTableRow || /^(?:#{1,6}\\s|\\d+[.)]|[-•*]|\\||【|▶|■|◈|[ⅠⅡⅢⅣⅤⅥⅦⅧ1-9][.\\s]|[가나다라마바사아][.\\s]|\\(\\d+\\)|\\[관점|\\[제공된)/.test(line);
           if (isBlockStart || bufLen + line.length > 650) {
             if (buf.length > 0) {
               groupedBlocks.push(buf.join(' '));
@@ -2178,7 +2198,7 @@ async function _askGeminiWebImpl({
               bufLen = 0;
             }
           }
-          if (isCodeOrFence) {
+          if (isCodeOrFence || isTableRow) {
             groupedBlocks.push(line);
           } else {
             buf.push(line);
@@ -3129,10 +3149,10 @@ function parseJsonFromGeminiReply(rawText) {
  */
 function renderPublicationGradeArchaeologyFigures(rawData = {}) {
   const siteName =
-    rawData.siteName || "강릉 병산동(277-12번지) 유적";
+    rawData.siteName || "본 조사 유적";
   const sitePeriod =
     rawData.sitePeriod ||
-    "초기철기~원삼국시대(기원전 2세기~기원후 3세기) 및 삼국시대(신라)";
+    "조사구역 확인 문화층 및 유구·출토유물 편년 단계";
 
   // 1. Normalize Radiocarbon / TL Samples
   const rawSamples =
@@ -3354,84 +3374,52 @@ function renderPublicationGradeArchaeologyFigures(rawData = {}) {
       ? rawData.featureDimensions
       : [
           {
-            name: "철기 1호 주거지",
-            lengthM: 12.5,
-            widthM: 5.35,
-            areaM2: 66.9,
-            ratio: 2.34,
-            group: "본 유적(강릉 병산동 277-12)",
+            name: "1호 주거지",
+            lengthM: 6.4,
+            widthM: 5.2,
+            areaM2: 33.3,
+            ratio: 1.23,
+            group: `본 유적(${siteName})`,
           },
           {
-            name: "철기 2호 주거지",
-            lengthM: 18.5,
-            widthM: 7.6,
-            areaM2: 140.6,
-            ratio: 2.43,
-            group: "본 유적(강릉 병산동 277-12)",
+            name: "2호 주거지",
+            lengthM: 5.8,
+            widthM: 4.9,
+            areaM2: 28.4,
+            ratio: 1.18,
+            group: `본 유적(${siteName})`,
           },
           {
-            name: "철기 3호 주거지",
-            lengthM: 8.55,
-            widthM: 7.2,
-            areaM2: 61.6,
-            ratio: 1.19,
-            group: "본 유적(강릉 병산동 277-12)",
+            name: "3호 주거지",
+            lengthM: 4.6,
+            widthM: 4.2,
+            areaM2: 19.3,
+            ratio: 1.1,
+            group: `본 유적(${siteName})`,
           },
           {
-            name: "철기 3-1호 주거지",
-            lengthM: 12.6,
-            widthM: 8.7,
-            areaM2: 109.6,
-            ratio: 1.45,
-            group: "본 유적(강릉 병산동 277-12)",
+            name: "1호 수혈유구",
+            lengthM: 2.8,
+            widthM: 2.2,
+            areaM2: 6.2,
+            ratio: 1.27,
+            group: `본 유적(${siteName})`,
           },
           {
-            name: "철기 4호 주거지",
-            lengthM: 4.1,
-            widthM: 2.9,
-            areaM2: 11.9,
-            ratio: 1.41,
-            group: "본 유적(강릉 병산동 277-12)",
+            name: "주변 비교유적 A",
+            lengthM: 6.1,
+            widthM: 5.0,
+            areaM2: 30.5,
+            ratio: 1.22,
+            group: "인접 비교유적군",
           },
           {
-            name: "철기 5호 주거지",
-            lengthM: 14.8,
-            widthM: 4.0,
-            areaM2: 59.2,
-            ratio: 3.7,
-            group: "본 유적(강릉 병산동 277-12)",
-          },
-          {
-            name: "삼국 1호 주거지",
-            lengthM: 2.5,
-            widthM: 2.0,
-            areaM2: 5.0,
-            ratio: 1.25,
-            group: "본 유적(강릉 병산동 277-12)",
-          },
-          {
-            name: "병산동 355-3 1호",
-            lengthM: 10.2,
-            widthM: 8.4,
-            areaM2: 85.7,
-            ratio: 1.21,
-            group: "인접 비교유적군(강릉·영동)",
-          },
-          {
-            name: "강릉 초당동 Ⅰ-3호",
-            lengthM: 11.4,
-            widthM: 9.2,
-            areaM2: 104.9,
-            ratio: 1.24,
-            group: "인접 비교유적군(강릉·영동)",
-          },
-          {
-            name: "삼척 갈야산 7호",
-            lengthM: 13.8,
-            widthM: 6.5,
-            areaM2: 89.7,
-            ratio: 2.12,
-            group: "인접 비교유적군(강릉·영동)",
+            name: "주변 비교유적 B",
+            lengthM: 5.2,
+            widthM: 4.5,
+            areaM2: 23.4,
+            ratio: 1.16,
+            group: "인접 비교유적군",
           },
         ];
 
@@ -3505,9 +3493,7 @@ function renderPublicationGradeArchaeologyFigures(rawData = {}) {
     const cy = yOfWid(Math.min(maxDim, w)).toFixed(1);
     const isPrimary =
       String(f.group || "").includes("본") ||
-      String(f.name || "").includes("철기") ||
-      String(f.name || "").includes("삼국") ||
-      idx < 7;
+      idx < 4;
 
     if (isPrimary) {
       ptsSvg += `
@@ -3528,8 +3514,8 @@ function renderPublicationGradeArchaeologyFigures(rawData = {}) {
   const svgFig2 = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${fig2W} ${fig2H}" style="width:100%;height:auto;background:#ffffff;border:1px solid #0f172a;display:block;">
     <rect x="0" y="0" width="${fig2W}" height="48" fill="#f8fafc"/>
     <line x1="0" y1="48" x2="${fig2W}" y2="48" stroke="#0f172a" stroke-width="1.5"/>
-    <text x="24" y="22" font-size="13" font-weight="800" fill="#0f172a" font-family="'Malgun Gothic',sans-serif">&lt;도면 2&gt; ${escXml(siteName)} 및 영동권 비교유적 주거지 평면 규모(장축×단축) 이변량 산점도</text>
-    <text x="24" y="39" font-size="10.5" fill="#475569" font-family="'Malgun Gothic',sans-serif">점선(---): 등장단비 기준선(Isometric Ratio Lines, 1.0:1 ~ 3.0:1) | ●: 본 조사 유적(병산동 277-12) 주거지, □: 강릉·영동권 동시기 비교유적</text>
+    <text x="24" y="22" font-size="13" font-weight="800" fill="#0f172a" font-family="'Malgun Gothic',sans-serif">&lt;도면 2&gt; ${escXml(siteName)} 및 주변 비교유적 유구 평면 규모(장축×단축) 이변량 산점도</text>
+    <text x="24" y="39" font-size="10.5" fill="#475569" font-family="'Malgun Gothic',sans-serif">점선(---): 등장단비 기준선(Isometric Ratio Lines, 1.0:1 ~ 3.0:1) | ●: ${escXml(siteName)} 확인 유구, □: 인접 권역 동시기 비교유적</text>
 
     <!-- Scatter Plot Box -->
     <rect x="${p2Left}" y="${p2Top}" width="${p2W}" height="${p2H}" fill="#ffffff" stroke="#0f172a" stroke-width="1.5"/>
@@ -3571,46 +3557,34 @@ function renderPublicationGradeArchaeologyFigures(rawData = {}) {
       ? rawData.assemblageStats
       : [
           {
-            label: "철기·원삼국 주거지(6기)",
+            label: "주요 주거·생활유구",
             count: 6,
-            pct: 85.7,
-            group: "조사 유구 구성(총 7기)",
+            pct: 75.0,
+            group: "조사 유구 구성",
           },
           {
-            label: "삼국시대 주거지(1기)",
-            count: 1,
-            pct: 14.3,
-            group: "조사 유구 구성(총 7기)",
+            label: "부속 수혈·주혈·기타유구",
+            count: 2,
+            pct: 25.0,
+            group: "조사 유구 구성",
           },
           {
-            label: "경질무문토기(심발·장란·완·시루)",
-            count: 142,
-            pct: 56.8,
-            group: "출토유물(총 250점)",
+            label: "일상 자비·취사용 토기류",
+            count: 45,
+            pct: 50.0,
+            group: "출토유물 구성",
           },
           {
-            label: "타날문토기·삼국시대 토기류",
-            count: 38,
-            pct: 15.2,
-            group: "출토유물(총 250점)",
-          },
-          {
-            label: "방추차·토제어망추(생업도구)",
+            label: "저장·운반·소형 식기류",
             count: 27,
-            pct: 10.8,
-            group: "출토유물(총 250점)",
+            pct: 30.0,
+            group: "출토유물 구성",
           },
           {
-            label: "석기류(석부·갈판·갈돌·석촉)",
-            count: 24,
-            pct: 9.6,
-            group: "출토유물(총 250점)",
-          },
-          {
-            label: "철기류(철부·철겸·철착·철도자)",
-            count: 19,
-            pct: 7.6,
-            group: "출토유물(총 250점)",
+            label: "생업·가공용 석기·방추차·기타",
+            count: 18,
+            pct: 20.0,
+            group: "출토유물 구성",
           },
         ];
 
@@ -3649,7 +3623,7 @@ function renderPublicationGradeArchaeologyFigures(rawData = {}) {
     <rect x="0" y="0" width="${fig3W}" height="48" fill="#f8fafc"/>
     <line x1="0" y1="48" x2="${fig3W}" y2="48" stroke="#0f172a" stroke-width="1.5"/>
     <text x="24" y="22" font-size="13" font-weight="800" fill="#0f172a" font-family="'Malgun Gothic',sans-serif">&lt;도면 3&gt; ${escXml(siteName)} 유구·출토유물 기종별 정량 조성비 및 속성 분포 그래프</text>
-    <text x="24" y="39" font-size="10.5" fill="#475569" font-family="'Malgun Gothic',sans-serif">발굴조사보고서 출토유물 집계표(총 250점) 및 유구 현황표(총 7기) 실측 수량 기준 (단위: %, 기/점)</text>
+    <text x="24" y="39" font-size="10.5" fill="#475569" font-family="'Malgun Gothic',sans-serif">발굴조사보고서 출토유물 집계표 및 유구 현황표 실측 수량 기준 (단위: %, 기/점)</text>
     <line x1="${barLeft}" y1="64" x2="${barLeft}" y2="${fig3H - 36}" stroke="#0f172a" stroke-width="1.5"/>
     <line x1="${barLeft}" y1="${fig3H - 36}" x2="${barLeft + barMaxW}" y2="${fig3H - 36}" stroke="#0f172a" stroke-width="1.5"/>
     ${barsSvg}
@@ -3664,47 +3638,36 @@ function renderPublicationGradeArchaeologyFigures(rawData = {}) {
       ? rawData.chronologyMatrix
       : [
           {
-            phase: "Ⅰ단계 (조영기)",
-            dateRange: "BC 2세기 후엽 ~ BC 1세기",
+            phase: "Ⅰ단계 (형성기)",
+            dateRange: "초기 생활면 형성 단계",
             featureStructure:
-              "철기 4호 주거지(4.10×2.90m, 11.9㎡): 소형 장방형 평면, 무시설식/수혈식 노지, 초기 소규모 정착 단계",
+              "자연 지형(구릉·대지·해안 단구) 기반 수혈 굴광 및 초기 주거·수혈유구 조영",
             artifactAssemblage:
-              "점토대토기 전통 계승 초기 경질무문토기 심발형토기, 석부·갈돌·갈판 등 마제석기 공반",
+              "선행 전통 계승 일상 토기류 및 기본 생업용 석기·도구 공반",
             comparativeSites:
-              "강릉 방동리·교동 유적 초기군, 동해 송정동 유적 (이홍종 2010; 김권중 2014)",
+              "인접 권역 동시기 초기 취락 유적군 및 선행연구 편년 기준",
             planType: "hearth",
           },
           {
-            phase: "Ⅱ-1단계 (확장기)",
-            dateRange: "AD 1세기 ~ AD 2세기 전엽",
+            phase: "Ⅱ단계 (전개·확산기)",
+            dateRange: "중심 취락 운영 단계",
             featureStructure:
-              "철기 1호(12.50×5.35m)·철기 3호(8.55×7.20m): 중·대형 장방형/방형 주거지, 수혈식·석위식 노지 및 다주공 배치",
+              "정형화된 주거 평면 및 주혈 배치, 내부 화덕·작업 공간 분화 및 유구 확산",
             artifactAssemblage:
-              "경질무문토기 심발(외반구연)·완·두형토기, 방추차, 어망추 및 초기 단조 철기류 유입",
+              "자비용·저장용·식기류 토기 기종 분화 및 방추차·생업도구 다량 공반",
             comparativeSites:
-              "강릉 병산동 355-3번지, 강릉 안인리·초당동 유적 Ⅰ기 (지현병 2011; 심재연 2019)",
-            planType: "hearth",
-          },
-          {
-            phase: "Ⅱ-2단계 (성행기)",
-            dateRange: "AD 2세기 후엽 ~ AD 3세기 중엽",
-            featureStructure:
-              "철기 2호(18.50×7.60m, 140.6㎡)·철기 3-1호(12.60×8.70m)·철기 5호(14.80×4.00m): 초대형 여(呂)·철(凸)자형 출입구 및 쪽구들·부뚜막 정착 (3호→3-1호 중복)",
-            artifactAssemblage:
-              "경질무문토기 장란형토기·단경호·파수부토기·시루(자비용기 다변화), 타날문토기, 주조철부·철겸·철착 다량 공반",
-            comparativeSites:
-              "강릉 병산동·송정동 거점취락, 삼척 갈야산 유적, 명주군 집단 중심기 (박지영 2024; 홍주희 2021)",
+              "주변 거점 취락 유적군 및 동일 문화권 비교유적 (DBpia 검증 문헌 기준)",
             planType: "flue",
           },
           {
-            phase: "Ⅲ단계 (삼국기)",
-            dateRange: "AD 5세기 후엽 ~ AD 6세기",
+            phase: "Ⅲ단계 (전환·재편기)",
+            dateRange: "후행 문화 전환 단계",
             featureStructure:
-              "삼국 1호 주거지(2.50×2.00m, 5.0㎡): 소형 방형 평면, 석축 부뚜막·구들 시설 고도화",
+              "선행 유구 폐기·중복 및 취락 공간 재편, 후대 유구·문화층 형성",
             artifactAssemblage:
-              "신라계 유개고배·단경호·파수부배 등 회청색경질토기 및 적갈색연질토기 조합",
+              "후행 양식 토기 및 신규 제작기법 유입에 따른 물질문화 전환",
             comparativeSites:
-              "강릉 초당동 고분군 및 병산동 일대 삼국시대 취락·고분군 (김성범 2002; 홍보식 2018)",
+              "지역권 내 후행기 취락·분묘 유적군 및 지역사 변천 연구",
             planType: "stone",
           },
         ];
@@ -3941,7 +3904,7 @@ function extractStructuredArchaeologyReportFacts(rawText = "") {
         full.slice(idxSec3, idxCatalog > idxSec3 ? idxCatalog : full.length)
       : full.slice(0, 15000);
 
-  // Extract site name (handle parentheses like "강릉 병산동(277-12번지)")
+  // Extract site name (handle parenthesized lot numbers)
   let siteName = "";
   let regionName = "";
   const cleanedForSite = coreExcavatedText.replace(/\([^)]*\)/g, " ");
@@ -6156,7 +6119,7 @@ function startOpenAiBridgeServer() {
             const cmd = payload.command;
             exec(
               cmd,
-              { cwd: "D:\\phone", timeout: 25000 },
+              { cwd: path.resolve(__dirname, ".."), timeout: 25000 },
               async (err, stdout, stderr) => {
                 const out = [stdout, stderr, err ? `Exit: ${err.code}` : ""]
                   .filter(Boolean)
@@ -6184,7 +6147,7 @@ function startOpenAiBridgeServer() {
             res.end(
               JSON.stringify({
                 ok: true,
-                message: "ARCHAEO STUDIO PRO 4.0 완전 종료 완료",
+                message: "ARCHAEO STUDIO 5.0 완전 종료 완료",
               })
             );
             if (process.argv.includes("--bridge-only")) {
@@ -6511,20 +6474,20 @@ const TOOLS = [
   {
     name: "gemini_web_toggle_panel",
     description:
-      "Show or hide the embedded 'ARCHAEO STUDIO PRO 4.0' workstation panel inside the Antigravity PC App window (same as pressing Ctrl+Shift+G).",
+      "Launch or focus the standalone 'ARCHAEO STUDIO 5.0' WordCraft native workstation and ensure the headless Gemini Desktop & DBpia AI background webviews are ready inside Antigravity.",
     inputSchema: {
       type: "object",
       properties: {
         visible: {
           type: "boolean",
           description:
-            "Optional. True to show the panel, false to hide it, or omit to toggle.",
+            "Optional. True to launch/focus ARCHAEO STUDIO 5.0, false to shut it down, or omit to toggle.",
         },
         view_mode: {
           type: "string",
-          enum: ["split", "gemini", "dbpia", "figures", "gdocs"],
+          enum: ["split", "gemini", "dbpia", "figures", "wordcraft"],
           description:
-            "Optional. 'split' (Gemini & DBpia), 'gemini', 'dbpia', 'figures' (publication-grade figure studio), or 'gdocs' (Google Docs panel).",
+            "Optional. Target view mode for ARCHAEO STUDIO 5.0 ('wordcraft', 'split', 'gemini', 'dbpia', 'figures').",
         },
       },
     },
@@ -6565,7 +6528,7 @@ const TOOLS = [
   {
     name: "archaeology_auto_discussion",
     description:
-      "Start or resume the Ph.D.-grade Korean Archaeological Excavation Report 『Ⅳ. 고찰(考察)』 pipeline: synthesizes survey data & DBpia AI evidence, renders 4 publication-grade archaeological figures (OxCal, scatter plot, assemblage chart, NRICH chronology matrix), writes a disciplined non-repetitive 4-section Master Manuscript (<표 1~4> + <도면 1~4> cross-referenced), and exports to a single unified Google Docs document at completion.",
+      "Start or resume the universal Ph.D.-grade Korean Archaeological Excavation Report 『Ⅳ. 고찰(考察)』 or Academic Paper 『논문』 pipeline in ARCHAEO STUDIO 5.0: synthesizes any site's survey data & DBpia AI evidence, renders publication-grade comparative figures & schematic diagrams, writes a non-repetitive Master Manuscript with dynamic tables & inline footnotes, and compiles directly to a native WordCraft (.docx) document.",
     inputSchema: {
       type: "object",
       properties: {
@@ -6578,17 +6541,17 @@ const TOOLS = [
             "figures_only",
           ],
           description:
-            "Execution mode: 'phd_consolidate' (Recommended: 1-pass Ph.D. Master Manuscript + Figures + single Google Docs export), 'phd_full' (DBpia AI research loop + Ph.D. Master Manuscript + Figures + Google Docs), 'phd_4chap' (4-section sequential precision writing), or 'figures_only' (Render 4 publication figures now).",
+            "Execution mode: 'phd_consolidate' (Recommended: Ph.D. Master Manuscript + Visuals + direct WordCraft .docx compilation), 'phd_full' (DBpia AI research loop + Ph.D. Master Manuscript + Visuals + WordCraft .docx), 'phd_4chap' (4-section sequential precision writing), or 'figures_only' (Render publication figures now).",
         },
         user_focus: {
           type: "string",
           description:
-            "Optional focus instruction (e.g. '원삼국~백제 한성기 주거지 및 주구묘 편년과 주변유적 비교').",
+            "Optional focus instruction or site/paper topic for any excavation report or academic paper.",
         },
         output_dir: {
           type: "string",
           description:
-            "Optional local directory to save compiled HTML/Markdown and SVG charts (default: D:/phone/archaeology_reports).",
+            "Optional local directory to save compiled WordCraft (.docx), Markdown, and SVG charts (default: ~/archaeology_reports).",
         },
         max_rounds: {
           type: "number",
@@ -6630,7 +6593,7 @@ async function handleJsonRpcMessage(msg) {
           },
           serverInfo: {
             name: "gemini-desktop-bridge",
-            version: "4.0.0",
+            version: "5.0.0",
           },
         },
       });
@@ -6697,7 +6660,7 @@ async function handleJsonRpcMessage(msg) {
               content: [
                 {
                   type: "text",
-                  text: "ARCHAEO STUDIO PRO 4.0 has been completely turned OFF and removed from Antigravity.",
+                  text: "ARCHAEO STUDIO 5.0 has been completely turned OFF and removed from Antigravity.",
                 },
               ],
             },
@@ -6717,7 +6680,7 @@ async function handleJsonRpcMessage(msg) {
             content: [
               {
                 type: "text",
-                text: `Toggled embedded ARCHAEO STUDIO PRO 4.0 panel in Antigravity (CDP port ${port}).`,
+                text: `Ready ARCHAEO STUDIO 5.0 headless bridge in Antigravity (CDP port ${port}).`,
               },
             ],
           },
@@ -6765,7 +6728,9 @@ async function handleJsonRpcMessage(msg) {
         const res = await runArchaeologyDiscussionPipeline({
           runMode: args.run_mode || "phd_consolidate",
           userFocus: args.user_focus || "",
-          targetPath: args.output_dir || "D:/phone/archaeology_reports",
+          targetPath:
+            args.output_dir ||
+            path.join(os.homedir(), "archaeology_reports"),
           maxRounds: Number(args.max_rounds || 3),
         });
         sendMcpResponse({

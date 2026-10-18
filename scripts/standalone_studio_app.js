@@ -12,7 +12,7 @@ function getStandaloneStudioHtml() {
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>기안동 유적 Ⅳ 고찰.docx - ARCHAEO STUDIO</title>
+<title>발굴조사보고서 Ⅳ 고찰.docx - ARCHAEO STUDIO</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&family=Noto+Serif+KR:wght@400;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -262,7 +262,7 @@ button { font: inherit; color: inherit; }
 <div class="as-screen">
   <!-- 1. 제목줄 -->
   <div class="as-screen__title">
-    <span id="win-doc-title" style="font-weight:600;">기안동 유적 Ⅳ 고찰.docx - ARCHAEO STUDIO</span>
+    <span id="win-doc-title" style="font-weight:600;">발굴조사보고서 Ⅳ 고찰.docx - ARCHAEO STUDIO</span>
     <span class="as-tag as-tag--new" id="top-mode-badge">WordCraft 통합</span>
     <div class="as-screen__win">
       <button type="button" class="as-btn" style="height:22px;padding:0 10px;font-size:11px;" onclick="openInWordCraft()" title="우측 문서를 네이티브 WordCraft 데스크톱 창으로 열기">WordCraft 데스크톱 열기 (.docx)</button>
@@ -373,7 +373,7 @@ button { font: inherit; color: inherit; }
           </div>
           <div class="as-step__body">
             <div class="as-prompt">
-              <textarea id="input-focus" class="as-field as-field--multi" rows="3" placeholder="무엇을 쓸지 적어 주세요. 예: 기안동 유적 주거지의 구조와 편년을 정리해 줘" aria-label="요청" oninput="refreshEngineeredPrompt(true)"></textarea>
+              <textarea id="input-focus" class="as-field as-field--multi" rows="3" placeholder="무엇을 쓸지 적어 주세요. 예: 조사 유적 확인 유구의 구조적 특징과 출토유물 편년 및 주변 유적과의 비교" aria-label="요청" oninput="refreshEngineeredPrompt(true)"></textarea>
               <div class="as-prompt__note">
                 <span class="as-tag as-tag--new">1차 가공</span>
                 <span>입력하신 요청은 고고학 학술 양식에 맞춰 1차 가공되어 전달됩니다.</span>
@@ -605,13 +605,13 @@ button { font: inherit; color: inherit; }
     <div class="as-dialog" role="dialog" aria-label="PDF로 내보내기" style="width:520px;">
       <div class="as-ph as-dialog__head">
         <span class="as-ph__title">PDF로 내보내기</span>
-        <span class="as-ph__sub" id="export-source-label">기안동 유적 Ⅳ 고찰.docx</span>
+        <span class="as-ph__sub" id="export-source-label">발굴조사보고서 Ⅳ 고찰.docx</span>
       </div>
       <div class="as-dialog__body">
         <div class="as-frow">
           <span class="as-frow__label">파일 이름</span>
           <div class="as-frow__ctl">
-            <input type="text" class="as-field" id="export-filename-input" value="기안동 유적 Ⅳ 고찰.pdf">
+            <input type="text" class="as-field" id="export-filename-input" value="발굴조사보고서 Ⅳ 고찰.pdf">
           </div>
         </div>
         <div class="as-frow">
@@ -710,6 +710,37 @@ function togglePageFont() {
   pages.forEach(p => { p.style.fontFamily = nextFont; });
 }
 
+function inferActiveDocumentBaseName() {
+  const isPaper = currentDocType === 'paper';
+  const focusVal = (document.getElementById('input-focus')?.value || '').trim();
+  if (focusVal) {
+    const cleaned = focusVal.replace(/[\\/:*?"<>|]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 28);
+    if (cleaned) {
+      return isPaper
+        ? (cleaned.includes('논문') ? cleaned : cleaned + ' 논문')
+        : (cleaned.includes('고찰') ? cleaned : cleaned + ' Ⅳ 고찰');
+    }
+  }
+  if (uploadedReportFiles.length > 0 && uploadedReportFiles[0].name) {
+    const base = String(uploadedReportFiles[0].name).replace(/\.[^.]+$/, '').trim().slice(0, 28);
+    if (base) {
+      return isPaper ? (base + ' 논문') : (base + ' Ⅳ 고찰');
+    }
+  }
+  return isPaper ? '학술논문' : '발굴조사보고서 Ⅳ 고찰';
+}
+
+function syncDynamicDocumentTitle() {
+  const docName = inferActiveDocumentBaseName() + '.docx';
+  const winTitleEl = document.getElementById('win-doc-title');
+  if (winTitleEl) winTitleEl.textContent = docName + ' - ARCHAEO STUDIO';
+  document.title = docName + ' - ARCHAEO STUDIO';
+  const exportLabel = document.getElementById('export-source-label');
+  if (exportLabel) exportLabel.textContent = docName;
+  const exportInput = document.getElementById('export-filename-input');
+  if (exportInput) exportInput.value = docName.replace('.docx', '.pdf');
+}
+
 function selectDocMode(mode) {
   currentDocType = mode === 'paper' ? 'paper' : 'report';
   const isPaper = currentDocType === 'paper';
@@ -726,11 +757,7 @@ function selectDocMode(mode) {
   btnReport.className = 'as-btn as-btn--lg as-btn--block ' + (!isPaper ? 'as-btn--accent' : 'as-btn--default');
   btnPaper.className = 'as-btn as-btn--lg as-btn--block ' + (isPaper ? 'as-btn--accent' : 'as-btn--default');
 
-  const docName = isPaper ? '기안동 주거지 논문.docx' : '기안동 유적 Ⅳ 고찰.docx';
-  document.getElementById('win-doc-title').textContent = docName + ' - ARCHAEO STUDIO';
-  document.title = docName + ' - ARCHAEO STUDIO';
-  document.getElementById('export-source-label').textContent = docName;
-  document.getElementById('export-filename-input').value = docName.replace('.docx', '.pdf');
+  syncDynamicDocumentTitle();
 
   const emptyEl = document.getElementById('doc-page-empty');
   if (emptyEl) {
@@ -778,6 +805,7 @@ function buildClientSideEngineeredPrompt() {
 }
 
 async function refreshEngineeredPrompt() {
+  syncDynamicDocumentTitle();
   const fallback = buildClientSideEngineeredPrompt();
   currentEngineeredPrompt = fallback;
   const box = document.getElementById('processed-prompt-box');
