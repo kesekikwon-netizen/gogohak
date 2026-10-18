@@ -23,7 +23,7 @@ if not exist "%REPORTS_DIR%" mkdir "%REPORTS_DIR%"
 echo [2/5] ARCHAEO STUDIO 플러그인 및 WordCraft/PdfCraft 포터블 복사 중...
 if not exist "%PLUGIN_DST%" mkdir "%PLUGIN_DST%"
 if /I not "%SRC_DIR%"=="%PLUGIN_DST%" (
-    xcopy "%SRC_DIR%\*" "%PLUGIN_DST%\" /E /I /Y /Q >nul
+    xcopy "%SRC_DIR%\*" "%PLUGIN_DST%\" /E /I /Y /C /Q >nul 2>nul
 )
 
 echo [3/5] 안티그라비티 스킬(archaeo-studio-pro, rea-gemini-app-bridge) 등록 중...
