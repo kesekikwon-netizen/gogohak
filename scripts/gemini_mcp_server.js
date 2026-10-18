@@ -2156,14 +2156,18 @@ async function injectTextIntoGeminiEditor(textToAppend) {
         const editor = document.querySelector('.ql-editor, [contenteditable="true"]');
         if (!editor) throw new Error('Gemini input editor not found');
         editor.focus();
-        const existing = (editor.textContent || '').trim();
+        const existing = (editor.innerText || editor.textContent || '').trim();
         const full = existing ? (existing + '\\n\\n' + ${escaped}) : ${escaped};
-        document.execCommand('selectAll', false, null);
-        const ok = document.execCommand('insertText', false, full);
-        if (!ok || !(editor.textContent || '').trim()) {
-          editor.textContent = full;
-        }
-        editor.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText' }));
+        const escHtml = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        editor.innerHTML = String(full).split(/\\r?\\n/).map(line => '<p>' + (escHtml(line) || '<br>') + '</p>').join('');
+        const sel = window.getSelection();
+        const range = document.createRange();
+        range.selectNodeContents(editor);
+        range.collapse(false);
+        sel.removeAllRanges();
+        sel.addRange(range);
+        document.execCommand('insertText', false, ' ');
+        editor.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText', data: ' ' }));
       })()`,
       returnByValue: true,
     });
@@ -3240,26 +3244,32 @@ async function _askGeminiWebImpl({
         editor.scrollIntoView({ block: 'center' });
         editor.focus();
 
-        document.execCommand('selectAll', false, null);
-        document.execCommand('delete', false, null);
-        const inserted = document.execCommand('insertText', false, ${escapedPrompt});
-        if (!inserted || (editor.textContent || '').trim().length < 5) {
-          editor.textContent = ${escapedPrompt};
-          const sel = window.getSelection();
-          const range = document.createRange();
-          range.selectNodeContents(editor);
-          range.collapse(false);
-          sel.removeAllRanges();
-          sel.addRange(range);
-          document.execCommand('insertText', false, ' ');
-        }
-        editor.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText' }));
+        // CRITICAL FIX: Never pass multi-line text with '\\n' into document.execCommand('insertText'),
+        // because Quill (.ql-editor) intercepts the first '\\n' as an Enter key press and immediately
+        // submits ONLY the first line! Instead, populate <p> paragraph nodes directly and insert a single space ' '.
+        const rawText = String(${escapedPrompt} || '');
+        const escHtml = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        const htmlParagraphs = rawText
+          .split(/\\r?\\n/)
+          .map(line => '<p>' + (escHtml(line) || '<br>') + '</p>')
+          .join('');
+        editor.innerHTML = htmlParagraphs;
+
+        const sel = window.getSelection();
+        const range = document.createRange();
+        range.selectNodeContents(editor);
+        range.collapse(false);
+        sel.removeAllRanges();
+        sel.addRange(range);
+        document.execCommand('insertText', false, ' ');
+        editor.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText', data: ' ' }));
         editor.dispatchEvent(new Event('change', { bubbles: true }));
 
         return {
           existingCount,
           lastPanelTextLen: lastPanelText.length,
-          lastPanelHead: lastPanelText.slice(0, 120)
+          lastPanelHead: lastPanelText.slice(0, 120),
+          insertedLen: (editor.innerText || editor.textContent || '').length
         };
       })()`,
       returnByValue: true,
@@ -3269,7 +3279,11 @@ async function _askGeminiWebImpl({
       existingCount: 0,
       lastPanelTextLen: 0,
       lastPanelHead: "",
+      insertedLen: 0,
     };
+
+    // Give Angular/Quill 250ms to digest the full multi-paragraph DOM before clicking Send
+    await new Promise((r) => setTimeout(r, 250));
 
     // Verified Send Loop: ensures .ql-editor clears and submission starts
     for (let attempt = 0; attempt < 15; attempt++) {
@@ -3305,7 +3319,7 @@ async function _askGeminiWebImpl({
             sel.removeAllRanges();
             sel.addRange(range);
             document.execCommand('insertText', false, ' ');
-            editor.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText' }));
+            editor.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText', data: ' ' }));
             if (sendBtn) sendBtn.click();
             else {
               editor.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true, cancelable: true }));
@@ -4529,6 +4543,93 @@ function extractDbpiaQueriesFromGeminiText(text) {
   return queries.slice(0, 5);
 }
 
+function buildDeterministicDbpiaQueries({
+  userFocus = "",
+  reportText = "",
+  docType = "report",
+}) {
+  const combined = `${userFocus || ""}\n${(reportText || "").slice(0, 4000)}`;
+  // Extract Korean archaeological site name pattern if present (e.g., "강릉 병산동", "경산 임당동", "화성 기안동")
+  const siteMatch =
+    /([가-힣]{2,5}\s+[가-힣0-9]+(?:동|리|읍|면|유적|고분군|산성))/.exec(combined);
+  const siteKeyword = siteMatch
+    ? siteMatch[1].replace(/\s+/g, " ").trim()
+    : "";
+
+  const periodKeywords = [];
+  for (const kw of [
+    "청동기",
+    "무문토기",
+    "초기철기",
+    "철기시대",
+    "원삼국",
+    "삼국시대",
+    "신라",
+    "백제",
+    "가야",
+    "고구려",
+    "통일신라",
+    "고려",
+    "조선",
+  ]) {
+    if (combined.includes(kw) && periodKeywords.length < 2) {
+      periodKeywords.push(kw);
+    }
+  }
+
+  const featureKeywords = [];
+  for (const fk of [
+    "주거지",
+    "수혈",
+    "목곽묘",
+    "석곽묘",
+    "석실분",
+    "고분",
+    "구들",
+    "부뚜막",
+    "노지",
+    "가마",
+    "토기",
+    "철기",
+  ]) {
+    if (combined.includes(fk) && featureKeywords.length < 2) {
+      featureKeywords.push(fk);
+    }
+  }
+
+  const cleanFocus = (userFocus || "")
+    .replace(/발굴조사보고서\s*고찰\s*작성/g, "")
+    .replace(/고찰\s*작성/g, "")
+    .trim();
+
+  const q1Parts = [
+    siteKeyword || cleanFocus,
+    periodKeywords.join(" "),
+    featureKeywords.join(" ") || "유구 출토유물",
+    "편년 및 성격 연구",
+  ]
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  const q2Parts = [
+    siteKeyword ? siteKeyword.split(" ")[0] : cleanFocus,
+    periodKeywords[0] || "고고학",
+    featureKeywords[0] || "취락 주거지",
+    docType === "paper" ? "형식분류 및 지역 비교연구" : "주변 비교유적 상대편년",
+  ]
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  const q1 =
+    q1Parts.join(" ").slice(0, 90) ||
+    "한국 고고학 발굴조사 유구 구조 변천 및 출토유물 편년 연구";
+  const q2 =
+    q2Parts.join(" ").slice(0, 90) ||
+    "발굴조사 주거지 중복관계 및 토기 형식분류 상대편년 연구";
+
+  return q1 === q2 ? [q1] : [q1, q2];
+}
+
 function buildFirstStageEngineeredPrompt({
   docType = "report",
   userFocus = "",
@@ -4543,20 +4644,20 @@ function buildFirstStageEngineeredPrompt({
   const topic =
     (userFocus && userFocus.trim()) ||
     (hasReport
-      ? "입력된 조사자료 기반 유구·유물 성격 및 편년 검토"
+      ? "제공된 조사자료 기반 유구·유물 성격 및 편년 검토"
       : "조사 유적의 유구·출토유물 양상과 주변 비교유적 편년 검토");
 
   return [
-    `[1차 가공 완료 · 작성 형식: ${docLabel}]`,
-    `• 핵심 주제: ${topic}`,
-    `• 내 보고서·조사 자료: ${hasReport ? "입력됨 (유구·유물 속성표 및 중복·층위 선후관계 최우선 반영)" : "비워 둠 (가상 유구 수치 날조 금지, 주제 및 DBpia 선행연구 중심으로 논증)"}`,
-    `• 연대분석·보유 자료: ${hasDating ? "입력됨 (절대연대 측정치와 상대편년 교차검증 반영)" : "비워 둠 (절대연대 수치를 쓰지 않고 출토유물 형식·중복관계·비교유적 상대편년만으로 논증)"}`,
-    `• 필수 구성: ${
+    `[고고학 학술 논증 설계 지침 · 작성 양식: ${docLabel}]`,
+    `• 핵심 논증 주제: ${topic}`,
+    `• 기초 조사자료 반영 범위: ${hasReport ? "아래 본문에 직접 제공된 유구·유물 속성 및 중복·층위 선후관계를 최우선 근거로 반영" : "별도 유구 수치 날조 금지, 제시된 주제와 아래 DBpia 선행연구 서지 데이터를 중심으로 논증"}`,
+    `• 연대분석 자료 반영 범위: ${hasDating ? "아래 본문에 직접 제공된 절대연대 측정치와 상대편년을 교차검증하여 반영" : "임의의 절대연대 수치 날조 금지, 출토유물 형식·중복관계·비교유적 상대편년만으로 논증"}`,
+    `• 필수 장·절 구성: ${
       isPaper
         ? "제목·저자 ➔ 국문초록·주제어(5개) ➔ Ⅰ. 머리말 ➔ Ⅱ. 자료 검토 및 형식 분류(표 1·차트) ➔ Ⅲ. 편년 및 단계 설정(모식도) ➔ Ⅳ. 지역적 전개와 고고학적 의의(표 2 주변유적 대비표) ➔ Ⅴ. 맺음말 ➔ 영문초록(Abstract·Keywords) ➔ 【각주】 ➔ 【참고문헌】"
         : "Ⅳ. 고 찰 ➔ 1. 머리말 ➔ 2. 유구 구조와 중복·성격 검토(표 1 유구 속성표·차트) ➔ 3. 출토유물 및 편년 단계 검토(단계별 변천 모식도) ➔ 4. 주변 유적과의 비교 및 유적의 성격(표 2 주변유적 대비표·맺음말 요약) ➔ 【각주】 ➔ 【참고문헌】"
     }`,
-    `• 서지·도면 기준: 본문 인용 1), 2) 위첨자 각주 ↔ 【참고문헌】 1:1 완전 일치 · 『보고서/학술지』·「논문」·00~00쪽 표준 표기 · 제미나이 차트/모식도 자동 포함`,
+    `• 학술 서지·도면 기준: 본문 인용 1), 2) 위첨자 각주 ↔ 【참고문헌】 1:1 완전 일치 · 『보고서/학술지』·「논문」·00~00쪽 표준 표기 · 제미나이 차트/모식도 자동 포함`,
   ].join("\n");
 }
 
@@ -4575,16 +4676,20 @@ function buildAdaptiveMasterPrompt({
   const materialBlocks = [];
   if (reportText && reportText.trim()) {
     materialBlocks.push(
-      `### [사용자 입력 보고서·조사 자료]\n${reportText.trim().slice(0, 35000)}`
+      `### [제공된 발굴조사보고서·기초조사 원자료 텍스트]\n${reportText.trim().slice(0, 35000)}`
     );
   }
   if (datingText && datingText.trim()) {
     materialBlocks.push(
-      `### [사용자 입력 연대분석·보유 자료]\n${datingText.trim().slice(0, 20000)}`
+      `### [제공된 연대분석·자연과학분석 원자료 텍스트]\n${datingText.trim().slice(0, 20000)}`
     );
   }
 
   return [
+    "### [시스템 절대 규칙: 외부 Google Workspace(Gmail·Google Drive·Google Docs) 검색 및 호출 엄격 금지]",
+    "- **절대 금지**: `@Google Workspace`, `@Gmail`, `@Google Drive`, `@Google Docs` 등 개인 계정 확장 도구를 절대 호출하거나 검색하지 마십시오.",
+    "- **즉시 집필 원칙**: 이메일(Gmail)이나 구글 드라이브(Google Drive)에서 문서를 찾지 마십시오. 또한 사용자에게 '원고나 파일을 보내달라'거나 '어떤 문서 형식으로 제작할지 알려달라'고 되묻지 마십시오. 필요한 모든 조사자료와 DBpia 학술논문 서지 데이터는 **바로 이 메시지 아래에 직접 포함되어 있으므로**, 질문 없이 즉시 완성된 본문 원고 전체를 처음부터 끝까지 작성하십시오.",
+    "",
     isPaper
       ? "### [고고학 학술논문(『한국고고학보』 투고 규격) 최종 원고 작성 지시]"
       : "### [발굴조사보고서 『Ⅳ. 고찰(考察)』 최종 원고 작성 지시]",
@@ -4601,8 +4706,8 @@ function buildAdaptiveMasterPrompt({
     materialBlocks.length > 0 ? materialBlocks.join("\n\n") + "\n" : "",
     "#### [1. 자료 유무에 따른 엄격한 작성 원칙 ('없는 자료는 없는 대로 결과 도출')]",
     hasReport
-      ? "1) **내 보고서·조사 자료 최우선 반영**: 입력된 보고서 자료의 유구 규모(장축×단축·면적), 평면형태, 내부시설(노지·부뚜막·구들·주공), **유구 간 중복(파괴·선후) 관계 및 토층 층위 관계**, 출토유물 조합을 빠짐없이 추출하여 상대편년과 단계 설정의 1차 근거로 삼으십시오."
-      : "1) **보고서 원자료 미입력 상태 대응**: 별도의 유구 원자료가 없으므로 가상의 유구 번호나 허구 실측치를 절대 지어내지 말고, 요청 주제와 DBpia 수집 논문·주변 비교유적 데이터를 바탕으로 서술하십시오.",
+      ? "1) **제공된 보고서·조사 자료 최우선 반영**: 위 `[제공된 발굴조사보고서·기초조사 원자료 텍스트]`의 유구 규모(장축×단축·면적), 평면형태, 내부시설(노지·부뚜막·구들·주공), **유구 간 중복(파괴·선후) 관계 및 토층 층위 관계**, 출토유물 조합을 빠짐없이 추출하여 상대편년과 단계 설정의 1차 근거로 삼으십시오."
+      : "1) **보고서 원자료 미입력 상태 대응**: 별도의 유구 원자료가 없으므로 가상의 유구 번호나 허구 실측치를 절대 지어내지 말고, 요청 주제와 아래 DBpia 수집 논문·주변 비교유적 데이터를 바탕으로 서술하십시오.",
     hasDating
       ? "2) **연대분석 자료 교차검증**: 입력된 연대분석(AMS 탄소연대·OSL 등) 수치를 유구 중복관계 및 유물 형식 편년과 교차검증하여 서술하십시오."
       : "2) **연대분석 자료 미입력 상태 대응**: 연대분석 자료가 비어 있으므로 **절대로 임의의 시료번호나 BP/보정연대 수치를 지어내지 마십시오.** 절대연대 수치는 다루지 않고 출토유물의 형식 변화, 유구 구조 변천, 선행 연구의 상대편년만으로 시기를 논증하십시오.",
@@ -4677,6 +4782,32 @@ async function runArchaeologyDiscussionPipeline({
 
   const localFiles = [];
   let craftExtractedReportText = reportText || "";
+
+  // Also include any uploaded PDF/DOCX files from pipelineState.uploadedFiles if reportText is short
+  try {
+    if (
+      Array.isArray(pipelineState.uploadedFiles) &&
+      pipelineState.uploadedFiles.length > 0 &&
+      craftExtractedReportText.length < 500
+    ) {
+      for (const uf of pipelineState.uploadedFiles) {
+        if (uf && uf.path && fs.existsSync(uf.path)) {
+          try {
+            const parsed = extractTextAndInfoWithCraft(uf.path);
+            if (parsed.extractedText) {
+              craftExtractedReportText = [
+                craftExtractedReportText,
+                `[${parsed.engine} 추출 파일: ${uf.name || path.basename(uf.path)} (${parsed.pages}쪽)]\n${parsed.extractedText.slice(0, 30000)}`,
+              ]
+                .filter(Boolean)
+                .join("\n\n");
+            }
+          } catch {}
+        }
+      }
+    }
+  } catch {}
+
   try {
     if (targetPath && fs.existsSync(targetPath)) {
       const st = fs.statSync(targetPath);
@@ -4768,39 +4899,18 @@ async function runArchaeologyDiscussionPipeline({
 
       await waitWhilePausedOrAborted();
       addPipelineLog(
-        `2단계: 입력 자료 확인 및 DBpia 선행연구 검색 질문을 생성 중입니다...`,
+        `2단계: 입력된 유적·조사 자료에서 핵심 학술 키워드를 추출하여 DBpia AI 검색어로 구성합니다...`,
         "PHASE_1_PLANNING",
         18
       );
 
-      const queryPlanPrompt = [
-        firstStagePrompt,
-        craftExtractedReportText
-          ? `\n[입력된 보고서·조사자료 요약]:\n${craftExtractedReportText.slice(0, 12000)}`
-          : "",
-        datingText ? `\n[입력된 연대분석·보유자료 요약]:\n${datingText.slice(0, 8000)}` : "",
-        "",
-        `위 요청과 자료를 바탕으로 [${docLabel}] 작성에 실제로 인용할 DBpia 학술논문·발굴보고서 검색 질문 2개를 아래 형식으로 출력하십시오:`,
-        "`[DBPIA_QUERY: 구체적인 고고학 검색 질문 1]`",
-        "`[DBPIA_QUERY: 구체적인 고고학 검색 질문 2]`",
-      ]
-        .filter(Boolean)
-        .join("\n");
-
-      const planReply = await askGeminiWeb({
-        prompt: queryPlanPrompt,
-        files: localFiles,
-        newChat: false,
+      // IMPORTANT: Do NOT call askGeminiWeb here! Literature search must run ONLY on DBpia AI (ai.dbpia.co.kr),
+      // never triggering Google Workspace / Gmail / Google Drive searches on Gemini.
+      const pendingQueries = buildDeterministicDbpiaQueries({
+        userFocus,
+        reportText: craftExtractedReportText,
+        docType: pipelineState.docType,
       });
-
-      let pendingQueries = extractDbpiaQueriesFromGeminiText(planReply).slice(0, 2);
-      if (pendingQueries.length === 0) {
-        pendingQueries = [
-          userFocus
-            ? `${userFocus} 관련 고고학 유구 유물 편년 및 비교유적 선행연구`
-            : "한반도 발굴조사 유구 구조 변천 및 출토유물 편년 연구",
-        ];
-      }
 
       for (let qIdx = 0; qIdx < pendingQueries.length; qIdx++) {
         await waitWhilePausedOrAborted();
@@ -4857,7 +4967,8 @@ async function runArchaeologyDiscussionPipeline({
 
       const masterReply = await askGeminiWeb({
         prompt: finalMasterPrompt,
-        newChat: false,
+        files: localFiles,
+        newChat: true,
       });
 
       pipelineState.latestManuscript = masterReply || "";

@@ -5,16 +5,40 @@ description: Universal blueprint and workflow for reverse-engineering any target
 
 # 🔬 REA × Gemini '작업' Mode × Craft Native App Integration Blueprint
 
-## 1. Workflow Summary
+## 1. End-to-End Reverse Engineering & Bridge Architecture
 1. **Inspect Target Website or Native Binary with REA**:
-   - For web targets (e.g., Gemini Web, DBpia AI): inspect DOM selectors, event listeners, and network payloads via CDP (`127.0.0.1:9223`).
-   - For native/Rust/C++ desktop targets (e.g., `WordCraft`, `PdfCraft`): inspect CLI commands (`--help-json`), UI crate structure (`crates/ui-egui`), and font database (`crates/fonts`) to embed custom studio panels and patch CJK/Korean system fonts (`Malgun Gothic`).
-2. **Bridge via Local HTTP/MCP Server (`gemini_mcp_server.js`, Port `18787`)**:
-   - Route all LLM generation through Antigravity's embedded Gemini Web (`https://gemini.google.com/app`, '작업' mode) so Antigravity agent quota consumption remains **0%**.
-3. **Structured OOXML Document Generation (`wordcraft-cli`)**:
-   - Set Korean theme fonts: `design.themeFonts={"heading":"Malgun Gothic","body":"Malgun Gothic"}`
-   - Convert Markdown tables (`|...|`) into native OOXML tables (`insert.table` + `table.setCell`)
-   - Convert `wc-chart` JSON blocks into native OOXML charts (`insert.chart`)
-   - Convert `wc-diagram` JSON blocks into native OOXML SmartArt diagrams (`insert.smartArt`)
-   - Convert inline Korean footnotes (`1)`, `2)`, `3)`) into bottom-of-page OOXML footnotes (`select.text` + `references.footnote`)
-   - Export to PDF (`pdfcraft.exe` / `file.exportPdf`) only on user request.
+   - **Web Targets (Google Gemini Web, DBpia AI)**:
+     - Discover CDP debugger targets from `http://127.0.0.1:9223/json` (or `DevToolsActivePort`).
+     - Lock Gemini Web (`https://gemini.google.com/app`) to `4 Argon High` + `'작업'` mode (`gem-segmented-button[data-value="40"]`).
+     - Extract DBpia AI (`https://ai.dbpia.co.kr`) answers and full KCI bibliography via both React DOM selectors (`[class*="ReferenceSources_referenceItem__"]`) and the REA-discovered internal Vetter JSON API (`GET https://agent.dbpia.co.kr/vetter_conversations/{convId}` with `credentials: 'include'`).
+   - **Native Rust/C++ Desktop Targets (`WordCraft`, `PdfCraft`)**:
+     - Inspect CLI command schemas (`wordcraft-cli.exe --help-json`), engine dispatch (`crates/engine/src/dispatch.rs`), UI crates (`crates/ui-egui`), and font database (`crates/fonts/src/fontdb.rs`).
+     - Embed custom docked left studio panels (`crates/ui-egui/src/archaeo_studio.rs`) and patch Korean system fonts (`C:\Windows\Fonts\malgun.ttf`).
+
+## 2. Critical Gemini `.ql-editor` Multi-Line Injection & Anti-Workspace Rules
+1. **Never Pass `\n` into `document.execCommand('insertText')` on `.ql-editor`**:
+   - Gemini Web's Quill editor intercepts the first `\n` inside `insertText` as an `Enter` key press and immediately submits only line 1, truncating the body and causing Gemini's Google Workspace extension to search Gmail / Google Drive for the missing text.
+   - **Mandatory Multi-Line Injection Pattern**:
+     ```javascript
+     const rawText = String(fullPrompt || '');
+     const escHtml = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+     editor.innerHTML = rawText.split(/\r?\n/).map(line => '<p>' + (escHtml(line) || '<br>') + '</p>').join('');
+     const sel = window.getSelection();
+     const range = document.createRange();
+     range.selectNodeContents(editor);
+     range.collapse(false);
+     sel.removeAllRanges();
+     sel.addRange(range);
+     document.execCommand('insertText', false, ' ');
+     editor.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText', data: ' ' }));
+     ```
+2. **Prevent Unwanted Google Workspace (Gmail / Drive / Docs) Searches**:
+   - Never ask Gemini to generate DBpia search queries before DBpia runs; build DBpia queries deterministically in JS (`buildDeterministicDbpiaQueries`) and call `askDbpiaAi(q)` directly.
+   - Prepend an explicit Anti-Workspace guard (`@Google Workspace, @Gmail, @Google Drive, @Google Docs 호출 절대 금지`) at the top of the Master Prompt and start with `newChat: true`.
+
+## 3. Structured OOXML Document Generation (`wordcraft-cli`)
+- Set Korean theme fonts first: `design.themeFonts={"heading":"Malgun Gothic","body":"Malgun Gothic"}`.
+- Convert `wc-chart` JSON blocks (`[[WC_CHART_n]]`) via `select.text={"text":"[[WC_CHART_n]]","story":"body"}` + `insert.chart`.
+- Convert `wc-diagram` JSON blocks (`[[WC_DIAGRAM_n]]`) via `select.text={"text":"[[WC_DIAGRAM_n]]","story":"body"}` + `insert.smartArt`.
+- Convert inline Korean footnotes (`1)`, `2)`, `3)`) via `select.text={"text":"[[WC_FN_n]]","story":"body"}` + `references.footnote={"text":"...","mark":"1)"}`.
+- Export to PDF (`pdfcraft.exe` / `file.save={"path":"...pdf"}`) strictly on demand when requested by the user.
