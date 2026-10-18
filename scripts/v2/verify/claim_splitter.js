@@ -26,6 +26,8 @@ function splitClaims(markdown, sectionId = 'S1', round = 0) {
     if (/^\|.*\|$/.test(trimmed)) continue;
     if (/^[-*+]\s*$/.test(trimmed)) continue;
     if (/^>\s*\[!/.test(trimmed)) continue;
+    if (/^\*{1,2}<\s*(?:표|그림|모식도|차트)[^>]*>/.test(trimmed)) continue;
+    if (/^>\s*근거\s*카드\s*:/.test(trimmed)) continue;
     proseLines.push(trimmed);
   }
 

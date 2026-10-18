@@ -453,7 +453,7 @@ test('6단계 Nano Banana Pro 시각자료 생성 및 runPipelineV2 전체 E2E �
           '```json\n' +
           JSON.stringify([
             {
-              claimId: 'S1.r0.P1.S1',
+              claimId: 'S1.r0.C1',
               verdict: '일치',
               evidenceQuote: '3호 주거지는 장축 6.2m, 단축 4.8m의 평면 凸자형 주거지이다.',
               page: 1,
@@ -469,7 +469,7 @@ test('6단계 Nano Banana Pro 시각자료 생성 및 runPipelineV2 전체 E2E �
           '```json\n' +
           JSON.stringify([
             {
-              claimId: 'S1.r0.P2.S1',
+              claimId: 'S1.r0.C2',
               verdict: '지지',
               evidenceQuote: '3호 주거지와 같은 凸자형 주거지는 원삼국시대 중기 단계로 편년된다.',
             },
