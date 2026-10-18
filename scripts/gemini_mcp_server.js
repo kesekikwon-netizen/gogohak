@@ -7062,4 +7062,5 @@ module.exports = {
   buildAdaptiveMasterPrompt,
   repairAndEnrichManuscriptWithVerifiedRefs,
   prepareMarkdownAndFootnotesForWordCraft,
+  extractStructuredArchaeologyReportFacts,
 };
