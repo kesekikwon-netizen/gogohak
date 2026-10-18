@@ -1,0 +1,31 @@
+{
+  "timeouts": {
+    "craftExtract": 120000,
+    "geminiJson": 420000,
+    "writeSection": 600000,
+    "dbpiaQuery": 240000,
+    "craftExport": 180000,
+    "cdpCommand": 60000
+  },
+  "retry": {
+    "backoffMs": [5000, 20000]
+  },
+  "gemini": {
+    "maxPromptChars": 12000,
+    "minIntervalMs": 8000,
+    "stableMs": 4000
+  },
+  "gates": {
+    "G1_minVerifiedRatio": 0.6,
+    "G2_minVerifiedLiterature": 3,
+    "G5_maxNeedsHumanRatio": 0.2
+  },
+  "verify": {
+    "doubleCheckKinds": ["dating", "chronology"],
+    "maxRework": 2
+  },
+  "dbpiaReview": {
+    "enabled": true,
+    "maxQueries": 10
+  }
+}

@@ -1,0 +1,93 @@
+{
+  "gemini": {
+    "editor": [
+      ".ql-editor",
+      "[contenteditable=\"true\"]"
+    ],
+    "sendButton": [
+      "button[aria-label=\"메시지 보내기\"]",
+      "button[aria-label=\"Send message\"]",
+      "button[aria-label=\"Send\"]",
+      ".send-button:not(.stop) button"
+    ],
+    "stopButton": [
+      "button[aria-label*=\"중지\"]",
+      "button[aria-label*=\"Stop\"]",
+      ".send-button.stop button"
+    ],
+    "responseContainer": [
+      "model-response",
+      "message-content"
+    ],
+    "modelPicker": [
+      "button[aria-label*=\"모드 선택\"]",
+      "button[aria-label*=\"mode\"]",
+      "bard-mode-switcher button"
+    ],
+    "workModeButton": [
+      "gem-segmented-button[data-value=\"40\"]",
+      ".is-remy-mode",
+      ".remy-plan-pill"
+    ],
+    "workModeSelected": [
+      "gem-segmented-button[data-value=\"40\"].gem-segmented-button-selected",
+      "gem-segmented-button[data-value=\"40\"][aria-checked=\"true\"]",
+      ".is-remy-mode",
+      ".remy-plan-pill"
+    ],
+    "loginIndicators": [
+      "로그인",
+      "Sign in"
+    ],
+    "quotaTextPatterns": [
+      "사용 한도에 도달",
+      "한도에 도달했습니다",
+      "You've reached your limit",
+      "quota exceeded",
+      "나중에 다시 시도해 주세요"
+    ]
+  },
+  "dbpia": {
+    "searchInput": [
+      "#agent-search-textarea",
+      "textarea[data-cy=\"ask-box-textarea\"]"
+    ],
+    "submitButton": [
+      "button[data-cy=\"ask-box-submit-button\"]"
+    ],
+    "answerContainer": [
+      "[class*=\"useMarkdownComponents_\"]",
+      "[class*=\"ChatMessage_\"]",
+      "[class*=\"Answer_\"]"
+    ],
+    "referenceItem": [
+      "[class*=\"ReferenceSources_referenceItem__\"]"
+    ],
+    "countDisplay": [
+      "[data-cy=\"ai-count-display\"]",
+      "[class*=\"AiCountDisplay_aiCountDisplay__\"]"
+    ],
+    "loginButton": [
+      ".dpUsageStatusLayer__btnLogin",
+      "[class*=\"Footer_loginButton__\"]",
+      "button[aria-label=\"계정\"]"
+    ],
+    "loginIndicators": [
+      "무료 검색 5회",
+      "로그인 월 20회"
+    ]
+  },
+  "_sourceMap": {
+    "gemini.editor": "scripts/gemini_mcp_server.js:913,986,2168,2266,2329",
+    "gemini.sendButton": "scripts/gemini_mcp_server.js:2274,2332",
+    "gemini.stopButton": "scripts/gemini_mcp_server.js:2265,2327",
+    "gemini.responseContainer": "scripts/gemini_mcp_server.js:1021,2156,2411,2415",
+    "gemini.modelPicker": "scripts/gemini_mcp_server.js:824,923",
+    "gemini.workModeButton": "scripts/gemini_mcp_server.js:873,893,929",
+    "dbpia.searchInput": "scripts/gemini_mcp_server.js:3022",
+    "dbpia.submitButton": "scripts/gemini_mcp_server.js:3034",
+    "dbpia.answerContainer": "scripts/gemini_mcp_server.js:2855,2858,3000,3081",
+    "dbpia.referenceItem": "scripts/gemini_mcp_server.js:2866,3006",
+    "dbpia.loginButton": "scripts/gemini_mcp_server.js:2513,2569"
+  }
+}

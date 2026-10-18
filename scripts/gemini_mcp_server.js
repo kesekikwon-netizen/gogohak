@@ -6433,6 +6433,26 @@ function startOpenAiBridgeServer() {
       return;
     }
 
+    if (req.method === "GET" && req.url.startsWith("/v2/selftest")) {
+      const { runSelftest } = require("./v2/harness/selftest.js");
+      runSelftest({
+        getCdpPort,
+        ensureEmbeddedGeminiWebview,
+        withCdpSession,
+        ensureArgonHighAndWorkMode,
+        getDbpiaLoginStatus,
+      })
+        .then((result) => {
+          res.writeHead(200, { "Content-Type": "application/json; charset=utf-8" });
+          res.end(JSON.stringify(result));
+        })
+        .catch((err) => {
+          res.writeHead(500, { "Content-Type": "application/json; charset=utf-8" });
+          res.end(JSON.stringify({ ok: false, error: err.message }));
+        });
+      return;
+    }
+
     res.writeHead(404, { "Content-Type": "application/json" });
     res.end(JSON.stringify({ error: "Not found" }));
   });
@@ -7023,7 +7043,26 @@ async function runCliControlMode() {
 }
 
 if (require.main === module) {
-  if (
+  if (process.argv.includes("--selftest")) {
+    const { runSelftest } = require("./v2/harness/selftest.js");
+    const literatureMode = process.argv.includes("--literature-manual") ? "manual" : "dbpia";
+    runSelftest({
+      getCdpPort,
+      ensureEmbeddedGeminiWebview,
+      withCdpSession,
+      ensureArgonHighAndWorkMode,
+      getDbpiaLoginStatus,
+      literatureMode,
+    })
+      .then((result) => {
+        console.log(JSON.stringify(result, null, 2));
+        process.exit(result.ok ? 0 : 1);
+      })
+      .catch((err) => {
+        console.error(JSON.stringify({ ok: false, error: err.message }, null, 2));
+        process.exit(1);
+      });
+  } else if (
     process.argv.includes("--off") ||
     process.argv.includes("--on") ||
     process.argv.includes("--toggle") ||
@@ -7063,4 +7102,25 @@ module.exports = {
   repairAndEnrichManuscriptWithVerifiedRefs,
   prepareMarkdownAndFootnotesForWordCraft,
   extractStructuredArchaeologyReportFacts,
+  withCdpSession,
+  getCdpPort,
+  ensureEmbeddedGeminiWebview,
+  ensureArgonHighAndWorkMode,
+  getGeminiStatus,
+  resetGeminiChat,
+  injectTextIntoGeminiEditor,
+  askGeminiWeb,
+  hardStopGeminiAndPipeline,
+  getDbpiaLoginStatus,
+  askDbpiaAi,
+  extractLatestDbpiaAnswer,
+  enrichDbpiaReferencesMetadata,
+  extractTextAndInfoWithCraft,
+  buildMultiFacetedDbpiaQueries,
+  parseJsonFromGeminiReply,
+  formatVerifiedCitationLine,
+  exportManuscriptToWordCraftAndPdfCraft,
+  addPipelineLog,
+  waitWhilePausedOrAborted,
+  pipelineState,
 };
