@@ -39,20 +39,13 @@ if exist "%SRC_DIR%\skills_backup\rea-gemini-app-bridge" (
 echo [4/5] Antigravity MCP 설정(mcp_config.json)에 gemini-desktop 자동 등록 중...
 node -e "const fs=require('fs'),path=require('path');const p=process.env.MCP_CFG;const dir=path.dirname(p);if(!fs.existsSync(dir))fs.mkdirSync(dir,{recursive:true});let cfg={mcpServers:{}};if(fs.existsSync(p)){try{cfg=JSON.parse(fs.readFileSync(p,'utf8'));}catch(e){}}if(!cfg.mcpServers)cfg.mcpServers={};const srvPath=path.join(process.env.PLUGIN_DST,'scripts','gemini_mcp_server.js');cfg.mcpServers['gemini-desktop']={command:'node',args:[srvPath],env:{GEMINI_CDP_PORT:'9223',GEMINI_BRIDGE_PORT:'18787'}};fs.writeFileSync(p,JSON.stringify(cfg,null,2),'utf8');console.log('  -> MCP 등록 완료:',p);"
 
-echo [5/5] 바탕화면에 [ARCHAEO STUDIO 실행.bat] 생성 중...
-set "DESKTOP_BAT=%USERPROFILE%\Desktop\ARCHAEO_STUDIO_실행.bat"
-(
-echo @echo off
-echo chcp 65001 ^>nul
-echo call "%%USERPROFILE%%\.gemini\config\plugins\gemini-desktop\ARCHAEOLOGY_STUDIO_실행.bat"
-) > "%DESKTOP_BAT%"
+echo [5/5] 바탕화면에 전용 아이콘 바로가기 [ARCHAEO STUDIO.lnk] 생성 중...
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$wsh = New-Object -ComObject WScript.Shell; $ico = Join-Path $env:PLUGIN_DST 'assets\archaeo-studio\archaeo_studio.ico'; $vbs = Join-Path $env:PLUGIN_DST 'scripts\launch_archaeo_studio.vbs'; $dirs = @([Environment]::GetFolderPath('Desktop'), (Join-Path $env:USERPROFILE 'Desktop')) | Select-Object -Unique; foreach ($d in $dirs) { if (Test-Path $d) { $lnk = Join-Path $d 'ARCHAEO STUDIO.lnk'; $sc = $wsh.CreateShortcut($lnk); $sc.TargetPath = Join-Path $env:SystemRoot 'System32\wscript.exe'; $sc.Arguments = ('\"' + $vbs + '\"'); $sc.WorkingDirectory = $env:PLUGIN_DST; $sc.Description = 'ARCHAEO STUDIO 5.0 - 한국 고고학 발굴조사보고서 Ⅳ.고찰 · 학술논문 워크스테이션'; $sc.IconLocation = ($ico + ',0'); $sc.Save(); Write-Host ('  -> 바로가기 생성 완료: ' + $lnk); } }"
 
 echo.
 echo ============================================================================
 echo   설치가 모두 완료되었습니다!
 echo   1. Antigravity 앱을 실행하고 우측 하단 [Gemini] 패널에서 구글 로그인을 확인하세요.
-echo   2. 바탕화면의 [ARCHAEO_STUDIO_실행.bat] 또는
-echo      %PLUGIN_DST%\bin\wordcraft\wordcraft-0.7.0-windows-x64-portable\wordcraft.exe
-echo      를 실행하면 즉시 고고학 고찰·논문 스튜디오가 작동합니다.
+echo   2. 바탕화면의 [ARCHAEO STUDIO] 아이콘을 더블클릭하면 즉시 실행됩니다.
 echo ============================================================================
 pause
