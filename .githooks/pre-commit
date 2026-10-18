@@ -1,0 +1,4 @@
+#!/usr/bin/env sh
+# ARCHAEO STUDIO 6.1 — 14.3 로컬 관문 pre-commit 훅
+# 활성화 방법(사용자 수동 1회 실행): git config core.hooksPath .githooks
+node scripts/v2/tools/check.js --staged

@@ -1,0 +1,32 @@
+name: ARCHAEO STUDIO 6.1 — v6 Gate & Cross-Verification CI
+
+on:
+  push:
+    branches:
+      - 'v6/**'
+      - main
+  pull_request:
+    branches:
+      - 'v6/**'
+      - main
+
+jobs:
+  v6-check:
+    name: v6 Gate Check & Node Test Suite
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Run v6 local gate (scripts/v2/tools/check.js)
+        run: node scripts/v2/tools/check.js
+
+      - name: Run full Node test suite (node --test tests/)
+        run: node --test tests/
