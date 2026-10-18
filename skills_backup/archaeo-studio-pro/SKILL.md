@@ -1,11 +1,11 @@
 ---
 name: archaeo-studio-pro
-description: Complete architectural blueprint, UI/UX design system specification, implementation guide, and Ph.D.-grade Korean archaeological excavation report ('Ⅳ. 고찰(考察)') & academic paper ('논문') automation methodology for building, deploying, or replicating ARCHAEO STUDIO 5.0 (WordCraft Native × Gemini Desktop Web '작업' Mode × DBpia AI × PdfCraft On-Demand Export) inside Antigravity on any Windows/macOS PC.
+description: Complete architectural blueprint, UI/UX design system specification, implementation guide, and Ph.D.-grade Korean archaeological excavation report ('Ⅳ. 고찰(考察)') & academic paper ('논문') automation methodology for building, deploying, or replicating ARCHAEO STUDIO 6.1 (Harness Supervisor × Evidence Store F/R/D × V1~V8 & X1~X4 Cross-Verification × Claude 2nd-Pass Handoff × Final DBpia AI Review × Nano Banana Pro Visuals × WordCraft/PdfCraft Native) inside Antigravity on any Windows/macOS PC.
 ---
 
-# 🏛️ ARCHAEO STUDIO 5.0 — Master Blueprint & Complete Replication Skill
+# 🏛️ ARCHAEO STUDIO 6.1 — Master Blueprint & Complete Replication Skill
 
-This skill contains the complete, zero-omission specification of **ARCHAEO STUDIO 5.0**. Any AI agent reading this skill can reconstruct the entire application — from UI design tokens and desktop icons to the CDP WebSocket bridge, DBpia Vetter API harvester, Anti-Gmail Workspace guard, and native Rust `WordCraft`/`PdfCraft` OOXML engines — without missing a single detail.
+This skill contains the complete, zero-omission specification of **ARCHAEO STUDIO 6.1** (building upon 5.0). Any AI agent reading this skill can reconstruct the entire application — from UI design tokens, Nano Banana Pro archaeological SVG/OOXML visual renderers, and desktop icons to the `scripts/v2/` Harness Supervisor, Evidence Store (`F-*`/`R-*`/`D-*`), `V1~V8` deterministic verifiers, `X1~X4` independent cross-verification conversations, Claude 2nd-pass handoff, final DBpia AI literature review, and native Rust `WordCraft`/`PdfCraft` OOXML engines.
 
 ---
 
@@ -38,7 +38,7 @@ This skill contains the complete, zero-omission specification of **ARCHAEO STUDI
   - `--font-mono: "JetBrains Mono", "Consolas", monospace`
 
 ### 2.2 5-Zone Workstation Layout (`scripts/standalone_studio_app.js`)
-1. **Window Titlebar (`.as-winbar`, `34px`)**: Document title (`기안동 유적 Ⅳ 고찰.docx - ARCHAEO STUDIO`), `WordCraft 통합` badge, `WordCraft 데스크톱 열기 (.docx)` button, Light/Dark theme switch.
+1. **Window Titlebar (`.as-winbar`, `34px`)**: Document title (`가상유적 Ⅳ 고찰.docx - ARCHAEO STUDIO`), `WordCraft 통합` badge, `WordCraft 데스크톱 열기 (.docx)` button, Light/Dark theme switch.
 2. **WordCraft Ribbon (`.as-ribbon`, `62px`)**:
    - `파일`: `새 문서`, `열기`, `저장 (.docx)`
    - `홈 · 서식`: `글자` (Serif ↔ Sans-Serif toggle)
@@ -50,11 +50,11 @@ This skill contains the complete, zero-omission specification of **ARCHAEO STUDI
    - **Step ② 요청**: Focus topic textarea + `[1차 가공]` brass tag + collapsible `▸ 가공된 요청 보기` preview box.
    - **Step ③ 내 보고서·조사 자료**: Excavation data textarea + `[파일 불러오기]` (`.docx`, `.pdf`, `.txt`, `.md`, `.csv` upload with automatic `PdfCraft`/`WordCraft` text & ONNX OCR extraction + removable file chips).
    - **Step ④ 연대분석·보유 자료 (`선택`)**: AMS/OSL dating textarea + `비워 두면 빼고 작성` badge.
-   - **Step ⑤ 실행**: Primary run buttons (`▶ 고찰 실행`, `▶ 논문 실행`), `[일시 멈춤]`, `[그만두기]`, `[디비피아 로그인]` + `● 로그인됨` pill, `[PDF로 내보내기]`.
-   - **Step ⑥ 진행 기록**: Live progress bar (`0%~100%`) + timestamped step logs.
+   - **Step ⑤ 실행**: Primary run buttons (`▶ 고찰 실행`, `▶ 논문 실행`), `[일시 멈춤]`, `[그만두기]`, `[디비피아 로그인]` + `● 로그인됨` pill, `[PDF로 내보내기]`, and 6.1 Claude 2nd-pass handoff controls (`[Claude 2차 다듬기용 내보내기]`, `[Claude 2차 원고 가져오기]`).
+   - **Step ⑥ 진행 기록**: Live progress bar (`0%~100%`) + timestamped step logs + `G1~G7` gate badges.
 4. **Right A4 Document Canvas (`.as-screen__canvas`)**:
    - Top collection strip (`.as-collect`, `32px`): Live DBpia paper count, progress bar, `WordCraft 창 열기`.
-   - Scrollable A4 Page (`.as-page`, `794px × 1123px`, `contenteditable="true"`): Live rendering of headings, tables, SVG charts/diagrams, inline citations `1)`, `2)`, and bottom footnote separator (`.as-page__notes`).
+   - Scrollable A4 Page (`.as-page`, `794px × 1123px`, `contenteditable="true"`): Live rendering of headings, tables, Nano Banana Pro SVG charts/diagrams, inline citations `1)`, `2)`, and bottom footnote separator (`.as-page__notes`).
 5. **Bottom Status Bar (`.as-status`, `26px`)**: Context hint, page counter (`쪽 1 / 1`), character counter (`글자 0`), zoom selector (`90% / 100% / 110%`).
 
 ---
@@ -62,79 +62,78 @@ This skill contains the complete, zero-omission specification of **ARCHAEO STUDI
 ## 3. Critical CDP Bridge Rules (`scripts/gemini_mcp_server.js`)
 
 ### 3.1 CRITICAL FIX #1: Multi-Line Prompt Injection into Gemini `.ql-editor` (TrustedHTML-Safe + Newline-Safe + Quill Blot-Tree Fast)
-- **Never** pass a multi-line string containing `\n` into `document.execCommand('insertText', false, fullPrompt)` on Gemini Web's Quill editor (`.ql-editor`) — Quill intercepts the first `\n` as an `Enter` key press and immediately submits **only line 1**, discarding the rest of the prompt!
-- **Never** assign `editor.innerHTML = ...` on `gemini.google.com/app` — it enforces CSP `TrustedHTML`.
-- **Never** create 2,000+ individual `<p>` nodes (one per PDF hard line-wrap), which freezes Quill's Parchment Blot tree and causes `CDP command timeout: Runtime.evaluate`. Instead, group consecutive lines into ~50–80 paragraph blocks (~650 chars each, keeping headings, JSON specs, and code fences on separate blocks) and insert once via `document.createDocumentFragment()`, with `1200ms` polling wrapped in `try/catch`!
+- **Never** pass a multi-line string containing raw newlines into `execCommand` `insertText` on Gemini Web's Quill editor (`.ql-editor`) — Quill intercepts the first newline as an `Enter` key press and immediately submits **only line 1**, discarding the rest of the prompt!
+- **Never** assign directly to `innerHTML` on `gemini.google.com/app` — it enforces CSP `TrustedHTML`.
+- **Never** create 2,000+ individual `<p>` nodes (one per PDF hard line-wrap), which freezes Quill's Parchment Blot tree and causes `CDP command timeout: Runtime.evaluate`. Instead, use `injectTextIntoGeminiEditor()` which groups consecutive lines into ~50–80 paragraph blocks (~650 chars each, keeping headings, JSON specs, and code fences on separate blocks) and inserts once via `document.createDocumentFragment()`, with `1200ms` polling wrapped in `try/catch`!
 
 ### 3.2 CRITICAL FIX #2: Structured PDF Excavation Report Parser (`extractStructuredArchaeologyReportFacts`) & Pure DBpia Queries
-1. **Zero-Truncation Section-Aware PDF Parsing (`extractStructuredArchaeologyReportFacts`)**: When a 50~100+ page excavation report PDF is uploaded, never blindly slice `.slice(0, 30000)` (which wastes 10,000 chars on textbook `Ⅱ. 자연·지리적 환경` and cuts off the `출토유물 목록` at the end of the report). Instead, segment the report into:
+1. **Zero-Truncation Section-Aware PDF Parsing (`extractStructuredArchaeologyReportFacts` & `scripts/v2/page_extractor.js`)**: When a 50~100+ page excavation report PDF is uploaded, never blindly slice `.slice(0, 30000)`. Instead, segment the report by page (`P1` `page_extractor.js`) and section:
    - `Ⅰ. 조사 개요` (preserved)
    - `Ⅱ. 주변 환경` (compressed to key surrounding archaeological sites only, ~1,500 chars)
    - `Ⅲ. 조사 내용` (100% preserved — all feature dimensions, plan shapes like `凸자형`/`방형`, internal facilities like `아궁이`/`부뚜막`/`노지`, stratigraphy, and feature overlaps like `3호 ↔ 3-1호 주거지`)
    - `Ⅳ. 조사결과 및 조사단 의견` (100% preserved)
    - `출토유물 목록` (grouped by feature count + representative artifact specifications)
-2. **Accurate Keyword Extraction from `Ⅲ. 조사내용`**: `buildMultiFacetedDbpiaQueries()` ranks period keywords (`철기시대`, `원삼국`, `삼국시대`, etc.), feature types (`凸자형 주거지`, `아궁이`, `부뚜막`, `노지`), and artifact types (`경질무문토기`, `타날문토기`, `심발형토기`, `시루`, `외반구연호`) specifically from `Ⅲ. 조사내용` and `Ⅳ. 조사결과` rather than the regional background history in `Ⅱ. 주변 환경`.
-3. **Never Include `@Google Workspace`, `@Gmail`, `@Google Drive`, or `Google` Keywords in Prompts**: Even negative mentions trigger the Google Drive connection popup.
+2. **Accurate Keyword Extraction from Facts (`scripts/v2/query_builder.js`)**: Ranks period keywords (`철기시대`, `원삼국`, `삼국시대`, etc.), feature types (`凸자형 주거지`, `아궁이`, `부뚜막`, `노지`), and artifact types (`경질무문토기`, `타날문토기`, `심발형토기`, `시루`, `외반구연호`) directly from extracted fact records (`F-*`).
+3. **Never Include Workspace/Drive/Mail Extension Trigger Keywords in Prompts**: Even negative mentions trigger external extension connection popups.
 
 ### 3.3 DBpia AI Vetter JSON API Full Synthesis (`요점`) & Multi-Hover Quotes (`extractLatestDbpiaAnswer` & `enrichDbpiaReferencesMetadata`)
 After submitting a query on `https://ai.dbpia.co.kr/ko/search`, extract the conversation ID from `/search/{convId}` and fetch `https://agent.dbpia.co.kr/vetter_conversations/{convId}` with `{ credentials: 'include' }` inside the DBpia webview:
-- **Full Synthesis (`요점`)**: Always prioritize `messages[last].content` (3,000~4,500 chars of structured academic synthesis) over DOM `[class*="useMarkdownComponents_"]` (which matches individual `<p>`/`<li>` elements and would otherwise truncate to the last `<li>` of ~160 chars).
+- **Full Synthesis (`요점`)**: Always prioritize `messages[last].content` (3,000~4,500 chars of structured academic synthesis) over DOM `[class*="useMarkdownComponents_"]`.
 - **All Hover Quotes (`hovers`)**: Join all hover entries (`NODE..._0`, `NODE..._1`, `NODE..._2`, etc.) for each `node_id` so every cited passage from the paper (up to 950 chars per paper) is captured.
 - **Bibliography Enrichment**: `messages[last].references` provides `node_id`, `node_title`, `node_autr`, `node_pbsh_yy`, `node_plct_nm`, and `node_iprd_nm`, enriched in parallel via `articleDetail?nodeId=NODE...` (`citation_volume`, `citation_issue`, `citation_firstpage`, `citation_lastpage`) and OpenAlex batch API.
-- **Studio Multi-Page A4 Pagination & Live DBpia Board (`standalone_studio_app.js`)**: Renders `#dbpia-live-board` during `PHASE_2_DBPIA_LOOP` so the user sees live DBpia queries, `요점` summaries, and verified paper cards in real time, and paginates the manuscript into discrete A4 pages (`- 1 -`, `- 2 -`, `- 3 -`...) with per-page bottom footnotes (`.as-page__notes`).
 
 ---
 
-## 4. `/goal`-Driven 8-Point Completion Criteria, Legal `[별표 2]` vs Academic Paper (`사료 세포`) Paradigm & Multi-Visual Enricher
-Instead of stopping after a single 1-shot Q&A, `runArchaeologyDiscussionPipeline()` establishes an explicit **8-Point Completion & Cross-Verification Rubric (`buildGoalEvaluationPlan`)** upfront based on:
-- **Excavation Report (`docType === "report"`)**: 「매장유산 보호 및 조사에 관한 법률」 시행규칙 제9조 [별표 2] & 국립문화유산연구원 보고서 평가 지표 (공간 구속적 Site-bound · 귀납적 4대 고찰 영역: 일러두기 기술 표준[도북/자북·해발고도·유물 일련번호 1:1 매칭·잔존치 `( )`], 학술자문회의 의견 반영, 층위·파괴/절치 중복 관계 분기[分期], 유구·유물 정량 비교 및 정비·복원 제언).
-- **Academic Paper (`docType === "paper"`)**: 『한국고고학보』/『역사학보』 동료 심사(Peer Review) 규격 (문제 구속적 Problem-bound · 연역적 5단계: ① 서론 문제 제기 및 비판적 연구사 검토 ➔ ② 본론 '사료 세포[표제어·출처·수집정보·가공정보]' 재분류 및 핵심 개념어·논지 도출 ➔ ③ 결론 신규 사료 추가 금지·문제 재확인·근거 요약, 참고문헌 한국어 가나다순 → 중·일·서양어 정렬).
+## 4. ARCHAEO STUDIO 6.1 (`scripts/v2/`) — Harness Supervisor, Evidence Store (`F/R/D`), `V1~V8` + `X1~X4` Cross-Verification, Claude 2nd-Pass Handoff & Final DBpia AI Review
 
-All 8 criteria are verified and deterministically enriched (`repairAndEnrichManuscriptWithVerifiedRefs` + `scripts/archaeology_visuals_enricher.js`):
-1. **`C1_DBPIA_SUFFICIENCY`**: Multi-faceted DBpia AI research (`vetter_conversations` full `요점` + `hovers` verbatim quotes + `articleDetail` KCI metadata).
-2. **`C2_SECTION_STRUCTURE`**: Complete mandatory sections (`머리말 ➔ 유구·자료 분석 ➔ 출토유물·편년 단계 설정 ➔ 주변 비교유적·고고학적 의의 ➔ 맺음말 ➔ 국·영문 초록 ➔ 【각주】 ➔ 【참고문헌】`).
-3. **`C3_ARGUMENT_DEPTH`**: Target character length (`6,500~7,500+` chars) and formal Korean archaeological argumentation endings (`~로 파악된다`, `~로 편년된다`, `~로 판단된다`).
-4. **`C4_QUANTITATIVE_TABLES` (4+ Comparative Tables)**:
-   - `<표 1>` 조사구역 확인 유구 제원·내부시설·중복관계·출토유물 속성 일람표
-   - `<표 2>` 주요 출토유물 기종별·형식별 제작기법 속성 및 선행연구 상대편년 비교표
-   - `<표 3>` 주변 병행유적(DBpia 수집 문헌 기반 동일 문화권 핵심 유적군) 유구·유물 정밀 대비표
-   - `<표 4>` DBpia AI 수집 핵심 선행연구(실제 저자·연도·논문명) 학술 쟁점별 논거 및 본 유적 적용 종합 대비표
-5. **`C5_CHART_AND_DIAGRAM` (3+ `wc-chart` Comparison Charts & 3+ `wc-diagram` Schematic Diagrams)**:
-   - `<그림 1>` (`wc-chart` #1): 본 유적 및 주변 비교유적군 시대별 확인 유구 비교 차트
-   - `<그림 2>` (`wc-chart` #2): 조사구역 주요 주거지 유구별 평면 규모(장축·단축 m 및 잔존 면적 ㎡) 정량 비교 차트
-   - `<그림 3>` (`wc-chart` #3): DBpia AI 수집 선행연구 주제 영역별 인용 논문 수 및 교차검증 비교 지표 분포 차트
-   - `<모식도 1>` (`wc-diagram` #1): 조사구역 퇴적 층위(Ⅰ~Ⅴ층) 및 지반 보강·점토 다짐·벽구·화덕 축조 공정 모식도
-   - `<모식도 2>` (`wc-diagram` #2): 유구 중복 관계 및 출토유물 조합에 기반한 단계별(Ⅰ~Ⅲ단계) 취락·물질문화 변천 모식도
-   - `<모식도 3>` (`wc-diagram` #3): DBpia 수집 문헌 교차검증 기반 지역 취락망 공간 네트워크 및 문화 교류 모식도
-   - Both rendered as interactive SVG multi-series charts & visual process diagrams on the Studio A4 canvas (`renderManuscriptOntoA4Page`) AND compiled as native OOXML `<c:chart>` (`insert.chart`) and `<dgm:relIds>` (`insert.smartArt`) inside WordCraft `.docx`.
-6. **`C6_VERIFIED_FOOTNOTES`**: Numbered Korean footnotes (`1)`~`N)`) with **0 occurrences of `'저자미상'` or `'연도미상'`** and **0 modulo duplication** (preserves all valid footnotes without wrapping around).
-7. **`C7_BIBLIOGRAPHY_CROSSCHECK`**: Deterministic 1:1 synchronization between inline `1)`~`N)`, `### 【각주】`, and `### 【참고문헌】` (sorted in Korean alphabetical order `가나다순`, using actual uploaded report titles instead of hardcoded placeholder reports).
-8. **`C8_DATA_FIDELITY_COMPLETENESS`**: Strict non-fabrication (`없는 자료는 없는 대로` — never invent fake AMS BP dates or fake phase-by-phase pottery counts; all charts and tables use only verified excavation report and DBpia AI numbers).
+### 4.1 Harness Layer (`scripts/v2/harness/`)
+- **`preflight.js`**: Pre-run diagnostic verifying CDP connection, Gemini tab (`4 Argon High` + `'작업'` mode lock), DBpia AI login state, `pdfcraft-cli.exe` / `wordcraft-cli.exe` binaries, and workspace write permissions.
+- **`dom_Contract.js`**: Versioned DOM selector and API contract for Gemini (`inputEditor`, `sendButton`, `streamingIndicator`, `responseTurn`, `newChatButton`, `modelSelector`, `modeWorkButton`) and DBpia (`searchTextarea`, `vetterApiPattern`, `deepResearchApiPattern`).
+- **`supervisor.js`**: Wraps all external calls (`gemini_ask`, `dbpia_ask`, `pdfcraft_extract`, `wordcraft_compile`) with timeouts, exponential backoff retries, `ensureGeminiEffortLock` (set-then-read verification of `4 Argon High` + `'작업'` mode), and `<<<END>>>` end-marker truncation detection + continuation recovery.
+- **`checkpoint.js` & `run_logger.js`**: Atomic per-stage (`P1`~`P9`) state persistence (`checkpoint.json`) for crash recovery and structured JSONL run logging (`logs/run.jsonl`).
+
+### 4.2 Evidence Store (`scripts/v2/evidence_store.js`) & 9-Stage Pipeline (`P1~P9`, `scripts/v2/index.js`)
+1. **`P1` Page-Preserving Extraction (`page_extractor.js`) & Fact Extraction (`fact_extractor.js`, Gate `G1`)**:
+   - Registers every archaeological feature, artifact, metric, overlap, and stratigraphy record as `F-0001` (with mandatory `source_page` and `verbatim_quote`) and dating samples as `D-01`.
+2. **`P2` Deterministic DBpia Query Builder (`query_builder.js`) & Literature Cards (`literature_cards.js`, Gate `G2`)**:
+   - Converts verified DBpia papers into `R-001` cards (`authors`, `year`, `title`, `journal`, `volume`, `issue`, `pages`, `verbatim_quotes`, `claims`, `completeness`).
+3. **`P3` Section Outline Planner (`outline_planner.js`, Gate `G3`)**:
+   - Assigns specific `fact_ids`, `ref_ids`, and visual specs (`required_tables`, `required_charts`, `required_diagrams`) to each section (`S1`~`S5`).
+4. **`P4` Section-by-Section Writing (`section_writer.js`) & Fact-Derived Visuals (`visuals_from_facts.js`, Gate `G4`)**:
+   - Calls Gemini once per section using only that section's assigned `F-*`/`R-*`/`D-*` cards.
+   - Every quantitative metric in prose must carry `[F-xxxx]` or `[D-xx]`, and every scholarly claim must carry `[R-xxx]` (`markers.js`).
+   - All tables, `wc-chart` blocks, and `wc-diagram` blocks are generated deterministically from `F-*` and `R-*` records (`visuals_from_facts.js`).
+5. **`P5~P6` Deterministic Verification (`V1~V8`, `verify/deterministic.js`) × Independent Cross-Verification (`X1~X3`, `verify/cross_verifier.js`) × Consensus (`X4`, `verify/consensus.js`, Gate `G5`)**:
+   - `V1`: Zero unregistered `[F-*]`/`[R-*]`/`[D-*]` markers.
+   - `V2`: Zero unmarked quantitative measurements in prose.
+   - `V3`: Zero fabricated BP/cal BC/cal AD/AMS/OSL dates when `D-*` is empty.
+   - `V4`: 1:1 bijective mapping between inline `[R-*]`, footnotes, and bibliography (`completeness: "full"`).
+   - `V5`: 100% match between table/chart/diagram numbers and `F-*` facts.
+   - `V6`: Zero forbidden keywords or placeholders (`저자미상`, `연도미상`, `00쪽`).
+   - `V7`: Section length and formal Korean academic sentence endings (`~로 판단된다`, `~로 편년된다`, `~로 파악된다`).
+   - `V8`: Direct verification of `verbatim_quote` against `pages.json`.
+   - `X1~X3`: Opens 3 separate Gemini verification chats (`X1` Fact vs Prose, `X2` Reference Quote vs Claim, `X3` Peer-Review Rubric) and merges with `V1~V8` via `X4` Consensus (`passed`, `needs_repair`, `contested`).
+6. **`P7` Claude 2nd-Pass Handoff (`handoff.js`, Gate `G6`)**:
+   - Exports `handoff/` bundle (`01_draft_marked.md`, `02_facts.json`, `03_references.json`, `04_verification_report.json`, `05_claude_instructions.md`) and re-verifies imported `06_claude_revised_marked.md` through `V1~V8`.
+7. **`P7.5` Final DBpia AI Literature Review (`verify/dbpia_review.js`, Gate `G7`)**:
+   - Queries DBpia AI with core manuscript claims to detect `contradicted` claims or `missing_must_cite` papers (`dbpia_final_review.json`).
+8. **`P8~P9` Final Assembly (`assembler.js`), Crosswalk (`crosswalk.js`), Regional Comparative Site Library (`site_library.js`), and WordCraft (`.docx`) Compilation**:
+   - Strips `[F-xxxx]` markers, converts `[R-xxx]` into sequential Korean footnotes `1)`, `2)` and sorted `【참고문헌】`, generates `crosswalk.md`, and compiles `.docx`.
 
 ---
 
-## 5. WordCraft Live Control (`control-key.local-7981`), Korean Font (`Malgun Gothic`) & Desktop Shortcut
-- **WordCraft Live TCP Control (`sendCommandToRunningWordCraft`)**: `wordcraft.exe --control 7981` writes its authentication key to `%APPDATA%\WordCraft\control-key.local-7981` (checked alongside `control-key.7981`) and streams newline-delimited JSON over `127.0.0.1:7981`. Always buffer `sock.on("data")` chunks until `\n` before checking `"ok":true`.
-- **Template-Literal Script Escaping (`standalone_studio_app.js`)**: Because `getStandaloneStudioHtml()` returns a template literal, any newline inside inline JS strings must be double-escaped (`\\n`) and verified with `new vm.Script(scriptBody)` in CI.
-- `.docx` theme fonts: `design.themeFonts={"heading":"Malgun Gothic","body":"Malgun Gothic"}`.
-- Desktop Shortcut (`ARCHAEO STUDIO.lnk`): Points to `wscript.exe "$PluginDir\scripts\launch_archaeo_studio.vbs"` with multi-resolution icon `assets\archaeo-studio\archaeo_studio.ico`.
+## 5. Nano Banana Pro Archaeological Visual Renderer (`scripts/archaeology_visuals_enricher.js`)
+- `renderPublicationGradeChartSvg` (`wc-chart`) and `renderPublicationGradeDiagramSvg` (`wc-diagram`) implement the **Nano Banana Pro Archaeological Design System**:
+  - Multi-stop SVG `<defs>` gradients (`nbTerracottaGrad`, `nbBronzeGrad`, `nbSageGrad`, `nbSlateGrad`, `nbCanvasGrad`), fine grid background pattern (`nbGridPattern`), and soft card/node elevation drop shadows (`nbCardShadow`, `nbNodeShadow`).
+  - Architectural header banner (`NANO BANANA PRO · ARCHAEOLOGICAL DESIGN SYSTEM`), high-contrast data value pills, orthogonal/bezier directional connectors, and hierarchical phase cards (`Ⅰ단계`, `Ⅱ단계`, `Ⅲ단계` with sub-attribute nodes).
 
 ---
 
-## 6. WordCraft (`.docx`) Export Integrity & Portable Setup Guardrails (Learned Fixes)
-1. **100% Universal Site & Topic Agnosticism — Zero Hardcoded Site Branches (`archaeology_visuals_enricher.js` & `gemini_mcp_server.js`)**:
-   - **Never** write site-specific branches (such as `isByeongsan`) or hardcoded site fallback tables/charts/diagrams for any specific excavation report or paper.
-   - The pipeline must operate universally on **any** excavation report or academic paper by dynamically parsing the active manuscript's headings, Markdown tables, quantitative feature dimensions (`m`, `㎡`, `cm`), artifact assemblages, stratigraphy/chronology stages, and live DBpia AI references (`validPapers`) to synthesize or normalize `wc-chart`, `wc-diagram`, and comparative tables.
+## 6. WordCraft (`.docx`) Export Integrity, Portable Setup & Chapter 14 SDLC Gate (`scripts/v2/tools/check.js`)
+1. **100% Universal Site & Topic Agnosticism — Zero Hardcoded Site Branches**:
+   - Never write site-specific branches (`isByeongsan`, etc.) or hardcoded site tables/charts/diagrams.
 2. **Parenthesized-Year-Safe & Table-Safe Footnote Tokenization (`prepareMarkdownAndFootnotesForWordCraft`)**:
-   - Never include digits (`0-9`) or `(` in the character class preceding `${num})` (`(?<![0-9(])`), preventing years like `이준호(2010)` or `심재연(2008)` from being corrupted into `이준호(20[[WC_FN_10]]`.
-   - Never substitute `[[WC_FN_n]]` tokens inside Markdown table rows (`| ... |`), because `wordcraft-cli` `select.text={"story":"body"}` only searches body paragraphs and fails the entire batch if a token is trapped inside a table cell.
-3. **Deterministic `wc-diagram` Schema Normalization (`normalizeWcDiagramSpec`)**:
-   - Gemini 4 Argon frequently outputs `wc-diagram` specs using `{"layout":"hierarchy","nodes":[{"id":"L1","label":"..."}],"edges":[...]}` or `steps`/`stages` inside ````코드 스니펫` or ````json` fences. Always normalize `nodes`/`edges`/`steps`/`stages` into `items: [{ text, level }]` before both Studio A4 preview rendering and `wordcraft-cli` `insert.smartArt` compilation so raw JSON never leaks into `.docx`.
-4. **Collapsed Multi-Round Table Repair (`repairCollapsedMarkdownTables`) & Clean Chart SVG Titles**:
-   - Repair Markdown tables where newlines were stripped during multi-round revisions (e.g., 49 pipe cells collapsed onto a single line repeated 7 times) back into proper `colCount`-column Markdown tables, and keep consecutive `| ... |` table lines intact during `.ql-editor` injection.
-   - When emitting `**<그림 n> ${chartTitle}**` in the body text, pass `title: ""` inside `insert.chart`'s JSON spec so WordCraft's SVG chart renderer does not render a clipped, duplicate header above the chart.
-5. **Zero Legacy `ARCHAEO STUDIO PRO 4.0 (Google Docs)` UI & Strict `'작업'` Mode Lock**:
-   - The embedded Antigravity drawer (`#agy-gemini-desktop-drawer`) must present `ARCHAEO STUDIO 5.0 (WordCraft .docx)` rather than the deprecated `PRO 4.0 / Google Docs` intermediate bar, and must immediately lock Gemini Web to `4 Argon (사고 수준: 최고가)` + `'작업'` mode (`gem-segmented-button[data-value="40"]`, never leaving `'채팅'` selected).
-6. **Windows Batch Script Delayed Expansion & Portable Paths (`새컴퓨터_자동설정.bat`)**:
-   - Always use `setlocal DisableDelayedExpansion` in `.bat` files that invoke `node -e "...!fs.existsSync..."` so `cmd.exe` does not strip characters between `!` operators.
-   - Never hardcode user-specific paths (`C:\Users\kyi25`, `D:\phone`); always use `%USERPROFILE%`, `%~dp0`, `os.homedir()`, or `__dirname`.
+   - Never include digits (`0-9`) or `(` in the character class preceding `${num})` (`(?<![0-9(])`), and never substitute `[[WC_FN_n]]` tokens inside Markdown table rows (`| ... |`).
+3. **Mechanical SDLC Gate (`node scripts/v2/tools/check.js`, `.githooks/pre-commit`, `.github/workflows/v6-check.yml`)**:
+   - Enforces syntax checks, 33 unit tests (`node --test tests/`), CI inline checks, protected path checks (`bin/`, `patches/`, `factory/`), forbidden pattern checks, and `skills/` === `skills_backup/` synchronization.
+
