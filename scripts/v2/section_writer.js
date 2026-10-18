@@ -141,16 +141,25 @@ function parseSectionReply(text, section = null) {
     clean = clean.replace(/^```(?:markdown|md)?\s*\n/, '').replace(/\n```$/, '').trim();
   }
 
+  let explicitSummary = '';
+  const summaryMatch = clean.match(/\n*\s*\[절\s*요약\]\s*\n([\s\S]*)$/i);
+  if (summaryMatch) {
+    explicitSummary = summaryMatch[1].replace(/\s+/g, ' ').trim();
+    clean = clean.slice(0, summaryMatch.index).trim();
+  }
+
   if (section?.heading && !/^#{1,4}\s+/m.test(clean)) {
     clean = `## ${section.heading}\n\n${clean}`;
   }
 
-  const plainSummary = clean
-    .replace(/^#{1,4}\s+.*$/gm, '')
-    .replace(/```[\s\S]*?```/g, '')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .slice(0, 250);
+  const plainSummary =
+    explicitSummary ||
+    clean
+      .replace(/^#{1,4}\s+.*$/gm, '')
+      .replace(/```[\s\S]*?```/g, '')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .slice(0, 250);
 
   return {
     markdown: clean,
