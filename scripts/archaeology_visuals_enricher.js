@@ -412,7 +412,7 @@ function ensureRichArchaeologyVisualsAndTables(
     return full;
   });
 
-  const validPapers = (collectedPapers || []).filter(
+  const validPapers = (Array.isArray(collectedPapers) ? collectedPapers : []).filter(
     (p) => p && p.title && p.author && !/저자미상|Unknown/i.test(p.author)
   );
   const siteTitle = extractSiteTitleFromMarkdown(md, userFocus);
