@@ -300,12 +300,13 @@ void MainWindow::showLayerTreeContextMenu(QgsLayerTreeView* treeView, const QPoi
         [vector, on, layoutLabels, refreshViews]() {
           if (vector && LayerLabelControls::setVisible(vector, !on, layoutLabels)) refreshViews();
         });
-    // Layout heritage numbers own their expression and badge size. Source name
-    // fields must not overwrite that independent presentation from this menu.
-    if (layoutLabels && LayerLabelControls::isHeritage(vector)) return;
+    // Layout heritage numbers own their badge size; the chosen field names the
+    // numbered sites on the sheet, as on the map.
+    const bool layoutHeritage = layoutLabels && LayerLabelControls::isHeritage(vector);
     const QString currentField = LayerOps::currentLabelField(vector);
     QMenu* fields = addSubmenu(labels, "layer.labelField", QStringLiteral("표시할 항목"));
-    fields->menuAction()->setEnabled(labelInfo.fieldEditable);
+    fields->menuAction()->setEnabled(layoutHeritage ? LayerLabelControls::describe(vector).fieldEditable
+                                                    : labelInfo.fieldEditable);
     const QgsFields available = vector->fields();
     QMenu* fieldGroup = fields;
     QMenu* fieldPage = fields;
@@ -331,7 +332,9 @@ void MainWindow::showLayerTreeContextMenu(QgsLayerTreeView* treeView, const QPoi
       action->setCheckable(true); action->setChecked(areaOn);
     }
     QMenu* sizes = addSubmenu(labels, "layer.labelSize", QStringLiteral("글자 크기"));
-    sizes->menuAction()->setEnabled(vector->labeling() != nullptr);
+    sizes->menuAction()->setEnabled(vector->labeling() != nullptr && !layoutHeritage);
+    if (layoutHeritage)
+      sizes->menuAction()->setToolTip(QStringLiteral("도면의 유적 번호는 정해진 크기로 그립니다. 글자 크기는 지도 탭에서 바꿉니다."));
     for (double size : {3., 4., 5., 6., 7., 8., 9., 10., 12., 14.}) {
       QAction* action = add(sizes, "layer.labelSizeValue", QStringLiteral("%1 pt").arg(size), labelReason,
           [this, vector, size, refreshViews]() { if (vector) {

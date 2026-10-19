@@ -706,7 +706,9 @@ bool HeritageLayoutNumbers::update(QgsLayoutItemMap* map, bool force) {
       return false;
     }
     QMap<QString, Site> sites;
-    const QString nameField = HeritageImport::chooseNameField(layer);
+    // The field chosen in 「표시할 항목」 names the sites, as on the map.
+    QString nameField = layer->customProperty(QStringLiteral("ka_hgis/label_field")).toString();
+    if (layer->fields().lookupField(nameField) < 0) nameField = HeritageImport::chooseNameField(layer);
     QgsExpressionContext classContext;
     if (categorized && layer->fields().lookupField(categorized->classAttribute()) < 0)
       classContext.appendScopes(QgsExpressionContextUtils::globalProjectLayerScopes(layer));

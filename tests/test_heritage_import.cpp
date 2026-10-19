@@ -66,6 +66,43 @@ class HeritageImportTest : public QObject {
   }
 
 private slots:
+  void alterationStandardLabelsDesignationTypeByDefault() {
+    QTemporaryDir temp;
+    QVERIFY(temp.isValid());
+    QgsVectorLayer source(QStringLiteral("Polygon?crs=EPSG:5187&field=국가유산명:string(100)"
+                                         "&field=지정종목:string(40)&field=구역명:string(40)"),
+                          QStringLiteral("fixture"), QStringLiteral("memory"));
+    QVERIFY(source.startEditing());
+    QgsFeature feature(source.fields());
+    feature.setAttribute(0, QStringLiteral("경주 월성"));
+    feature.setAttribute(1, QStringLiteral("사적"));
+    feature.setAttribute(2, QStringLiteral("1구역"));
+    feature.setGeometry(QgsGeometry::fromWkt(QStringLiteral(
+        "POLYGON((100000 400000,100010 400000,100010 400010,100000 400010,100000 400000))")));
+    QVERIFY(source.addFeature(feature));
+    QVERIFY(source.commitChanges());
+    QgsVectorFileWriter::SaveVectorOptions options;
+    options.driverName = QStringLiteral("ESRI Shapefile");
+    options.fileEncoding = QStringLiteral("CP949");  // 인트라넷 SHP 그대로. UTF-8이면 DBF 10바이트에 이름이 잘린다.
+    const QString shp = temp.filePath(QStringLiteral("현상변경허용기준.shp"));
+    QCOMPARE(QgsVectorFileWriter::writeAsVectorFormatV3(&source, shp, QgsCoordinateTransformContext(), options),
+             QgsVectorFileWriter::NoError);
+    for (const auto dataset : {HeritageDataset::AlterationStandard, HeritageDataset::DesignatedHeritage}) {
+      QgsProject project;
+      const auto imported = HeritageImport::loadDataset(&project, dataset, {shp},
+                                                        temp.filePath(QStringLiteral("cache%1").arg(int(dataset))));
+      QVERIFY2(imported.ok(), qPrintable(imported.error));
+      QCOMPARE(imported.layers.size(), 1);
+      auto* layer = imported.layers.first();
+      // 현상변경허용기준만 지정종목, 다른 종류는 그대로 유산 이름.
+      const QString want = dataset == HeritageDataset::AlterationStandard ? QStringLiteral("지정종목")
+                                                                           : QStringLiteral("국가유산명");
+      QCOMPARE(LayerOps::currentLabelField(layer), want);
+      QVERIFY(layer->labeling());
+      QCOMPARE(layer->labeling()->settings().fieldName, QStringLiteral("\"%1\"").arg(want));
+    }
+  }
+
   void cp949NamesSurviveAutomaticImport_data() {
     QTest::addColumn<bool>("withCpg");
     QTest::addColumn<QString>("inputEncoding");

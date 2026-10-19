@@ -809,6 +809,29 @@ private slots:
       QCoreApplication::processEvents();
       QVERIFY(studio.grab().save(QDir(output).filePath(QStringLiteral("layer-information-studio.png"))));
     }
+    // 도면 탭의 「라벨·명칭 속성」도 지도 탭과 같은 줄을 보인다.
+    const auto labelMenuRows = [&window](QgsLayerTreeView* view, const QModelIndex& row) {
+      QMap<QString, QPair<bool, QString>> rows;
+      QTimer::singleShot(0, &window, [&rows]() {
+        auto* menu = qobject_cast<QMenu*>(QApplication::activePopupWidget());
+        if (!menu) return;
+        auto* labels = menu->findChild<QAction*>(QStringLiteral("layer.labels"));
+        if (labels && labels->menu())
+          for (const auto* action : labels->menu()->actions())
+            rows.insert(action->objectName(), {action->isEnabled(), action->toolTip()});
+        menu->close();
+      });
+      window.showLayerTreeContextMenu(view, view->visualRect(row).center());
+      return rows;
+    };
+    const auto mapRows = labelMenuRows(tree, tree->node2index(node));
+    const auto layoutRows = labelMenuRows(layoutTree, layoutTree->node2index(node));
+    QVERIFY(mapRows.contains(QStringLiteral("layer.labelField")));
+    QCOMPARE(layoutRows.keys(), mapRows.keys());
+    QVERIFY(layoutRows.value(QStringLiteral("layer.labelField")).first);
+    // 도면 번호 동그라미는 크기가 정해져 있다. 누를 수 없게 두고 까닭을 보인다.
+    QVERIFY(!layoutRows.value(QStringLiteral("layer.labelSize")).first);
+    QVERIFY(!layoutRows.value(QStringLiteral("layer.labelSize")).second.isEmpty());
     project->setDirty(false);
   }
 

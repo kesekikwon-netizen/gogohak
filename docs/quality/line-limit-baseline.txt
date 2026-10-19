@@ -21,7 +21,7 @@
 3267 src/app/MainWindow.cpp
 652 src/app/MainWindow.h
 881 src/app/MainWindowAlign.cpp
-478 src/app/MainWindowContextMenus.cpp
+481 src/app/MainWindowContextMenus.cpp
 1516 src/app/MainWindowEditing.cpp
 552 src/app/MainWindowExport.cpp
 502 src/app/MainWindowOffline.cpp
@@ -36,7 +36,7 @@
 305 src/core/DemDownloadService.cpp
 959 src/core/GeologyMapService.cpp
 633 src/core/GeorefService.cpp
-331 src/core/HeritageImport.cpp
+336 src/core/HeritageImport.cpp
 640 src/core/HeritageIntranetFlow.cpp
 1228 src/core/HeritageLayoutNumbers.cpp
 353 src/core/HeritageRegionResolver.cpp
@@ -69,15 +69,15 @@
 746 tests/test_heritage_browser.cpp
 369 tests/test_heritage_download_retry.cpp
 456 tests/test_heritage_flow.cpp
-508 tests/test_heritage_import.cpp
-2536 tests/test_heritage_style.cpp
+545 tests/test_heritage_import.cpp
+2576 tests/test_heritage_style.cpp
 588 tests/test_layer_information.cpp
 680 tests/test_layer_state.cpp
 524 tests/test_network_services.cpp
 564 tests/test_perf.cpp
 400 tests/test_polygon_erase.cpp
 802 tests/test_reference_download.cpp
-6239 tests/test_save_open.cpp
+6262 tests/test_save_open.cpp
 1099 tests/test_storage_safety.cpp
 327 tests/test_submit_package.cpp
 338 tests/test_survey_contour.cpp

@@ -256,13 +256,18 @@ HeritageImport::Result HeritageImport::loadDataset(QgsProject* project, Heritage
     }
 
     // 유적명은 실제 필드에서 고른다. 없으면 그렇다고 말한다.
-    const QString nameField = chooseNameField(layer);
+    QString nameField = chooseNameField(layer);
     if (nameField.isEmpty()) {
       out.messages << QStringLiteral("%1: 유적명 컬럼을 찾지 못해 범례에 이름을 넣지 못했습니다.")
                           .arg(layerName);
     }
     // 한 종류는 한 색이다. 지정유산 안의 6종도 모두 지정유산 색을 쓴다
     // (레이어창에서는 「지정유산」 그룹으로 묶어 구분한다).
+    // 현상변경허용기준은 지정종목을 글자로 먼저 보인다(2026-10-19 사용자 요청).
+    if (dataset == HeritageDataset::AlterationStandard) {
+      const int kind = layer->fields().indexOf(QStringLiteral("지정종목"));
+      if (looksLikeText(layer, kind)) nameField = layer->fields().at(kind).name();
+    }
     const HeritageStyleResult styled = HeritageStyle::apply(layer, dataset, nameField);
     if (!styled.message.isEmpty()) out.messages << styled.message;
     if (layer->dataProvider()) layer->dataProvider()->createSpatialIndex();

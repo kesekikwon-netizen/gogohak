@@ -48,6 +48,7 @@
 #include "core/HeritageImport.h"
 #include "core/HeritageLayoutNumbers.h"
 #include "core/HeritageStyle.h"
+#include "core/LayerLabelControls.h"
 #include "core/LayerOps.h"
 #include "core/LayoutService.h"
 
@@ -1122,6 +1123,45 @@ private slots:
     after.readFromLayer(layer);
     QCOMPARE(after.xmlData(), original.xmlData());
     QVERIFY(dynamic_cast<QgsSingleSymbolRenderer*>(layer->renderer()));
+  }
+
+  void layoutNumbersFollowTheChosenLabelField() {
+    QgsProject project;
+    auto* layer = new QgsVectorLayer(QStringLiteral("Polygon?crs=EPSG:5186&field=nm:string(80)&field=kind:string(40)"),
+                                     QStringLiteral("현상변경허용기준"), QStringLiteral("memory"));
+    QVERIFY(layer->isValid());
+    QVERIFY(layer->startEditing());
+    const QList<QPair<QString, QString>> rows = {{QStringLiteral("경주 월성"), QStringLiteral("사적")},
+        {QStringLiteral("경주 첨성대"), QStringLiteral("국보")}, {QStringLiteral("경주 계림"), QStringLiteral("사적")}};
+    double x = 190000.;
+    for (const auto& row : rows) {
+      QgsFeature f(layer->fields());
+      f.setGeometry(QgsGeometry::fromRect(QgsRectangle(x, 550000., x + 100., 550100.)));
+      f.setAttribute(QStringLiteral("nm"), row.first);
+      f.setAttribute(QStringLiteral("kind"), row.second);
+      QVERIFY(layer->addFeature(f));
+      x += 200.;
+    }
+    QVERIFY(layer->commitChanges());
+    HeritageStyle::apply(layer, HeritageDataset::AlterationStandard, QStringLiteral("nm"));
+    LayerOps::markReferenceLayer(layer);
+    project.addMapLayer(layer, false);
+    project.layerTreeRoot()->addGroup(QStringLiteral("참조 지도"))
+        ->addGroup(HeritageStyle::layerName(HeritageDataset::AlterationStandard))->addLayer(layer);
+    QgsPrintLayout layout(&project);
+    auto* map = makeLayoutMap(layout, {layer}, QgsRectangle(189950., 549750., 190550., 550350.));
+    HeritageLayoutNumbers numbers;
+    const auto names = [&numbers]() {
+      QSet<QString> out;
+      for (const auto& entry : numbers.entries()) out.insert(entry.name);
+      return out;
+    };
+    QVERIFY(numbers.update(map, true));
+    QCOMPARE(names(), (QSet<QString>{QStringLiteral("경주 월성"), QStringLiteral("경주 첨성대"), QStringLiteral("경주 계림")}));
+    // 「표시할 항목」에서 고른 항목이 도면 번호·범례의 이름이 된다.
+    QVERIFY(LayerLabelControls::setField(layer, QStringLiteral("kind")));
+    QVERIFY(numbers.update(map));
+    QCOMPARE(names(), (QSet<QString>{QStringLiteral("사적"), QStringLiteral("국보")}));
   }
 
   void layoutNumberCirclesAndLegendMatchWithoutChangingSourceStyle() {
