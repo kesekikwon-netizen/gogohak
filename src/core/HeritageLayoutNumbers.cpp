@@ -40,7 +40,6 @@
 #include <qgslegendrenderer.h>
 #include <qgsmaplayerlegend.h>
 #include <qgsmaplayerstyle.h>
-#include <qgsgeometrygeneratorsymbollayer.h>
 #include <qgsmarkersymbol.h>
 #include <qgsmarkersymbollayer.h>
 #include <qgslayertreemodellegendnode.h>
@@ -968,8 +967,8 @@ bool HeritageLayoutNumbers::update(QgsLayoutItemMap* map, bool force) {
   for (int i = 0; i < pins.size(); ++i) {
     pins[i].x = placed.at(i).x();
     pins[i].y = placed.at(i).y();
-    // On its own area the badge needs no leader line; off it, the line runs
-    // to the nearest edge of the area, not to a point deep inside.
+    // The site point kept with the badge: the badge itself when it sits on its
+    // own area, else the nearest edge of the area.
     const QgsGeometry& area = pinAreas.at(i);
     if (area.isEmpty()) continue;
     const QgsGeometry at = QgsGeometry::fromPointXY(placed.at(i));
@@ -1026,21 +1025,9 @@ void HeritageLayoutNumbers::publishNumberPins(QgsLayoutItemMap* map, const QVect
     glyph->setSizeUnit(Qgis::RenderUnit::Millimeters);
     glyph->setDataDefinedProperty(QgsSymbolLayer::Property::Character, QgsProperty::fromField(QStringLiteral("num")));
     glyph->setDataDefinedProperty(QgsSymbolLayer::Property::FillColor, QgsProperty::fromField(QStringLiteral("ink")));
+    // No leader lines: a badge sits on its site or on the nearest free spot
+    // next to it (2026-10-19 현장 요청 「선을 긋지 말고 제위치에」).
     marker->appendSymbolLayer(glyph);
-    if (auto* leader = dynamic_cast<QgsGeometryGeneratorSymbolLayer*>(std::unique_ptr<QgsSymbolLayer>(
-            QgsGeometryGeneratorSymbolLayer::create({{QStringLiteral("SymbolType"), QStringLiteral("Line")}})).release())) {
-      leader->setSymbolType(Qgis::SymbolType::Line);
-      leader->setGeometryExpression(QStringLiteral(
-          "if(distance($geometry, make_point(\"ox\",\"oy\")) > 0.5, "
-          "make_line(make_point(\"ox\",\"oy\"), $geometry), geom_from_wkt('LineString EMPTY'))"));
-      auto line = QgsLineSymbol::createSimple({
-          {QStringLiteral("line_color"), QStringLiteral("#1f2937")},
-          {QStringLiteral("line_width"), QStringLiteral("0.10")},
-          {QStringLiteral("line_width_unit"), QStringLiteral("MM")},
-      });
-      if (line) leader->setSubSymbol(line.release());
-      marker->appendSymbolLayer(leader);
-    }
     m_numberLayer->setRenderer(new QgsSingleSymbolRenderer(marker.release()));
     m_numberLayer->setLabelsEnabled(false);
     m_numberLayer->setCustomProperty(QStringLiteral("ka_hgis/omit_sheet_legend"), true);

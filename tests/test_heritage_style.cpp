@@ -913,7 +913,7 @@ private slots:
     auto* pinLayer = numbers.numberLayer();
     QVERIFY(pinLayer);
     auto* pinSymbol = dynamic_cast<QgsSingleSymbolRenderer*>(pinLayer->renderer());
-    QVERIFY(pinSymbol && dynamic_cast<QgsGeometryGeneratorSymbolLayer*>(pinSymbol->symbol()->symbolLayer(2)));
+    QVERIFY(pinSymbol && pinSymbol->symbol()->symbolLayerCount() == 2);  // 지시선 없음
     QSet<QString> pins;
     int offset = 0;
     QgsFeature feature;
@@ -1279,9 +1279,8 @@ private slots:
     QVERIFY(pinSymbol);
     auto* glyph = dynamic_cast<QgsFontMarkerSymbolLayer*>(pinSymbol->symbol()->symbolLayer(1));
     QVERIFY(glyph);
-    auto* leader = dynamic_cast<QgsGeometryGeneratorSymbolLayer*>(pinSymbol->symbol()->symbolLayer(2));
-    QVERIFY(leader);
-    QCOMPARE(leader->symbolType(), Qgis::SymbolType::Line);
+    // 지시선 없이 원과 숫자만 그린다(2026-10-19 현장 요청 「선을 긋지 말고 제위치에」).
+    QCOMPARE(pinSymbol->symbol()->symbolLayerCount(), 2);
     QgsFeature pin;
     QVERIFY(pins->getFeatures().nextFeature(pin));
     QCOMPARE(pin.attribute(QStringLiteral("num")).toInt(), entry.number);
