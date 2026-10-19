@@ -10,6 +10,7 @@
 #include <QStringList>
 #include <memory>
 
+#include <qgsmapsettings.h>
 #include <qgsrectangle.h>
 
 class QObject;
@@ -17,6 +18,7 @@ class QgsLayerTree;
 class QgsLayerTreeMapCanvasBridge;
 class QgsMapLayer;
 class QgsMapCanvas;
+class QgsMapRendererSequentialJob;
 
 // 라벨 위에 한 번 더 그리는 덧그림.
 //
@@ -35,6 +37,8 @@ class QgsMapCanvas;
 // the main map's layer list (a layer the main map draws gets its names from there,
 // never twice), a watched layer's style/data/edit signal, or the extent, size, DPR, CRS or
 // rotation. A finished base-map render alone does not redraw it.
+// The picture is rendered in the background (QgsMapRendererSequentialJob); until it arrives the last
+// picture is shown moved and scaled to the new extent, so pan and zoom never wait for it.
 class KaAboveLabelsOverlay : public QgsMapCanvasItem {
 public:
   explicit KaAboveLabelsOverlay(QgsMapCanvas* canvas);
@@ -54,6 +58,7 @@ public:
   QSize cachePixelSize() const { return m_cache.size(); }
   qreal cacheDevicePixelRatio() const { return m_cache.isNull() ? 0. : m_cache.devicePixelRatio(); }
   int rebuildCount() const { return m_rebuilds; }
+  bool isRendering() const { return m_job != nullptr; }
 
 protected:
   void paint(QPainter* painter) override;
@@ -64,7 +69,11 @@ private:
   void watchLayers();
   void markDirty();
   QString cacheKey() const;
-  void rebuildCache(qreal dpr);
+  static QString frameOf(const QgsMapSettings& ms);
+  void startRender(qreal dpr, const QSize& logical, const QString& key);
+  void runJob(const QgsMapSettings& settings);
+  void finishJob();
+  void dropJob();
 
   QList<QPointer<QgsMapLayer>> m_layers;
   // 화면을 칠할 때마다 지도를 다시 그리면 팬·줌이 멎는다. 결과를 담아 두고
@@ -72,12 +81,22 @@ private:
   QImage m_cache;
   QString m_cacheKey;
   QSize m_cacheSize;
+  QgsRectangle m_cacheExtent;
+  QString m_cacheFrame;  // CRS and rotation of m_cache
+  // The background render: shapes first, then (if any layer writes its names here) names only.
+  std::unique_ptr<QgsMapRendererSequentialJob> m_job;
+  std::unique_ptr<QgsMapSettings> m_labelSettings;
+  QImage m_shapes;
+  QString m_jobKey;
+  QSize m_jobSize;
+  QgsRectangle m_jobExtent;
+  QString m_jobFrame;
   // 본 지도가 마지막으로 다 그린 레이어(id). 이 안의 레이어 이름은 본 지도가 이미 썼으니 여기서 쓰지 않는다.
   QStringList m_canvasDrawnIds;
   bool m_dirty = true;
-  bool m_painting = false;
   int m_rebuilds = 0;
   // Connection owners: destroyed with the item so no signal reaches a dead overlay.
   std::unique_ptr<QObject> m_canvasContext;
   std::unique_ptr<QObject> m_layerContext;
+  std::unique_ptr<QObject> m_jobContext;
 };

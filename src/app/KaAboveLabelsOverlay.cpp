@@ -9,7 +9,7 @@
 #include <qgslayertreemapcanvasbridge.h>
 #include <qgsmapcanvas.h>
 #include <qgsmaplayer.h>
-#include <qgsmaprenderercustompainterjob.h>
+#include <qgsmaprenderersequentialjob.h>
 #include <qgsmapsettings.h>
 #include <qgsproject.h>
 #include <qgsvectorlayer.h>
@@ -36,7 +36,8 @@ void keepOverlayLayersOff(const QPointer<QgsMapCanvas>& canvas) {
 KaAboveLabelsOverlay::KaAboveLabelsOverlay(QgsMapCanvas* canvas)
     : QgsMapCanvasItem(canvas),
       m_canvasContext(std::make_unique<QObject>()),
-      m_layerContext(std::make_unique<QObject>()) {
+      m_layerContext(std::make_unique<QObject>()),
+      m_jobContext(std::make_unique<QObject>()) {
   // 좌표격자(1000)보다 아래, 지도보다는 위. 격자와 눈금은 계속 맨 위에 남는다.
   setZValue(900);
   setVisible(false);
@@ -44,7 +45,7 @@ KaAboveLabelsOverlay::KaAboveLabelsOverlay(QgsMapCanvas* canvas)
   // 레이어가 실제로 바뀌었을 때만 다시 만든다.
   if (canvas)
     QObject::connect(canvas, &QgsMapCanvas::renderComplete, m_canvasContext.get(), [this](QPainter*) {
-      // 본 지도가 방금 다 그린 레이어 목록. 그림이 바뀌는 이때에 맞춰 이름을 누가 쓸지도 바꾼다(rebuildCache).
+      // 본 지도가 방금 다 그린 레이어 목록. 그림이 바뀌는 이때에 맞춰 이름을 누가 쓸지도 바꾼다(startRender).
       QStringList drawn;
       for (const QgsMapLayer* layer : mMapCanvas->layers())
         drawn << layer->id();
@@ -56,7 +57,13 @@ KaAboveLabelsOverlay::KaAboveLabelsOverlay(QgsMapCanvas* canvas)
     });
 }
 
-KaAboveLabelsOverlay::~KaAboveLabelsOverlay() = default;
+KaAboveLabelsOverlay::~KaAboveLabelsOverlay() {
+  // 그리는 중인 레이어가 이 항목보다 먼저 사라지지 않게 여기서 렌더를 끝낸다.
+  if (m_job) {
+    QObject::disconnect(m_job.get(), nullptr, m_jobContext.get(), nullptr);
+    m_job->cancel();
+  }
+}
 
 QgsLayerTreeMapCanvasBridge* KaAboveLabelsOverlay::makeLayerTreeBridge(QgsLayerTree* root, QgsMapCanvas* canvas,
                                                                        QObject* parent) {
@@ -160,8 +167,6 @@ QString KaAboveLabelsOverlay::cacheKey() const {
 
 void KaAboveLabelsOverlay::paint(QPainter* painter) {
   if (!painter || !mMapCanvas || m_layers.isEmpty()) return;
-  // 렌더 안에서 다시 이 항목이 그려지는 일이 없도록 막는다.
-  if (m_painting) return;
   if (currentLayers().isEmpty()) return;
 
   const QSize logical = mMapCanvas->size();
@@ -171,19 +176,46 @@ void KaAboveLabelsOverlay::paint(QPainter* painter) {
   if (!(dpr > 0.05f)) dpr = static_cast<float>(mMapCanvas->devicePixelRatioF());
   if (!(dpr > 0.05f)) dpr = 1.0f;
 
-  // 입력이 그대로면 담아 둔 그림을 쓴다. 마우스가 움직일 때마다 다시 그리면 화면이 멎는다.
+  // 입력이 그대로면 담아 둔 그림을 쓴다. 바뀌었으면 뒤에서 새로 그리고 그동안은 지난 그림을 쓴다.
+  // 여기(주 스레드)서 그리면 유적이 많은 시·군(경주 꼭짓점 약 275만)에서 확대·이동마다 창이 몇 초씩 멎는다.
   const QString key = cacheKey();
-  if (m_dirty || m_cache.isNull() || m_cacheSize != logical || m_cacheKey != key) {
-    m_cacheSize = logical;
-    m_cacheKey = key;
-    rebuildCache(dpr);
+  const bool current = m_cacheKey == key && m_cacheSize == logical;
+  if (m_dirty || (!current && m_jobKey != key)) {
     m_dirty = false;
+    startRender(dpr, logical, key);
   }
-  if (!m_cache.isNull()) painter->drawImage(QPointF(0, 0), m_cache);
+  if (m_cache.isNull()) return;
+  if (current) {
+    painter->drawImage(QPointF(0, 0), m_cache);
+    return;
+  }
+  // 지난 그림을 지금 화면 위치에 맞춰 늘이거나 옮겨 보인다(본 지도의 미리보기와 같은 방식).
+  // 좌표계나 회전이 달라졌으면 맞출 수 없으니 새 그림이 올 때까지 비워 둔다.
+  const QgsMapSettings& ms = mMapCanvas->mapSettings();
+  if (m_cacheFrame != frameOf(ms)) return;
+  const QPointF topLeft =
+      toCanvasCoordinates(QgsPointXY(m_cacheExtent.xMinimum(), m_cacheExtent.yMaximum())) - pos();
+  const QPointF bottomRight =
+      toCanvasCoordinates(QgsPointXY(m_cacheExtent.xMaximum(), m_cacheExtent.yMinimum())) - pos();
+  painter->drawImage(QRectF(topLeft, bottomRight), m_cache);
 }
 
-void KaAboveLabelsOverlay::rebuildCache(qreal dpr) {
-  m_cache = QImage();
+QString KaAboveLabelsOverlay::frameOf(const QgsMapSettings& ms) {
+  return ms.destinationCrs().authid() + QLatin1Char('|') + QString::number(ms.rotation(), 'f', 4);
+}
+
+void KaAboveLabelsOverlay::dropJob() {
+  if (!m_job) return;
+  // 늦게 끝나는 지난 렌더는 결과를 버린다. 끝날 때 스스로 지워진다.
+  QgsMapRendererSequentialJob* old = m_job.release();
+  QObject::disconnect(old, nullptr, m_jobContext.get(), nullptr);
+  QObject::connect(old, &QgsMapRendererJob::finished, old, &QObject::deleteLater);
+  old->cancelWithoutBlocking();
+  m_jobKey.clear();
+}
+
+void KaAboveLabelsOverlay::startRender(qreal dpr, const QSize& logical, const QString& key) {
+  dropJob();
   if (!mMapCanvas || m_layers.isEmpty()) return;
   const QList<QgsMapLayer*> live = currentLayers();
   if (live.isEmpty()) return;
@@ -194,23 +226,9 @@ void KaAboveLabelsOverlay::rebuildCache(qreal dpr) {
   ms.setBackgroundColor(Qt::transparent);
   // 도형은 여기서 한 번만 그린다. 지번은 본 화면에 이미 있다.
   ms.setFlag(Qgis::MapSettingsFlag::DrawLabeling, false);
-  ms.setOutputSize(m_cacheSize);
+  ms.setOutputSize(logical);
   ms.setDevicePixelRatio(static_cast<float>(dpr));
 
-  // Same allocation as QgsMapRendererSequentialJob: physical pixels, logical painter.
-  QImage img(ms.deviceOutputSize(), QImage::Format_ARGB32_Premultiplied);
-  if (img.isNull()) return;
-  img.setDevicePixelRatio(dpr);
-  img.setDotsPerMeterX(static_cast<int>(1000 * ms.outputDpi() / 25.4));
-  img.setDotsPerMeterY(static_cast<int>(1000 * ms.outputDpi() / 25.4));
-  img.fill(Qt::transparent);
-  QPainter p(&img);
-  m_painting = true;
-  // 페인트 안에서는 start()+waitForFinished() 로 배경 스레드를 기다리면 안 된다.
-  // renderSynchronously() 가 이 자리(주 스레드)에서 그리라고 만들어진 API 다.
-  // The vector-only pass stays sequential like the base map (WMS crash class rule).
-  QgsMapRendererCustomPainterJob job(ms, &p);
-  job.renderSynchronously();
   // 레이어 창 연결(bridge)이 이 레이어를 본 지도에 다시 넣었으면 본 지도가 이미 이름을 쓴다. 여기서 또 쓰면
   // 두 엔진이 다른 자리를 골라 「오외도지석묘1호호」처럼 겹친다(R83). 이름은 한 엔진에만 맡긴다.
   QList<QgsMapLayer*> labeled;
@@ -219,15 +237,54 @@ void KaAboveLabelsOverlay::rebuildCache(qreal dpr) {
     if (vector && vector->labelsEnabled() && vector->labeling() && !m_canvasDrawnIds.contains(layer->id()))
       labeled.append(vector);
   }
+  m_labelSettings.reset();
   if (!labeled.isEmpty()) {
     QgsMapSettings labelSettings = ms;
     labelSettings.setLayers(labeled);
     labelSettings.setFlag(Qgis::MapSettingsFlag::DrawLabeling, true);
     labelSettings.setFlag(Qgis::MapSettingsFlag::SkipSymbolRendering, true);
-    QgsMapRendererCustomPainterJob labelJob(labelSettings, &p);
-    labelJob.renderSynchronously();
+    m_labelSettings = std::make_unique<QgsMapSettings>(labelSettings);
   }
-  m_painting = false;
-  p.end();
-  m_cache = img;
+  m_jobKey = key;
+  m_jobSize = logical;
+  m_jobExtent = mMapCanvas->extent();
+  m_jobFrame = frameOf(ms);
+  m_shapes = QImage();
+  // The vector-only pass stays sequential like the base map (WMS crash class rule): one job, one thread.
+  runJob(ms);
+}
+
+void KaAboveLabelsOverlay::runJob(const QgsMapSettings& settings) {
+  m_job = std::make_unique<QgsMapRendererSequentialJob>(settings);
+  QObject::connect(m_job.get(), &QgsMapRendererJob::finished, m_jobContext.get(), [this] { finishJob(); });
+  m_job->start();
+}
+
+void KaAboveLabelsOverlay::finishJob() {
+  if (!m_job) return;
+  const QImage image = m_job->renderedImage();
+  m_job.release()->deleteLater();
+  if (m_shapes.isNull() && m_labelSettings) {
+    // 도형 다음에 이름만 얹는다(심볼 없이). 두 번째 렌더도 뒤에서 돈다.
+    m_shapes = image;
+    const QgsMapSettings labels = *m_labelSettings;
+    m_labelSettings.reset();
+    runJob(labels);
+    return;
+  }
+  QImage picture = image;
+  if (!m_shapes.isNull()) {
+    picture = m_shapes;
+    QPainter p(&picture);
+    p.drawImage(QPointF(0, 0), image);
+    p.end();
+    m_shapes = QImage();
+  }
+  m_cache = picture;
+  m_cacheKey = m_jobKey;
+  m_cacheSize = m_jobSize;
+  m_cacheExtent = m_jobExtent;
+  m_cacheFrame = m_jobFrame;
+  m_jobKey.clear();
+  update();
 }

@@ -2,6 +2,7 @@
 #include <QImage>
 #include <QPainter>
 #include <QDir>
+#include <QElapsedTimer>
 #include <cmath>
 
 #include "app/KaAboveLabelsOverlay.h"
@@ -15,6 +16,7 @@
 #include <qgssinglesymbolrenderer.h>
 #include <qgsvectordataprovider.h>
 #include <qgsvectorlayer.h>
+#include <qgsvectorsimplifymethod.h>
 
 namespace {
 bool orange(QRgb pixel) {
@@ -36,6 +38,7 @@ private slots:
   void overlayMatchesCanvas_data();
   void overlayMatchesCanvas();
   void cacheUsesCanvasPixelsAndRedrawsOnlyOnChange();
+  void heavyLayerDoesNotFreezeTheWindow();
 };
 
 void TestAboveLabels::overlayMatchesCanvas_data() {
@@ -83,6 +86,7 @@ void TestAboveLabels::overlayMatchesCanvas() {
   overlay->setLayers({&ring});
   // Fill the cache before moving/resizing, as in an existing field workspace.
   (void)canvas.grab();
+  QTRY_VERIFY_WITH_TIMEOUT(!overlay->isRendering(), 10000);
 
   overlay->setVisible(false);
   rendered.clear();
@@ -98,6 +102,8 @@ void TestAboveLabels::overlayMatchesCanvas() {
   QTRY_VERIFY_WITH_TIMEOUT(!canvas.isDrawing(), 10000);
   const QImage base = canvas.grab().toImage().convertToFormat(QImage::Format_RGB32);
   overlay->setVisible(true);
+  (void)canvas.grab();  // the overlay renders in the background; compare its finished picture
+  QTRY_VERIFY_WITH_TIMEOUT(!overlay->isRendering(), 10000);
   const QImage combined = canvas.grab().toImage().convertToFormat(QImage::Format_RGB32);
   const QString output = qEnvironmentVariable("QA_OUTPUT_DIR");
   if (!output.isEmpty()) {
@@ -153,6 +159,7 @@ void TestAboveLabels::cacheUsesCanvasPixelsAndRedrawsOnlyOnChange() {
   QTRY_VERIFY_WITH_TIMEOUT(!rendered.isEmpty(), 10000);
   overlay->setLayers({&ring});
   (void)canvas.grab();
+  QTRY_VERIFY_WITH_TIMEOUT(!overlay->isRendering(), 10000);
   const qreal dpr = canvas.mapSettings().devicePixelRatio();
   qInfo() << "DPR" << dpr << "cache" << overlay->cachePixelSize();
   // Same physical resolution as the base map: sharp at 125-200 %.
@@ -174,6 +181,58 @@ void TestAboveLabels::cacheUsesCanvasPixelsAndRedrawsOnlyOnChange() {
   ring.triggerRepaint();
   (void)canvas.grab();
   QCOMPARE(overlay->rebuildCount(), built + 1);
+}
+
+// 경주 현상변경허용기준(꼭짓점 약 210만)이 덧그림에 있으면 확대·이동마다 창이 4~11초 멎었다(2026-10-19).
+// 덧그림은 뒤에서 그리고, 화면을 칠하는 일은 바로 돌아와야 한다.
+void TestAboveLabels::heavyLayerDoesNotFreezeTheWindow() {
+  QgsVectorLayer heavy(QStringLiteral("Polygon?crs=EPSG:5187"), QStringLiteral("현상변경허용기준"),
+                       QStringLiteral("memory"));
+  QgsFeatureList features;
+  for (int ring = 0; ring < 400; ++ring) {
+    QgsPolylineXY points;
+    const double radius = 50. + ring;
+    for (int i = 0; i < 10000; ++i) {
+      const double a = 2 * M_PI * i / 10000.;
+      points << QgsPointXY(200400 + radius * std::cos(a), 450300 + radius * std::sin(a));
+    }
+    points << points.first();
+    QgsFeature feature;
+    feature.setGeometry(QgsGeometry::fromPolygonXY({points}));
+    features << feature;
+  }
+  QVERIFY(heavy.dataProvider()->addFeatures(features));
+  heavy.updateExtents();
+  QgsVectorSimplifyMethod none;
+  none.setSimplifyHints(Qgis::VectorRenderingSimplificationFlags());
+  heavy.setSimplifyMethod(none);
+
+  QgsMapCanvas canvas;
+  canvas.setFrameShape(QFrame::NoFrame);
+  canvas.resize(800, 600);
+  canvas.setParallelRenderingEnabled(false);
+  canvas.setPreviewJobsEnabled(false);
+  canvas.setDestinationCrs(heavy.crs());
+  auto* overlay = new KaAboveLabelsOverlay(&canvas);
+  canvas.show();
+  QCoreApplication::processEvents();
+  canvas.setExtent(QgsRectangle(200000, 450000, 200800, 450600));
+  LayerOps::applyCanvasScreenDpi(&canvas);
+  QSignalSpy rendered(&canvas, &QgsMapCanvas::mapCanvasRefreshed);
+  canvas.refresh();
+  QTRY_VERIFY_WITH_TIMEOUT(!rendered.isEmpty(), 10000);
+  overlay->setLayers({&heavy});
+
+  QElapsedTimer timer;
+  timer.start();
+  (void)canvas.grab();
+  const qint64 paintMs = timer.elapsed();
+  QTRY_VERIFY_WITH_TIMEOUT(!overlay->isRendering(), 120000);
+  const qint64 renderMs = timer.elapsed();
+  (void)canvas.grab();
+  qInfo() << "paint" << paintMs << "ms, overlay ready after" << renderMs << "ms";
+  QVERIFY(!overlay->cachePixelSize().isEmpty());
+  QVERIFY2(paintMs < 300, qPrintable(QStringLiteral("painting waited %1 ms for the overlay").arg(paintMs)));
 }
 
 int main(int argc, char** argv) {

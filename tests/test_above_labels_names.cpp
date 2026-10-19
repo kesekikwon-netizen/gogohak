@@ -116,6 +116,8 @@ void TestAboveLabelsNames::sameNameLabelledOnceWhenCanvasAlsoDrawsLayer() {
     overlay->setVisible(false);
     const QImage base = canvas.grab().toImage().convertToFormat(QImage::Format_RGB32);
     overlay->setVisible(true);
+    (void)canvas.grab();  // the overlay renders in the background; compare its finished picture
+    (void)QTest::qWaitFor([&] { return !overlay->isRendering(); }, 10000);
     return addedInk(base, canvas.grab().toImage().convertToFormat(QImage::Format_RGB32));
   };
   // syncMapCanvas state: the main map leaves the layer out, so the overlay writes its name.
