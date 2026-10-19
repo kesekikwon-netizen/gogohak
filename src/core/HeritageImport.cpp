@@ -263,11 +263,12 @@ HeritageImport::Result HeritageImport::loadDataset(QgsProject* project, Heritage
     }
     // 한 종류는 한 색이다. 지정유산 안의 6종도 모두 지정유산 색을 쓴다
     // (레이어창에서는 「지정유산」 그룹으로 묶어 구분한다).
-    // 현상변경허용기준은 지정종목을 글자로 먼저 보인다(2026-10-19 사용자 요청).
-    if (dataset == HeritageDataset::AlterationStandard) {
-      const int kind = layer->fields().indexOf(QStringLiteral("지정종목"));
-      if (looksLikeText(layer, kind)) nameField = layer->fields().at(kind).name();
-    }
+    // 현상변경허용기준은 지정종목, 발굴조사구역은 사업명을 글자로 먼저 보인다(2026-10-19 사용자 요청).
+    // 발굴조사구역의 유적명은 「A구역」처럼 사업 안의 구역 이름뿐이다.
+    const QString preferred = dataset == HeritageDataset::AlterationStandard ? QStringLiteral("지정종목")
+        : dataset == HeritageDataset::ExcavationSurveyArea ? QStringLiteral("사업명") : QString();
+    const int preferredIndex = preferred.isEmpty() ? -1 : layer->fields().indexOf(preferred);
+    if (looksLikeText(layer, preferredIndex)) nameField = layer->fields().at(preferredIndex).name();
     const HeritageStyleResult styled = HeritageStyle::apply(layer, dataset, nameField);
     if (!styled.message.isEmpty()) out.messages << styled.message;
     if (layer->dataProvider()) layer->dataProvider()->createSpatialIndex();

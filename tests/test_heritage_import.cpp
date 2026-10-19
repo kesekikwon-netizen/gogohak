@@ -66,17 +66,20 @@ class HeritageImportTest : public QObject {
   }
 
 private slots:
-  void alterationStandardLabelsDesignationTypeByDefault() {
+  void alterationAndExcavationLabelsUseTheirDefaultField() {
     QTemporaryDir temp;
     QVERIFY(temp.isValid());
     QgsVectorLayer source(QStringLiteral("Polygon?crs=EPSG:5187&field=국가유산명:string(100)"
-                                         "&field=지정종목:string(40)&field=구역명:string(40)"),
+                                         "&field=지정종목:string(40)&field=구역명:string(40)"
+                                         "&field=사업명:string(100)&field=유적명:string(40)"),
                           QStringLiteral("fixture"), QStringLiteral("memory"));
     QVERIFY(source.startEditing());
     QgsFeature feature(source.fields());
     feature.setAttribute(0, QStringLiteral("경주 월성"));
     feature.setAttribute(1, QStringLiteral("사적"));
     feature.setAttribute(2, QStringLiteral("1구역"));
+    feature.setAttribute(3, QStringLiteral("경주 구정동 주택 신축부지내 유적"));
+    feature.setAttribute(4, QStringLiteral("A구역"));
     feature.setGeometry(QgsGeometry::fromWkt(QStringLiteral(
         "POLYGON((100000 400000,100010 400000,100010 400010,100000 400010,100000 400000))")));
     QVERIFY(source.addFeature(feature));
@@ -87,16 +90,17 @@ private slots:
     const QString shp = temp.filePath(QStringLiteral("현상변경허용기준.shp"));
     QCOMPARE(QgsVectorFileWriter::writeAsVectorFormatV3(&source, shp, QgsCoordinateTransformContext(), options),
              QgsVectorFileWriter::NoError);
-    for (const auto dataset : {HeritageDataset::AlterationStandard, HeritageDataset::DesignatedHeritage}) {
+    for (const auto dataset : {HeritageDataset::AlterationStandard, HeritageDataset::ExcavationSurveyArea,
+                               HeritageDataset::DesignatedHeritage}) {
       QgsProject project;
       const auto imported = HeritageImport::loadDataset(&project, dataset, {shp},
                                                         temp.filePath(QStringLiteral("cache%1").arg(int(dataset))));
       QVERIFY2(imported.ok(), qPrintable(imported.error));
       QCOMPARE(imported.layers.size(), 1);
       auto* layer = imported.layers.first();
-      // 현상변경허용기준만 지정종목, 다른 종류는 그대로 유산 이름.
+      // 현상변경허용기준은 지정종목, 발굴조사구역은 사업명, 다른 종류는 그대로 유적명.
       const QString want = dataset == HeritageDataset::AlterationStandard ? QStringLiteral("지정종목")
-                                                                           : QStringLiteral("국가유산명");
+          : dataset == HeritageDataset::ExcavationSurveyArea ? QStringLiteral("사업명") : QStringLiteral("유적명");
       QCOMPARE(LayerOps::currentLabelField(layer), want);
       QVERIFY(layer->labeling());
       QCOMPARE(layer->labeling()->settings().fieldName, QStringLiteral("\"%1\"").arg(want));

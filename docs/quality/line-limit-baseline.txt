@@ -36,9 +36,9 @@
 305 src/core/DemDownloadService.cpp
 959 src/core/GeologyMapService.cpp
 633 src/core/GeorefService.cpp
-336 src/core/HeritageImport.cpp
+337 src/core/HeritageImport.cpp
 640 src/core/HeritageIntranetFlow.cpp
-1228 src/core/HeritageLayoutNumbers.cpp
+1290 src/core/HeritageLayoutNumbers.cpp
 353 src/core/HeritageRegionResolver.cpp
 393 src/core/KaPortableRuntime.cpp
 357 src/core/KaSafeQgis.cpp
@@ -69,8 +69,8 @@
 746 tests/test_heritage_browser.cpp
 369 tests/test_heritage_download_retry.cpp
 456 tests/test_heritage_flow.cpp
-545 tests/test_heritage_import.cpp
-2576 tests/test_heritage_style.cpp
+549 tests/test_heritage_import.cpp
+2626 tests/test_heritage_style.cpp
 588 tests/test_layer_information.cpp
 680 tests/test_layer_state.cpp
 524 tests/test_network_services.cpp

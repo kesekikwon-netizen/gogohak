@@ -3,6 +3,7 @@
 #include "LayoutService.h"
 #include "HeritageImport.h"
 #include "HeritageStyle.h"
+#include "LayerOps.h"
 #include "PdfExportSettings.h"
 
 #include <cmath>
@@ -23,6 +24,7 @@
 #include <qgsfeaturerequest.h>
 #include <qgsfeatureiterator.h>
 #include <qgsgeometry.h>
+#include <qgsgeometryengine.h>
 #include <qgspointxy.h>
 #include <qgslayout.h>
 #include <qgslayoutitemlegend.h>
@@ -175,6 +177,31 @@ QVariant classAttributeValue(QgsVectorLayer* layer, const QString& attribute, co
 // a free ring slot inside the visible frame and off the legend card.
 constexpr double kNumberGapMm = 0.3;
 
+// Only sites this close to the survey area get a number and a legend row;
+// farther sites stay drawn in colour (2026-10-19 사용자 요청).
+constexpr double kNumberedNearSurveyM = 500.;
+
+// The survey area grown by kNumberedNearSurveyM, in the map CRS. Empty without
+// a drawn survey area: then every site on the paper is numbered as before.
+QgsGeometry surveyNeighbourhood(QgsProject* project, const QgsCoordinateReferenceSystem& mapCrs) {
+  QgsVectorLayer* survey = LayerOps::findByLayerKey(project, QStringLiteral("survey_area"));
+  if (!survey || !survey->isValid()) return {};
+  QVector<QgsGeometry> parts;
+  QgsFeature feature;
+  auto features = survey->getFeatures(QgsFeatureRequest().setNoAttributes());
+  while (features.nextFeature(feature))
+    if (feature.hasGeometry()) parts.append(feature.geometry());
+  if (parts.isEmpty()) return {};
+  // Survey layers use the projected work CRS (metres), so buffer there.
+  QgsGeometry near = QgsGeometry::unaryUnion(parts).buffer(kNumberedNearSurveyM, 8);
+  try {
+    near.transform(QgsCoordinateTransform(survey->crs(), mapCrs, project->transformContext()));
+  } catch (const QgsCsException&) {
+    return {};
+  }
+  return near;
+}
+
 void applyHeritageNumberCallout(QgsPalLayerSettings& labels) {
   labels.geometryGeneratorEnabled = true;
   labels.geometryGenerator = QStringLiteral("point_on_surface($geometry)");
@@ -212,6 +239,7 @@ struct Site {
   double originX = 0.;
   double originY = 0.;
   int index = 0;
+  int originalIndex = -1;
   QColor color;
   std::shared_ptr<QgsSymbol> symbol;
 };
@@ -578,6 +606,7 @@ bool HeritageLayoutNumbers::update(QgsLayoutItemMap* map, bool force) {
   if (!map || !map->layout() || !map->layout()->project()) return false;
   QgsProject* project = map->layout()->project();
   const auto layers = numberedSourceLayers(map);
+  const QgsGeometry nearSurvey = surveyNeighbourhood(project, map->crs());
   QByteArray signature;
   QDataStream stream(&signature, QIODevice::WriteOnly);
   // Round the view so a repeated refresh of the same screen does not miss the
@@ -592,6 +621,9 @@ bool HeritageLayoutNumbers::update(QgsLayoutItemMap* map, bool force) {
          << map->crs().authid() << whole(map->scale())
          << whole(paperBox.xMinimum()) << whole(paperBox.yMinimum())
          << whole(paperBox.xMaximum()) << whole(paperBox.yMaximum());
+  const QgsRectangle nearBox = nearSurvey.boundingBox();
+  stream << nearSurvey.isEmpty() << whole(nearBox.xMinimum()) << whole(nearBox.yMinimum())
+         << whole(nearBox.xMaximum()) << whole(nearBox.yMaximum());
   // Badges keep off a legend card that overlaps the map, so its place on the
   // map is part of the placement input (0.1 mm steps).
   const QVector<QPolygonF> legendBlocks = LayoutBadgePlacer::legendBlocks(map, m_exporting);
@@ -699,6 +731,8 @@ bool HeritageLayoutNumbers::update(QgsLayoutItemMap* map, bool force) {
       return false;
     }
     QgsGeometry footprint = mapFootprintOnPaper(map, m_exporting);
+    // Number only the paper near the survey; far sites are never even read.
+    if (!nearSurvey.isEmpty()) footprint = footprint.intersection(nearSurvey);
     try {
       footprint.transform(QgsCoordinateTransform(map->crs(), layer->crs(), project->transformContext()));
     } catch (const QgsCsException& e) {
@@ -712,7 +746,7 @@ bool HeritageLayoutNumbers::update(QgsLayoutItemMap* map, bool force) {
     QgsExpressionContext classContext;
     if (categorized && layer->fields().lookupField(categorized->classAttribute()) < 0)
       classContext.appendScopes(QgsExpressionContextUtils::globalProjectLayerScopes(layer));
-    if (layer->isInScaleRange(map->scale())) {
+    if (layer->isInScaleRange(map->scale()) && !footprint.isEmpty()) {
       QgsFeatureRequest request;
       request.setFilterRect(footprint.boundingBox());
       QgsAttributeList subset;
@@ -731,13 +765,22 @@ bool HeritageLayoutNumbers::update(QgsLayoutItemMap* map, bool force) {
       }
       if (canSubset && !subset.isEmpty())
         request.setSubsetOfAttributes(subset);
+      // Heritage zones carry up to millions of vertices: test against a
+      // prepared footprint and cut each zone to the footprint box before the
+      // exact intersection (clipped() is fast but may return an invalid ring).
+      const QgsRectangle footprintBox = footprint.boundingBox();
+      std::unique_ptr<QgsGeometryEngine> footprintEngine(QgsGeometry::createGeometryEngine(footprint.constGet()));
+      footprintEngine->prepareGeometry();
       auto features = layer->getFeatures(request);
       QgsFeature feature;
       while (features.nextFeature(feature)) {
         if (!feature.hasGeometry()) continue;
         const QgsGeometry geom = feature.geometry();
-        if (!footprint.intersects(geom)) continue;
-        QgsGeometry clipped = geom.intersection(footprint);
+        if (!footprintEngine->intersects(geom.constGet())) continue;
+        QgsGeometry clipped;
+        if (!footprintBox.contains(geom.boundingBox()))
+          clipped = QgsGeometry(geom).clipped(footprintBox).intersection(footprint);
+        if (clipped.isEmpty()) clipped = geom.intersection(footprint);
         if (clipped.isEmpty()) {
           // Points often lose the intersection product even when they sit
           // on the page. Keep the site and pin the number to the feature.
@@ -809,6 +852,7 @@ bool HeritageLayoutNumbers::update(QgsLayoutItemMap* map, bool force) {
       for (auto it = sites.begin(); it != sites.end(); ++it) {
         if (it->index < 0 || it->index >= all.size())
           continue;
+        it->originalIndex = it->index;
         QgsRendererCategory category = all.at(it->index);
         if (QgsSymbol* symbol = category.symbol()) {
           prepareLayoutSymbol(symbol, *dataset);
@@ -817,6 +861,18 @@ bool HeritageLayoutNumbers::update(QgsLayoutItemMap* map, bool force) {
         }
         it->index = visibleCategories.size();
         visibleCategories.append(category);
+      }
+      if (!nearSurvey.isEmpty()) {
+        // Unnumbered sites farther from the survey keep their colour; legend
+        // rows follow the numbered indices only.
+        QSet<int> numbered;
+        for (const Site& site : std::as_const(sites)) numbered.insert(site.originalIndex);
+        for (int i = 0; i < all.size(); ++i) {
+          if (numbered.contains(i)) continue;
+          QgsRendererCategory category = all.at(i);
+          if (QgsSymbol* symbol = category.symbol()) prepareLayoutSymbol(symbol, *dataset);
+          visibleCategories.append(category);
+        }
       }
       drawing->setRenderer(new QgsCategorizedSymbolRenderer(categorized->classAttribute(), visibleCategories));
     } else if (singleRenderer) {
@@ -1024,8 +1080,13 @@ void HeritageLayoutNumbers::raiseAboveGeometries(QgsLayoutItemMap* base) {
       labelStyles.insert(it.key(), it.value());
       continue;
     }
-    std::unique_ptr<QgsVectorLayer> drawing(vector->clone());
-    QgsMapLayerStyle(it.value()).writeToLayer(drawing.get());
+    // update() left this override on the cached drawing copy; reuse it
+    // instead of opening the source again and parsing the style XML.
+    const auto cached = m_drawingSources.constFind(it.key());
+    const bool reuse = cached != m_drawingSources.cend() && cached->layer;
+    std::shared_ptr<QgsVectorLayer> drawing = reuse ? cached->layer : std::shared_ptr<QgsVectorLayer>(vector->clone());
+    if (!reuse) QgsMapLayerStyle(it.value()).writeToLayer(drawing.get());
+    std::unique_ptr<QgsFeatureRenderer> kept(reuse && drawing->renderer() ? drawing->renderer()->clone() : nullptr);
     if (QgsFeatureRenderer* renderer = drawing->renderer()) {
       QgsRenderContext context;
       const auto symbols = renderer->symbols(context);
@@ -1035,6 +1096,7 @@ void HeritageLayoutNumbers::raiseAboveGeometries(QgsLayoutItemMap* base) {
     QgsMapLayerStyle style;
     style.readFromLayer(drawing.get());
     labelStyles.insert(it.key(), style.xmlData());
+    if (kept) drawing->setRenderer(kept.release());
   }
   numbers->setLayers(labelLayers);
   numbers->setKeepLayerStyles(true);

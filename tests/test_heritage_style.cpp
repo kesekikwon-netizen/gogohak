@@ -1125,6 +1125,56 @@ private slots:
     QVERIFY(dynamic_cast<QgsSingleSymbolRenderer*>(layer->renderer()));
   }
 
+  void layoutNumbersOnlyNearTheSurveyAreaFarOnesStayDrawn() {
+    QgsProject project;
+    auto* survey = new QgsVectorLayer(QStringLiteral("Polygon?crs=EPSG:5186"), QStringLiteral("조사구역"),
+                                      QStringLiteral("memory"));
+    LayerOps::markSurveyLayer(survey, QStringLiteral("survey_area"));
+    QVERIFY(survey->startEditing());
+    QgsFeature area(survey->fields());
+    area.setGeometry(QgsGeometry::fromRect(QgsRectangle(190000., 550000., 190050., 550050.)));
+    QVERIFY(survey->addFeature(area));
+    QVERIFY(survey->commitChanges());
+    project.addMapLayer(survey);
+    // 조사구역에서 300 m(번호), 900 m(색만) 떨어진 두 유적.
+    auto* layer = makeLayer({QStringLiteral("가까운 유적"), QStringLiteral("먼 유적")});
+    QVERIFY(layer->startEditing());
+    QgsFeatureIterator it = layer->getFeatures();
+    QgsFeature f;
+    QVector<QgsFeatureId> ids;
+    double x = 190350.;
+    while (it.nextFeature(f)) {
+      ids << f.id();
+      QgsGeometry moved = QgsGeometry::fromRect(QgsRectangle(x, 550000., x + 50., 550050.));
+      QVERIFY(layer->changeGeometry(f.id(), moved));
+      x += 600.;
+    }
+    QVERIFY(layer->commitChanges());
+    HeritageStyle::apply(layer, HeritageDataset::ExcavationSurveyArea, QStringLiteral("nm"));
+    LayerOps::markReferenceLayer(layer);
+    project.addMapLayer(layer, false);
+    project.layerTreeRoot()->addGroup(QStringLiteral("참조 지도"))
+        ->addGroup(HeritageStyle::layerName(HeritageDataset::ExcavationSurveyArea))->addLayer(layer);
+    QgsPrintLayout layout(&project);
+    auto* map = makeLayoutMap(layout, {layer, survey}, QgsRectangle(189800., 549500., 191200., 550600.));
+    HeritageLayoutNumbers numbers;
+    QVERIFY2(numbers.update(map, true), qPrintable(numbers.error()));
+    QCOMPARE(numbers.entries().size(), 1);
+    QCOMPARE(numbers.entries().first().name, QStringLiteral("가까운 유적"));
+    // 먼 유적도 도면에 색 면으로는 그대로 그린다.
+    std::unique_ptr<QgsVectorLayer> drawing(layer->clone());
+    QgsMapLayerStyle(numbers.overrides().value(layer->id())).writeToLayer(drawing.get());
+    QgsRenderContext context;
+    context.expressionContext().appendScopes(QgsExpressionContextUtils::globalProjectLayerScopes(drawing.get()));
+    drawing->renderer()->startRender(context, drawing->fields());
+    for (QgsFeatureId id : ids) {
+      const QgsFeature feature = drawing->getFeature(id);
+      context.expressionContext().setFeature(feature);
+      QVERIFY2(drawing->renderer()->willRenderFeature(feature, context), qPrintable(feature.attribute(0).toString()));
+    }
+    drawing->renderer()->stopRender(context);
+  }
+
   void layoutNumbersFollowTheChosenLabelField() {
     QgsProject project;
     auto* layer = new QgsVectorLayer(QStringLiteral("Polygon?crs=EPSG:5186&field=nm:string(80)&field=kind:string(40)"),
