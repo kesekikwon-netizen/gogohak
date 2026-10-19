@@ -375,6 +375,8 @@ public:
   // RGB GeoTIFF 용지 흰색을 투명으로. 이미 적용돼 있으면 그대로 둔다.
   static void knockOutRasterPaper(QgsRasterLayer* layer);
   static void knockOutProjectRasterPaper(QgsProject* project);
+  // 타일 배경(WMTS·XYZ)은 두 배로 받지 않는다. 받을 타일이 256장을 넘으면 QGIS가 그 조각을 비운다.
+  static void limitTileOversampling(QgsProject* project);
   static QString layerKeyOf(const QgsMapLayer* layer);
   static bool isReferenceLayer(const QgsMapLayer* layer);
   static bool isCadastralLayer(const QgsMapLayer* layer);

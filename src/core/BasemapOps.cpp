@@ -135,6 +135,15 @@ static bool uriLooksLikeXyz(const QString& source) {
   return source.contains(QLatin1String("type=xyz"), Qt::CaseInsensitive);
 }
 
+// QGIS leaves a block blank when it needs more than 256 tiles. With maxOversampling 2 a
+// 2000 px PDF piece asked for 4000 px, so a 300 DPI 1919 조선지형도 sheet lost its first piece.
+static void limitTileOversampling(QgsRasterLayer* rl) {
+  if (!rl || rl->providerType() != QLatin1String("wms") || !rl->resampleFilter()) return;
+  const QString src = rl->source();
+  if (uriLooksLikeXyz(src) || src.contains(QLatin1String("tileMatrixSet="), Qt::CaseInsensitive))
+    rl->resampleFilter()->setMaxOversampling(1.0);
+}
+
 static void tuneBasemapLayer(QgsRasterLayer* rl, bool crispText = false) {
   if (!rl || !rl->isValid()) return;
   rl->setBlendMode(QPainter::CompositionMode_SourceOver);
@@ -157,6 +166,7 @@ static void tuneBasemapLayer(QgsRasterLayer* rl, bool crispText = false) {
       rf->setZoomedOutResampler(new QgsBilinearRasterResampler());
     }
   }
+  limitTileOversampling(rl);
   if (crispText) {
     if (QgsRasterDataProvider* dp = rl->dataProvider()) {
       dp->setDpi(192);
@@ -202,6 +212,12 @@ void LayerOps::knockOutRasterPaper(QgsRasterLayer* layer) {
   trans->setTransparentThreeValuePixelList(whites);
   rend->setRasterTransparency(trans);
   layer->triggerRepaint();
+}
+
+void LayerOps::limitTileOversampling(QgsProject* project) {
+  if (!project) return;
+  for (QgsMapLayer* ml : project->mapLayers())
+    ::limitTileOversampling(qobject_cast<QgsRasterLayer*>(ml));
 }
 
 void LayerOps::knockOutProjectRasterPaper(QgsProject* project) {

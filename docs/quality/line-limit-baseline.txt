@@ -29,7 +29,7 @@
 961 src/app/MainWindowRibbon.cpp
 1819 src/app/MainWindowSession.cpp
 565 src/app/MainWindowUndo.cpp
-2572 src/core/BasemapOps.cpp
+2588 src/core/BasemapOps.cpp
 340 src/core/CadastralImport.cpp
 352 src/core/CadastralPortal.cpp
 585 src/core/ControlPointCsv.cpp
@@ -42,8 +42,8 @@
 353 src/core/HeritageRegionResolver.cpp
 393 src/core/KaPortableRuntime.cpp
 357 src/core/KaSafeQgis.cpp
-2920 src/core/LayerOps.cpp
-473 src/core/LayerOps.h
+2921 src/core/LayerOps.cpp
+475 src/core/LayerOps.h
 1667 src/core/LayoutService.cpp
 411 src/core/LocationSearch.cpp
 382 src/core/PaleoLandformService.cpp

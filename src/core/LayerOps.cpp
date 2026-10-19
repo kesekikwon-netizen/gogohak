@@ -2261,6 +2261,7 @@ void LayerOps::syncMapCanvas(QgsProject* project, QgsMapCanvas* canvas, bool zoo
   if (!project || !canvas) return;
   applyWheelZoomFactor(canvas);
   knockOutProjectRasterPaper(project);
+  limitTileOversampling(project);
   applyCanvasScreenDpi(canvas);
 
   // visibleLayersPaintOrder는 무효한 레이어를 화면 목록에서 뺀다. GPKG에 쓰는 동안

@@ -13,6 +13,7 @@
 #include <qgsmaplayerserverproperties.h>
 #include <qgsproject.h>
 #include <qgsrasterlayer.h>
+#include <qgsrasterresamplefilter.h>
 #include <qgsvectorlayer.h>
 
 #include <vector>
@@ -210,6 +211,30 @@ private slots:
     QVERIFY2(LayerOps::addDemElevationRaster(&project, nullptr, path, &err), qPrintable(err));
     QCOMPARE(ReferenceKind::tagged(&project, QString::fromLatin1(ReferenceKind::kDem)).size(), 1);
     QVERIFY(ReferenceKind::tagged(&project, QString::fromLatin1(ReferenceKind::kDemRelief)).size() <= 1);
+  }
+
+  // QGIS draws nothing for a tile block that needs more than 256 tiles. Bilinear with
+  // maxOversampling 2 doubled the 2000 px PDF pieces, so the first piece of a 300 DPI
+  // 1919 조선지형도 sheet came out blank (2026-10-19). Tiled layers must not oversample.
+  void tiles_doNotOversampleSoPdfPiecesStayUnderTheTileLimit() {
+    QgsProject project;
+    QVERIFY(LayerOps::addKoreaBasemap(&project, nullptr, LayerOps::KoreaBasemap::GoogleSatellite));
+    QgsRasterLayer* added = nullptr;
+    for (QgsMapLayer* l : project.mapLayers()) added = qobject_cast<QgsRasterLayer*>(l);
+    QVERIFY(added && added->resampleFilter());
+    QCOMPARE(added->resampleFilter()->maxOversampling(), 1.0);
+
+    // A survey saved before the fix restores maxOversampling 2 from its project file.
+    auto* restored = new QgsRasterLayer(QStringLiteral("type=xyz&url=https://tiles.example.org/%7Bz%7D/%7Bx%7D/%7By%7D.png"),
+                                        QStringLiteral("옛 저장 타일"), QStringLiteral("wms"));
+    restored->resampleFilter()->setMaxOversampling(2.0);
+    QTemporaryDir dir;
+    auto* dem = new QgsRasterLayer(writeTinyDem(dir.filePath(QStringLiteral("dem.tif"))), QStringLiteral("DEM"));
+    dem->resampleFilter()->setMaxOversampling(2.0);
+    QVERIFY(project.addMapLayer(restored) && project.addMapLayer(dem));
+    LayerOps::limitTileOversampling(&project);
+    QCOMPARE(restored->resampleFilter()->maxOversampling(), 1.0);
+    QCOMPARE(dem->resampleFilter()->maxOversampling(), 2.0);
   }
 
   void koreaExtent_sameAnswerFromCache() {
