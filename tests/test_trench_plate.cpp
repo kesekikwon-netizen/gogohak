@@ -2,6 +2,7 @@
 // beside 회전(방위) whose needle shows the turn from north. 새 모양 only; the stock window keeps its sentence.
 #include <QtTest>
 
+#include <QComboBox>
 #include <QDoubleSpinBox>
 #include <QLabel>
 
@@ -66,6 +67,20 @@ private slots:
     flat.slopePct = 0.2;
     dialog.setTerrainAspect(flat);
     QVERIFY2(note().contains(QStringLiteral("평지")) && note().contains(QStringLiteral("남북으로")), qPrintable(note()));
+  }
+
+  // ㄱ·ㄴ자 시굴트렌치 (사용자 요청 2026-10-19): the 모양 choice lays 15 m + 15 m Ls at the 10% area.
+  void lShapeChoiceLaysTheTenPercentPlan() {
+    KaTrenchDialog dialog;
+    dialog.setArea(squareWkb(200), 40000.0);
+    auto* shape = dialog.findChild<QComboBox*>(QStringLiteral("trenchShape"));
+    QVERIFY(shape);
+    shape->setCurrentIndex(shape->findData(15.0));
+    QCOMPARE(dialog.spec().armLength, 15.0);
+    QTRY_VERIFY_WITH_TIMEOUT(!dialog.planPending(), 20000);
+    const QString summary = dialog.findChild<QLabel*>(QStringLiteral("trenchSummary"))->text();
+    QVERIFY2(summary.contains(QStringLiteral("ㄱ·ㄴ자")) && summary.contains(QStringLiteral("비율 10.0%")),
+             qPrintable(summary));
   }
 
   void paperWindowCarriesTheMeterAndTheDial() {

@@ -1937,7 +1937,7 @@ bool MainWindow::applyTrenchFromDialog() {
     QString noGridReason;  // [pkg B2] F047: why nothing fits (e.g. a self-crossing boundary)
     if (m_trenchDlg->ratioMode()) {
       // [pkg B2] F097: the plan the dialog preview already searched (cached), not a second search.
-      const auto plan = TrenchPlanCache::ratioPlan(m_trenchDlg->areaWkb(), target, 2.0, sp.azimuthDeg);
+      const auto plan = TrenchPlanCache::ratioPlan(m_trenchDlg->areaWkb(), target, 2.0, sp.azimuthDeg, sp.armLength);
       if (plan.cells.empty()) {
         notify(Notice::Warning, QStringLiteral("시굴격자"), plan.error);
         return false;

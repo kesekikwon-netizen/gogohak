@@ -85,9 +85,15 @@ void numberFromHighSide(std::vector<TrenchGridGenerator::Cell>& cells, double az
   std::vector<Key> keys;
   keys.reserve(cells.size());
   for (std::size_t i = 0; i < cells.size(); ++i) {
+    // Mean of the corners (the closing point repeats the first): the centre of a straight trench.
     const auto& r = cells[i].ring;
-    const double cx = (r[0].first + r[1].first + r[2].first + r[3].first) / 4.0;
-    const double cy = (r[0].second + r[1].second + r[2].second + r[3].second) / 4.0;
+    double cx = 0.0, cy = 0.0;
+    for (std::size_t k = 0; k + 1 < r.size(); ++k) {
+      cx += r[k].first;
+      cy += r[k].second;
+    }
+    cx /= double(r.size() - 1);
+    cy /= double(r.size() - 1);
     // Centimetres: cells of one row share a value exactly, so the row reads left to right.
     keys.push_back({std::round((cx * ux + cy * uy) * 100.0), cx * vx + cy * vy, i});
   }

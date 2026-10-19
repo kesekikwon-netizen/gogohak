@@ -217,6 +217,7 @@ add_library(ka_core STATIC
   src/core/DemAnalyzer.cpp
   src/core/DemHillshadeFile.cpp
   src/core/TrenchGridGenerator.cpp
+  src/core/TrenchLShape.cpp
   src/core/TrenchTerrain.cpp
   src/core/TrenchLayerEdit.cpp
   src/core/TrenchPlanCache.cpp
@@ -308,6 +309,7 @@ add_library(ka_core STATIC
   src/core/EditHistory.h
   src/core/DemAnalyzer.h
   src/core/TrenchGridGenerator.h
+  src/core/TrenchLShape.h
   src/core/TrenchLayerEdit.h
   src/core/TrenchPlanCache.h
   src/core/TilePackService.h
@@ -1004,6 +1006,17 @@ if(KA_HGIS_BUILD_TESTS)
   endif()
   ka_add_qtest(trench_plan ka_trench_plan_tests)
   set_tests_properties(trench_plan PROPERTIES TIMEOUT 120)
+  # ㄱ·ㄴ자 시굴트렌치 15 m + 15 m at the 10% area (user request 2026-10-19).
+  add_executable(ka_trench_lshape_tests tests/test_trench_lshape.cpp)
+  target_link_libraries(ka_trench_lshape_tests PRIVATE ${KA_TEST_LIBS})
+  target_include_directories(ka_trench_lshape_tests PRIVATE ${KA_INCLUDES})
+  target_link_directories(ka_trench_lshape_tests PRIVATE ${KA_LIBDIRS})
+  target_compile_definitions(ka_trench_lshape_tests PRIVATE ${KA_TEST_DEFS})
+  if (MSVC)
+    target_compile_options(ka_trench_lshape_tests PRIVATE /utf-8)
+  endif()
+  ka_add_qtest(trench_lshape ka_trench_lshape_tests)
+  set_tests_properties(trench_lshape PROPERTIES TIMEOUT 120)
   # 시굴격자 사면 방향 from the 수치지형도 contours when there is no DEM (user request 2026-10-05).
   add_executable(ka_trench_terrain_tests tests/test_trench_terrain.cpp)
   target_link_libraries(ka_trench_terrain_tests PRIVATE ${KA_TEST_LIBS})
@@ -1916,7 +1929,7 @@ if(KA_HGIS_BUILD_TESTS)
     set_tests_properties(topographic_import PROPERTIES ENVIRONMENT "GDAL_DATA=${OSGEO4W_ROOT}/apps/gdal-dev/share/gdal;PATH=${_ka_path_esc};QGIS_PREFIX_PATH=${QGIS_PREFIX_PATH};QT_QPA_PLATFORM=offscreen" TIMEOUT 300)
     set_tests_properties(reference_status PROPERTIES ENVIRONMENT "GDAL_DATA=${OSGEO4W_ROOT}/apps/gdal-dev/share/gdal;PATH=${_ka_path_esc};QGIS_PREFIX_PATH=${QGIS_PREFIX_PATH};QT_QPA_PLATFORM=offscreen" TIMEOUT 60)
     set_tests_properties(heritage_flow PROPERTIES ENVIRONMENT "PATH=${_ka_path_esc};QT_QPA_PLATFORM=offscreen" TIMEOUT 60)
-    set_tests_properties(trench_plan trench_edit trench_plate PROPERTIES ENVIRONMENT "GDAL_DATA=${OSGEO4W_ROOT}/apps/gdal-dev/share/gdal;PATH=${_ka_path_esc};QGIS_PREFIX_PATH=${QGIS_PREFIX_PATH};QT_QPA_PLATFORM=offscreen")
+    set_tests_properties(trench_plan trench_edit trench_plate trench_lshape PROPERTIES ENVIRONMENT "GDAL_DATA=${OSGEO4W_ROOT}/apps/gdal-dev/share/gdal;PATH=${_ka_path_esc};QGIS_PREFIX_PATH=${QGIS_PREFIX_PATH};QT_QPA_PLATFORM=offscreen")
     set_tests_properties(heritage_style PROPERTIES ENVIRONMENT "GDAL_DATA=${OSGEO4W_ROOT}/apps/gdal-dev/share/gdal;PATH=${_ka_path_esc};QGIS_PREFIX_PATH=${QGIS_PREFIX_PATH};QT_QPA_PLATFORM=offscreen" TIMEOUT 180)
     set_tests_properties(heritage_form PROPERTIES ENVIRONMENT "PATH=${_ka_path_esc};QT_QPA_PLATFORM=offscreen" TIMEOUT 60)
     set_tests_properties(theme_options theme_render ribbon_overflow ribbon_pixels toolbar_fit icon_glyphs icon_mockup PROPERTIES ENVIRONMENT "PATH=${_ka_path_esc};QT_QPA_PLATFORM=offscreen" TIMEOUT 60)

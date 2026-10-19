@@ -37,7 +37,7 @@ void KaTrenchDialog::refreshRows() {
   if (auto* form = qobject_cast<QFormLayout*>(layout())) {
     form->setRowVisible(m_rows, !fill);
     form->setRowVisible(m_cols, !fill);
-    form->setRowVisible(m_size, !ratio);
+    form->setRowVisible(m_size, !ratio && m_shape->currentData().toDouble() == 0.0);
     form->setRowVisible(m_balk, !ratio);
     form->setRowVisible(m_prefix, !ratio);
   }
@@ -55,7 +55,9 @@ void KaTrenchDialog::refreshPlan() {
   if (!autoFill()) {
     m_planPending = false;
     const TrenchGridGenerator::Spec sp = spec();
-    const double t = sp.rows * sp.cols * sp.trenchWidth * sp.trenchLength;
+    const double one = sp.armLength > 0.0 ? sp.trenchWidth * (2.0 * sp.armLength - sp.trenchWidth)
+                                          : sp.trenchWidth * sp.trenchLength;
+    const double t = sp.rows * sp.cols * one;
     setSummaryTone("plain");
     showMeter(-1.0, 0.0);
     m_ratio->setText(QStringLiteral("수동 배치: %1개 · 총 %2㎡ — 「맵에 찍기」로 맵에서 위치를 정하세요.")
@@ -67,8 +69,9 @@ void KaTrenchDialog::refreshPlan() {
   if (ratioMode()) {
     const double target = targetPct();
     const double az = effectiveAzimuth();
+    const double arm = spec().armLength;
     TrenchGridGenerator::RatioFill known;
-    if (TrenchPlanCache::lookup(area, target, 2.0, az, &known)) {
+    if (TrenchPlanCache::lookup(area, target, 2.0, az, &known, arm)) {
       m_planPending = false;
       showRatioPlan(known, az);
       return;
@@ -77,8 +80,8 @@ void KaTrenchDialog::refreshPlan() {
     setSummaryTone("plain");
     m_ratio->setText(QStringLiteral("배치를 계산하는 중입니다…"));
     // The pool is drained in the destructor, so `this` outlives the task.
-    m_planPool->start([this, seq, area, target, az]() {
-      const TrenchGridGenerator::RatioFill plan = TrenchPlanCache::ratioPlan(area, target, 2.0, az);
+    m_planPool->start([this, seq, area, target, az, arm]() {
+      const TrenchGridGenerator::RatioFill plan = TrenchPlanCache::ratioPlan(area, target, 2.0, az, arm);
       QMetaObject::invokeMethod(this, [this, seq, plan, az]() {
         if (seq != m_planSeq) return;
         m_planPending = false;
@@ -115,11 +118,14 @@ void KaTrenchDialog::showRatioPlan(const TrenchGridGenerator::RatioFill& plan, d
     m_balk->setValue(plan.balk);
   }
   setSummaryTone("ok");
+  const QString shape = plan.arm > 0.0
+                            ? QStringLiteral("ㄱ·ㄴ자 트렌치 %2개 · 폭 2 m · 팔 %3 m + %3 m · 둑 %4 m 이상")
+                            : QStringLiteral("트렌치 %2개 · 폭 2 m · 최대 길이 %3 m · 둑 %4 m");
   m_ratio->setText(
-      QStringLiteral("%1 · 트렌치 %2개 · 폭 2 m · 최대 길이 %3 m · 둑 %4 m · 총 %5㎡ · 비율 %6% (목표 %7%) · 방위 %8°")
+      (QStringLiteral("%1 · ") + shape + QStringLiteral(" · 총 %5㎡ · 비율 %6% (목표 %7%) · 방위 %8°"))
           .arg(surveyKind() == SurveyKind::Trial ? QStringLiteral("시굴조사") : QStringLiteral("표본조사"))
           .arg(plan.cells.size())
-          .arg(QLocale().toString(plan.length, 'f', 2))
+          .arg(QLocale().toString(plan.arm > 0.0 ? plan.arm : plan.length, 'f', plan.arm > 0.0 ? 1 : 2))
           .arg(QLocale().toString(plan.balk, 'f', 0))
           .arg(QLocale().toString(TrenchGridGenerator::totalArea(plan.cells), 'f', 2))
           .arg(QLocale().toString(plan.ratioPct, 'f', 1))

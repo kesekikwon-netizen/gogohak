@@ -3,7 +3,6 @@
 #include <QByteArray>
 #include <QString>
 #include <QtGlobal>
-#include <array>
 #include <vector>
 
 // Rotated excavation trench rectangles in work CRS (5186/5187). GPKG via OGR.
@@ -23,14 +22,21 @@ struct Spec {
   int cols = 1;
   double azimuthDeg = 0.0;  // clockwise from north
   QString namePrefix = QStringLiteral("Tr-");
+  // ㄱ·ㄴ자 트렌치: outer length of each of the two arms (m); 0 = straight trench.
+  // trenchLength is not used then; balkWidth is the gap between the L squares.
+  double armLength = 0.0;
 };
 
 struct Cell {
   QString name;
   double width = 2.0;
+  // Straight: the long side. ㄱ·ㄴ자: the centreline (arm + arm - width), so width × length
+  // is the trench area either way.
   double length = 20.0;
-  // Closed ring, 5 points, work CRS metres.
-  std::array<std::pair<double, double>, 5> ring{};
+  double arm = 0.0;  // ㄱ·ㄴ자: outer length of each arm; 0 = straight trench
+  // Closed ring, work CRS metres: 5 points (straight) or 7 (ㄱ·ㄴ자, ring[0] = outer corner,
+  // ring[1] and ring[5] = the arm ends).
+  std::vector<std::pair<double, double>> ring;
 };
 
 std::vector<Cell> build(const Spec& spec);
@@ -69,7 +75,11 @@ PickedArea pickAutoFillArea(const std::vector<SurveyPoly>& features,
 std::vector<Cell> buildInArea(const Spec& spec, const QByteArray& areaWkb,
                               QString* reasonOut = nullptr);
 
-// Every cell is a finite rectangle within the 2 m x 20 m limit matching its attributes.
+// Why the survey-area polygon (WKB) cannot hold trenches; empty when it can.
+QString areaProblem(const QByteArray& areaWkb);
+
+// Every cell is a finite rectangle within the 2 m x 20 m limit matching its attributes, or a
+// ㄱ·ㄴ자 whose arms are within it (TrenchLShape::validCell).
 bool cellsValid(const std::vector<Cell>& cells, QString* errorOut = nullptr);
 
 // 표고 표본 하나(작업 CRS 미터 + 표고 m).
@@ -101,10 +111,12 @@ struct RatioFill {
   double ratioPct = 0.0;
   double areaM2 = 0.0;
   double azimuthDeg = 0.0;
+  double arm = 0.0;  // ㄱ·ㄴ자: longest actual arm; 0 for straight trenches
   QString error;  // nonempty when no valid plan can be made
 };
+// armLength > 0 lays ㄱ·ㄴ자 trenches of that arm instead (arms shortened equally to the target).
 RatioFill buildForTargetRatio(const QByteArray& areaWkb, double targetPct, double width = 2.0,
-                              double azimuthDeg = 0.0);
+                              double azimuthDeg = 0.0, double armLength = 0.0);
 
 // Sum of trench areas (w × len per cell, square metres).
 double totalArea(const std::vector<Cell>& cells);

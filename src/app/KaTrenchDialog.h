@@ -75,6 +75,7 @@ private:
   QCheckBox* m_terrain = nullptr;
   QLabel* m_terrainInfo = nullptr;
   TrenchGridGenerator::SlopeAspect m_aspect;
+  QComboBox* m_shape = nullptr;  // 곧은 트렌치 or ㄱ·ㄴ자 (arm length as data)
   QComboBox* m_size = nullptr;
   QDoubleSpinBox* m_balk = nullptr;
   QSpinBox* m_rows = nullptr;

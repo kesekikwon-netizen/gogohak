@@ -1,4 +1,5 @@
 #include "TrenchGridGenerator.h"
+#include "TrenchLShape.h"
 #include "TrenchTerrain.h"
 
 #include <cmath>
@@ -47,7 +48,8 @@ bool validSpec(const Spec& spec) {
 }
 
 bool validCell(const Cell& cell) {
-  if (!validDimensions(cell.width, cell.length)) return false;
+  if (cell.arm != 0.0) return TrenchLShape::validCell(cell);
+  if (cell.ring.size() != 5 || !validDimensions(cell.width, cell.length)) return false;
   for (const auto& point : cell.ring)
     if (!std::isfinite(point.first) || !std::isfinite(point.second)) return false;
   const auto& p = cell.ring;
@@ -68,6 +70,7 @@ bool validCell(const Cell& cell) {
 }  // namespace
 
 std::vector<Cell> build(const Spec& spec) {
+  if (spec.armLength != 0.0) return TrenchLShape::build(spec);
   std::vector<Cell> out;
   const int rows = spec.rows;
   const int cols = spec.cols;
@@ -99,14 +102,7 @@ std::vector<Cell> build(const Spec& spec) {
       cell.width = w;
       cell.length = len;
       const auto p0 = world(x0, y0);
-      const auto p1 = world(x0 + w, y0);
-      const auto p2 = world(x0 + w, y0 + len);
-      const auto p3 = world(x0, y0 + len);
-      cell.ring[0] = p0;
-      cell.ring[1] = p1;
-      cell.ring[2] = p2;
-      cell.ring[3] = p3;
-      cell.ring[4] = p0;
+      cell.ring = {p0, world(x0 + w, y0), world(x0 + w, y0 + len), world(x0, y0 + len), p0};
       if (!validCell(cell)) return {};
       out.push_back(cell);
     }
@@ -165,6 +161,11 @@ void forEachVertex(const OGRGeometry* g, F&& fn) {
 }
 
 }  // namespace
+
+QString areaProblem(const QByteArray& areaWkb) {
+  const Geometry area(geomFromWkb(areaWkb));
+  return areaProblemOf(area.get());
+}
 
 PickedArea pickAutoFillArea(const std::vector<SurveyPoly>& features,
                             const std::vector<qint64>& selectedFids, bool useAll) {
@@ -229,6 +230,7 @@ PickedArea pickAutoFillArea(const std::vector<SurveyPoly>& features,
 }
 
 std::vector<Cell> buildInArea(const Spec& spec, const QByteArray& areaWkb, QString* reasonOut) {
+  if (spec.armLength != 0.0) return TrenchLShape::buildInArea(spec, areaWkb, reasonOut);
   std::vector<Cell> out;
   if (reasonOut) reasonOut->clear();
   const auto fail = [reasonOut](const QString& why) {
@@ -367,18 +369,11 @@ std::vector<Cell> buildInArea(const Spec& spec, const QByteArray& areaWkb, QStri
           keepLen = cut;
         }
         const auto k0 = world(u0, keepV0);
-        const auto k1 = world(u0 + w, keepV0);
-        const auto k2 = world(u0 + w, keepV0 + keepLen);
-        const auto k3 = world(u0, keepV0 + keepLen);
         Cell cell;
         cell.name = spec.namePrefix + QString::number(n++);
         cell.width = w;
         cell.length = keepLen;
-        cell.ring[0] = k0;
-        cell.ring[1] = k1;
-        cell.ring[2] = k2;
-        cell.ring[3] = k3;
-        cell.ring[4] = k0;
+        cell.ring = {k0, world(u0 + w, keepV0), world(u0 + w, keepV0 + keepLen), world(u0, keepV0 + keepLen), k0};
         if (!validCell(cell)) continue;
         got.push_back(cell);
       }
@@ -446,7 +441,8 @@ SlopeAspect upslopeAspect(const std::vector<ElevSample>& samples, double minSlop
 }
 
 RatioFill buildForTargetRatio(const QByteArray& areaWkb, double targetPct, double width,
-                              double azimuthDeg) {
+                              double azimuthDeg, double armLength) {
+  if (armLength != 0.0) return TrenchLShape::buildForTargetRatio(areaWkb, targetPct, width, azimuthDeg, armLength);
   RatioFill best;
   if (areaWkb.isEmpty() || !validDimensions(width, kMaxLength) ||
       !std::isfinite(targetPct) || targetPct <= 0.0 || targetPct > 100.0 ||
