@@ -4800,6 +4800,185 @@ function buildCrossVerificationRevisionPrompt({
     .join("\n");
 }
 
+function buildFinalArgonMasterAuditPrompt({
+  docType = "report",
+  userFocus = "",
+  currentManuscript = "",
+  reportText = "",
+  datingText = "",
+  collectedBlock = "",
+}) {
+  const isPaper = docType === "paper";
+  const docLabel = isPaper
+    ? "대학원 석사학위 논문 이상 · 『한국고고학보』 등재학술지 논문"
+    : "국가유산청·국립문화유산연구원 『문화재발굴조사보고서 Ⅳ. 고찰(考察)』";
+
+  const factSnippet = reportText && reportText.trim()
+    ? `\n### [발굴조사보고서 핵심 실측·출토유물 대조 기준]\n${extractStructuredArchaeologyReportFacts(reportText).structuredText.slice(0, 12000)}\n`
+    : "";
+  const datingSnippet = datingText && datingText.trim()
+    ? `\n### [절대연대·자연과학분석 대조 기준]\n${datingText.trim().slice(0, 6000)}\n`
+    : "";
+
+  return [
+    `### [Gemini 4 Argon High 최종 총괄 감수 및 차트·그래프·모식도·표 고도화 지시 — ${docLabel}]`,
+    "- 외부 도구를 호출하거나 추가 질문을 하지 마십시오. 아래 수록된 `[검수 대상 원고 전체]`를 발굴조사보고서 원자료 및 DBpia 검증 논문 데이터와 정밀 대조하여, **오탈자·문맥·각주 정합성 검수**와 **표(`<표 1>`~`<표 4>`)·비교차트(`wc-chart`)·모식도(`wc-diagram`) 최종 고도화**를 완료한 **완성본 원고 전체**를 처음부터 끝까지 출력하십시오 (절대로 원고 본문을 요약하거나 생략하지 마십시오).",
+    "",
+    "#### [최종 총괄 검수 4대 핵심 과업]",
+    "1) **비교차트(`wc-chart`) 및 모식도(`wc-diagram`) 정밀 검수·고도화**:",
+    "   - 원고 내 모든 ```wc-chart 코드블록(최소 2~3종: 유구별 장축·단축·면적 실측 비교차트, 출토유물 기종·속성 분포 차트, DBpia 선행연구 시기·주제 분포 차트 등)의 `categories`와 `series.values`가 보고서 원문 및 `<표 1>`~`<표 4>`의 실제 수치와 100% 일치하는지 검증하고 더욱 정밀하게 보강하십시오.",
+    "   - 원고 내 모든 ```wc-diagram 코드블록(최소 3종: ① 조사구역 층위 및 유구 축조·폐기 공정 모식도, ② 유구 중복·유물 조합 기반 Ⅰ~Ⅲ단계 편년 변천 모식도, ③ 주변 비교유적군 공간 네트워크 및 문화권 모식도)의 `\"items\": [{\"text\": \"...\", \"level\": 0}, {\"text\": \"...\", \"level\": 1}]` 배열이 본 유적의 실제 유구명·유물 속성·검증 연구자(`저자(연도)`)를 정확히 반영하도록 다듬으십시오.",
+    "2) **정량·비교 학술 표(`<표 1>` ~ `<표 4>`) 및 폰트·기호 완전 정비**:",
+    "   - `<표 1>`(유구 제원·구조·공반유물), `<표 2>`(출토유물 분류·속성·상대편년), `<표 3>`(본 유적 및 주변 비교유적군 대비표), `<표 4>`(DBpia 수집 핵심 선행연구 논거 및 고찰 적용 대비표) 내부에 인라인 백틱, LaTeX 수식 기호, 깨진 물음표(`?`), 축약 표현(`외 다수`, `기타`)이 없도록 정비하십시오.",
+    "3) **실제 사람 조판과 동일한 순차적 서술 흐름(문단 ↔ 표·차트·모식도 일체화)**:",
+    "   - 표·차트·모식도가 절 끝에 한꺼번에 몰리지 않고 관련 분석 문단 바로 뒤에 자연스럽게 이어지며, 본문 문단 안에서 `<표 1>`~`<표 4>`와 차트·모식도의 수치를 직접 인용·해석하도록 앞뒤 문맥을 매끄럽게 다듬으십시오.",
+    "4) **오탈자·띄어쓰기·한자 및 각주(`1)`)↔【참고문헌】 1:1 최종 교정**:",
+    "   - 조사 중복(`의 의`, `은 은`), 띄어쓰기 오류(`주거지 들`→`주거지들`, `확인 되었다`→`확인되었다`), 호환용 한자 오기를 전수 교정하고, 본문 각주 번호(`1)`, `2)`...)와 `### 【각주】`, `### 【참고문헌】`이 아래 DBpia 실존 저자·연도·학술지·쪽수와 100% 일치하도록 확정하십시오 (`저자미상` 절대 금지).",
+    factSnippet,
+    datingSnippet,
+    collectedBlock,
+    "",
+    "### [검수 대상 원고 전체 (이 원고의 모든 장·절 분량을 유지·보강하면서 표·차트·모식도·문맥·오탈자를 최종 완성할 것)]",
+    currentManuscript.slice(0, 27000),
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
+function applyFinalArgonMasterAuditToManuscript(
+  originalMd = "",
+  auditedReply = "",
+  collectedPapers = [],
+  { docType = "report", userFocus = "" } = {}
+) {
+  const baseOriginal = String(originalMd || "");
+  let reply = String(auditedReply || "").trim();
+  if (!reply || reply.length < 400) {
+    return {
+      manuscript: repairAndEnrichManuscriptWithVerifiedRefs(
+        baseOriginal,
+        collectedPapers,
+        { docType, userFocus }
+      ),
+      upgradedChartsCount: 0,
+      upgradedDiagramsCount: 0,
+      upgradedTablesCount: 0,
+      usedFullRewrite: false,
+    };
+  }
+
+  // Strip any conversational preamble before the first markdown heading or title
+  const firstHeadingMatch = /(?:^|\n)(?:#{1,3}\s+|【국문초록】|Ⅳ\.\s*고\s*찰)/.exec(reply);
+  if (firstHeadingMatch && firstHeadingMatch.index > 0 && firstHeadingMatch.index < 600) {
+    reply = reply.slice(firstHeadingMatch.index).trim();
+  }
+
+  // Extract audited wc-chart and wc-diagram blocks from Gemini 4 Argon High's audit reply
+  const auditedCharts = [];
+  const auditedDiagrams = [];
+  reply = reply.replace(/```([^\r\n`]*)\r?\n([\s\S]*?)```/gi, (full, langRaw, body) => {
+    const lang = String(langRaw || "").trim().toLowerCase();
+    const trimmed = String(body || "").trim();
+    if (!trimmed.startsWith("{") || !trimmed.endsWith("}")) return full;
+    try {
+      const spec = JSON.parse(trimmed);
+      if (
+        lang.includes("wc-chart") ||
+        (spec.data && Array.isArray(spec.data.series)) ||
+        Array.isArray(spec.series)
+      ) {
+        const normBlock = "```wc-chart\n" + JSON.stringify(spec) + "\n```";
+        auditedCharts.push(normBlock);
+        return normBlock;
+      }
+      if (
+        lang.includes("wc-diagram") ||
+        Array.isArray(spec.items) ||
+        Array.isArray(spec.nodes) ||
+        Array.isArray(spec.steps) ||
+        Array.isArray(spec.stages)
+      ) {
+        const normBlock = "```wc-diagram\n" + JSON.stringify(spec) + "\n```";
+        auditedDiagrams.push(normBlock);
+        return normBlock;
+      }
+    } catch {}
+    return full;
+  });
+
+  // Extract audited markdown tables (<표 1> ~ <표 4>) from reply
+  const tableRegex = /(?:(?:\*\*|<)?표\s*\d+[^\n]*\n+)?((?:^|\n)\|[^\n]+\|\r?\n\|[\s:\-|]+\|(?:\r?\n\|[^\n]+\|)+)/g;
+  const auditedTables = [];
+  let tm;
+  while ((tm = tableRegex.exec(reply)) !== null) {
+    auditedTables.push(tm[0].trim());
+  }
+
+  const hasRequiredSections =
+    /(?:1\.\s*머리말|Ⅰ\.\s*머리말)/.test(reply) &&
+    /(?:2\.|Ⅱ\.)/.test(reply) &&
+    /(?:3\.|Ⅲ\.)/.test(reply) &&
+    /(?:4\.|Ⅳ\.)/.test(reply);
+
+  let mergedMd = baseOriginal;
+  let usedFullRewrite = false;
+
+  if (hasRequiredSections && reply.length >= baseOriginal.length * 0.78) {
+    // Full audited manuscript meets length & structural requirements
+    mergedMd = reply;
+    usedFullRewrite = true;
+  } else {
+    // Smart Visuals & Tables Splice: keep full-length prose of originalMd while upgrading charts, diagrams, and tables with Argon High's audited versions
+    if (auditedCharts.length > 0) {
+      let cIdx = 0;
+      mergedMd = mergedMd.replace(/```wc-chart[\s\S]*?```/gi, (oldBlock) => {
+        if (cIdx < auditedCharts.length) {
+          return auditedCharts[cIdx++];
+        }
+        return oldBlock;
+      });
+    }
+    if (auditedDiagrams.length > 0) {
+      let dIdx = 0;
+      mergedMd = mergedMd.replace(/```wc-diagram[\s\S]*?```/gi, (oldBlock) => {
+        if (dIdx < auditedDiagrams.length) {
+          return auditedDiagrams[dIdx++];
+        }
+        return oldBlock;
+      });
+    }
+    if (auditedTables.length > 0) {
+      for (const newTbl of auditedTables) {
+        const numMatch = /<\s*표\s*(\d+)\s*>/.exec(newTbl);
+        if (numMatch) {
+          const tblNum = numMatch[1];
+          const targetTblRe = new RegExp(
+            `(?:\\*\\*)?<\\s*표\\s*${tblNum}\\s*>[^\\n]*\\n+(?:\\|[^\\n]+\\|\\r?\\n)+`,
+            "g"
+          );
+          if (targetTblRe.test(mergedMd)) {
+            mergedMd = mergedMd.replace(targetTblRe, newTbl + "\n");
+          }
+        }
+      }
+    }
+  }
+
+  const finalMd = repairAndEnrichManuscriptWithVerifiedRefs(
+    mergedMd,
+    collectedPapers,
+    { docType, userFocus }
+  );
+
+  return {
+    manuscript: finalMd,
+    upgradedChartsCount: auditedCharts.length,
+    upgradedDiagramsCount: auditedDiagrams.length,
+    upgradedTablesCount: auditedTables.length,
+    usedFullRewrite,
+  };
+}
+
 function formatCollectedDbpiaBlock(collectedPapers = [], liveResearchFeed = []) {
   const verifiedList = (collectedPapers || []).filter((p) => p && p.title);
   const lines = [
@@ -5260,6 +5439,71 @@ async function runArchaeologyDiscussionPipeline({
         updateStudioUiState().catch(() => {});
       }
 
+      // -----------------------------------------------------------------------
+      // PHASE 4.5: Final Gemini 4 Argon High Master Audit (Manuscript + Charts + Diagrams + Tables)
+      // -----------------------------------------------------------------------
+      await waitWhilePausedOrAborted();
+      addPipelineLog(
+        `[최종 총괄 검수 (Gemini 4 Argon High)] 전체 원고·오탈자·순차 조판 문맥 및 표 4종·비교차트(wc-chart)·모식도(wc-diagram)를 최고 추론 모드로 한 번 더 정밀 검수·고도화합니다...`,
+        "PHASE_3_CROSS_VERIFY",
+        87
+      );
+
+      try {
+        const latestCollectedBlock = formatCollectedDbpiaBlock(
+          pipelineState.collectedPapers,
+          pipelineState.liveResearchFeed
+        );
+        const finalAuditPrompt = buildFinalArgonMasterAuditPrompt({
+          docType: pipelineState.docType,
+          userFocus,
+          currentManuscript,
+          reportText: craftExtractedReportText,
+          datingText: craftExtractedDatingText,
+          collectedBlock: latestCollectedBlock,
+        });
+
+        const auditedReply = await askGeminiWeb({
+          prompt: finalAuditPrompt,
+          files: [],
+          newChat: false,
+        });
+
+        const auditMerged = applyFinalArgonMasterAuditToManuscript(
+          currentManuscript,
+          auditedReply,
+          pipelineState.collectedPapers,
+          { docType: pipelineState.docType, userFocus }
+        );
+
+        currentManuscript = auditMerged.manuscript;
+        verification = evaluateArchaeologyManuscriptQuality(currentManuscript, {
+          docType: pipelineState.docType,
+          hasReport,
+          hasDating,
+          collectedPapers: pipelineState.collectedPapers,
+          goalPlan,
+        });
+        pipelineState.goalVerification = verification;
+        pipelineState.goalPlan.criteria = verification.criteriaResults;
+        pipelineState.latestManuscript = currentManuscript;
+        pipelineState.totalCharsWritten = currentManuscript.length;
+        pipelineState.chaptersCompleted = verification.passedCount;
+        updateStudioUiState().catch(() => {});
+
+        addPipelineLog(
+          `[최종 차트·모식도·원고 검수 완료] Gemini 4 Argon High 최종 감수 반영 완료 (비교차트 ${verification.chartCount}종 · 모식도 ${verification.diagramCount}종 · 표 ${verification.tableCount}종 · 총 ${currentManuscript.length.toLocaleString()}자)`,
+          "PHASE_3_CROSS_VERIFY",
+          91
+        );
+      } catch (auditErr) {
+        currentManuscript = repairAndEnrichManuscriptWithVerifiedRefs(
+          currentManuscript,
+          pipelineState.collectedPapers,
+          { docType: pipelineState.docType, userFocus }
+        );
+      }
+
       try {
         const { syncUnifiedPipelineToEvidenceStore } = require("./v2/index.js");
         const syncRes = syncUnifiedPipelineToEvidenceStore({
@@ -5278,9 +5522,9 @@ async function runArchaeologyDiscussionPipeline({
       } catch (_) {}
 
       addPipelineLog(
-        `✅ [/goal · V1~V8 통합 교차검증 완료 (${verification.passedCount}/${verification.totalCriteria} 기준 충족 · ${verification.score}점)] 근거 대조표(crosswalk.md)·유적 라이브러리 저장 및 WordCraft(.docx) 문서를 생성합니다.`,
+        `✅ [/goal · V1~V8 통합 교차검증 및 4 Argon 최종 감수 완료 (${verification.passedCount}/${verification.totalCriteria} 기준 충족 · ${verification.score}점)] 근거 대조표(crosswalk.md)·유적 라이브러리 저장 및 WordCraft(.docx) 문서를 생성합니다.`,
         "PHASE_4_EXPORT_MASTER",
-        92
+        95
       );
 
       await waitWhilePausedOrAborted();
@@ -7332,6 +7576,8 @@ module.exports = {
   evaluateArchaeologyManuscriptQuality,
   buildFirstStageEngineeredPrompt,
   buildAdaptiveMasterPrompt,
+  buildFinalArgonMasterAuditPrompt,
+  applyFinalArgonMasterAuditToManuscript,
   repairAndEnrichManuscriptWithVerifiedRefs,
   prepareMarkdownAndFootnotesForWordCraft,
   extractStructuredArchaeologyReportFacts,
