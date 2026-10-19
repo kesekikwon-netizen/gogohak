@@ -42,8 +42,9 @@ bool validShape(double width, double arm) {
 }
 
 bool validSpec(const Spec& spec) {
-  return validShape(spec.trenchWidth, spec.armLength) && std::isfinite(spec.balkWidth) && spec.balkWidth >= 0.0 &&
-         std::isfinite(spec.azimuthDeg) && std::isfinite(spec.originX) && std::isfinite(spec.originY);
+  return validShape(spec.trenchWidth, spec.armLength) && spec.armBend >= 0 && spec.armBend <= 3 &&
+         std::isfinite(spec.balkWidth) && spec.balkWidth >= 0.0 && std::isfinite(spec.azimuthDeg) &&
+         std::isfinite(spec.originX) && std::isfinite(spec.originY);
 }
 
 // The grid turned clockwise by the azimuth: local u = east, v = north at 0°.
@@ -72,6 +73,16 @@ Cell lCell(const QString& name, Point corner, Point ex, Point ey, double arm, do
   cell.length = 2.0 * arm - width;
   cell.ring = {at(0, 0), at(arm, 0), at(arm, width), at(width, width), at(width, arm), at(0, arm), at(0, 0)};
   return cell;
+}
+
+// The L in the arm × arm square from (u0, v0), its outer corner in the square's corner the bend
+// names: ㄴ south-west, ㄱ north-east, ㄴ mirrored south-east, ㄱ mirrored north-west.
+Cell squareL(const QString& name, const Frame& frame, double u0, double v0, double arm, double width, int bend) {
+  const bool east = bend == 1 || bend == 2;   // the across arm runs back west
+  const bool north = bend == 1 || bend == 3;  // the along arm runs back south
+  const Point ex = frame.ex(), ey = frame.ey();
+  return lCell(name, frame.world(east ? u0 + arm : u0, north ? v0 + arm : v0),
+               east ? Point{-ex.first, -ex.second} : ex, north ? Point{-ey.first, -ey.second} : ey, arm, width);
 }
 
 OGRPolygon polygonOf(const Cell& cell) {
@@ -113,7 +124,7 @@ AreaGrid areaGrid(OGRGeometry* area, double azimuthDeg) {
 }
 
 // Whole Ls inside the area with these gaps; empty with *tooMany when the grid is too fine.
-std::vector<Cell> fill(const AreaGrid& grid, double width, double arm, double gapU, double gapV,
+std::vector<Cell> fill(const AreaGrid& grid, double width, double arm, int bend, double gapU, double gapV,
                        const QString& prefix, bool* tooMany) {
   std::vector<Cell> out;
   *tooMany = false;
@@ -124,12 +135,11 @@ std::vector<Cell> fill(const AreaGrid& grid, double width, double arm, double ga
     *tooMany = true;
     return out;
   }
-  const Point ex = grid.frame.ex(), ey = grid.frame.ey();
   for (long long j = 0; j < static_cast<long long>(countV); ++j) {
     for (long long i = 0; i < static_cast<long long>(countU); ++i) {
       const double u0 = grid.uMin + i * stepU, v0 = grid.vMin + j * stepV;
       if (u0 + arm > grid.uMax || v0 + arm > grid.vMax) continue;  // outside the envelope
-      Cell cell = lCell(prefix + QString::number(out.size() + 1), grid.frame.world(u0, v0), ex, ey, arm, width);
+      Cell cell = squareL(prefix + QString::number(out.size() + 1), grid.frame, u0, v0, arm, width, bend);
       OGRPolygon polygon = polygonOf(cell);
       if (!OGRPreparedGeometryContains(grid.prepared.get(), OGRGeometry::ToHandle(&polygon))) continue;
       if (validCell(cell)) out.push_back(std::move(cell));
@@ -180,8 +190,8 @@ std::vector<Cell> build(const Spec& spec) {
   out.reserve(static_cast<size_t>(spec.rows) * spec.cols);
   for (int r = 0; r < spec.rows; ++r) {
     for (int col = 0; col < spec.cols; ++col) {
-      Cell cell = lCell(spec.namePrefix + QString::number(out.size() + 1), frame.world(col * step, r * step),
-                        frame.ex(), frame.ey(), spec.armLength, spec.trenchWidth);
+      Cell cell = squareL(spec.namePrefix + QString::number(out.size() + 1), frame, col * step, r * step,
+                          spec.armLength, spec.trenchWidth, spec.armBend);
       if (!validCell(cell)) return {};
       out.push_back(std::move(cell));
     }
@@ -203,8 +213,8 @@ std::vector<Cell> buildInArea(const Spec& spec, const QByteArray& areaWkb, QStri
   OGRGeometryFactory::createFromWkb(areaWkb.constData(), nullptr, &area, static_cast<size_t>(areaWkb.size()));
   const AreaGrid grid = areaGrid(area, spec.azimuthDeg);
   bool tooMany = false;
-  std::vector<Cell> out =
-      fill(grid, spec.trenchWidth, spec.armLength, spec.balkWidth, spec.balkWidth, spec.namePrefix, &tooMany);
+  std::vector<Cell> out = fill(grid, spec.trenchWidth, spec.armLength, spec.armBend, spec.balkWidth, spec.balkWidth,
+                               spec.namePrefix, &tooMany);
   if (tooMany)
     return fail(QStringLiteral("구역에 비해 트렌치 간격이 좁아 칸 수가 한도를 넘습니다. 둑(간격)을 키우세요."));
   if (out.empty())
@@ -215,10 +225,10 @@ std::vector<Cell> buildInArea(const Spec& spec, const QByteArray& areaWkb, QStri
 }
 
 RatioFill buildForTargetRatio(const QByteArray& areaWkb, double targetPct, double width, double azimuthDeg,
-                              double armLength) {
+                              double armLength, int armBend) {
   RatioFill best;
-  if (!validShape(width, armLength) || !std::isfinite(targetPct) || targetPct <= 0.0 || targetPct > 100.0 ||
-      !std::isfinite(azimuthDeg)) {
+  if (!validShape(width, armLength) || armBend < 0 || armBend > 3 || !std::isfinite(targetPct) || targetPct <= 0.0 ||
+      targetPct > 100.0 || !std::isfinite(azimuthDeg)) {
     best.error = QStringLiteral("폭은 0 초과 2 m 이하, 팔 길이는 폭보다 길고 20 m 이하, 목표 비율은 0 초과 100% 이하의 "
                                 "유효한 값이어야 합니다.");
     return best;
@@ -240,17 +250,16 @@ RatioFill buildForTargetRatio(const QByteArray& areaWkb, double targetPct, doubl
   const QString prefix = targetPct <= 3.5 ? QStringLiteral("Sp-") : QStringLiteral("Tr-");
   const double oneL = width * (2.0 * armLength - width);
 
-  // The two directions take their own gap, so the count is not stuck at squares (8×8, 9×9).
-  // A wider gap only removes Ls: once a gap pair falls short, wider ones are not tried. Of the
-  // pairs giving the same count the widest is kept, so the Ls spread over the whole area
-  // instead of crowding the side the grid starts from.
+  // Each direction takes its own gap, so the count is not stuck at squares (8×8, 9×9). Wider gaps
+  // only remove Ls: once a pair falls short, wider ones are not tried. Of pairs giving the same
+  // count the widest is kept, so the Ls spread over the area instead of crowding one side.
   double bestArea = std::numeric_limits<double>::infinity();
   double bestSpread = 0.0;
   for (double gapU = kMinGap; gapU <= kMaxGap; gapU += 1.0) {
     bool reached = false;
     for (double gapV = kMinGap; gapV <= kMaxGap; gapV += 1.0) {
       bool tooMany = false;
-      std::vector<Cell> cells = fill(grid, width, armLength, gapU, gapV, prefix, &tooMany);
+      std::vector<Cell> cells = fill(grid, width, armLength, armBend, gapU, gapV, prefix, &tooMany);
       if (tooMany) continue;
       const double candidateArea = double(cells.size()) * oneL;
       if (candidateArea < targetArea) break;
@@ -266,29 +275,12 @@ RatioFill buildForTargetRatio(const QByteArray& areaWkb, double targetPct, doubl
     if (!reached) break;  // even the narrowest gap the other way falls short
   }
   if (best.cells.empty()) {
-    best.error = QStringLiteral("현재 구역과 방향에서 팔 %1 m ㄱ·ㄴ자 트렌치로 목표 %2%를 배치할 수 없습니다. 기존 "
-                                "격자는 유지됩니다.")
-                     .arg(armLength).arg(targetPct);
+    best.error = QStringLiteral("현재 구역과 방향에서는 팔 %1 m ㄱ·ㄴ자 트렌치로 목표 %2%를 채울 수 없습니다. "
+                                "기존 격자는 유지됩니다.").arg(armLength).arg(targetPct);
     return best;
   }
-
-  // Every arm shortened equally about its corner: area w(2a' − w) = factor × w(2a − w). The
-  // smaller L lies inside the original one, so containment and separation hold.
-  const double factor = targetArea / bestArea;
-  const double shortArm = (factor * (2.0 * armLength - width) + width) / 2.0;
-  for (Cell& cell : best.cells) {
-    const Point corner = cell.ring[0];
-    const Point ex{(cell.ring[1].first - corner.first) / armLength, (cell.ring[1].second - corner.second) / armLength};
-    const Point ey{(cell.ring[5].first - corner.first) / armLength, (cell.ring[5].second - corner.second) / armLength};
-    cell = lCell(cell.name, corner, ex, ey, shortArm, width);
-    if (!validCell(cell)) {
-      best.cells.clear();
-      best.error = QStringLiteral("목표 면적에 맞는 유효한 ㄱ·ㄴ자 시굴격자를 계산하지 못했습니다.");
-      return best;
-    }
-  }
   TrenchTerrain::numberFromHighSide(best.cells, azimuthDeg, prefix);
-  best.arm = shortArm;
+  best.arm = armLength;
   best.length = best.cells.front().length;
   best.azimuthDeg = azimuthDeg;
   best.ratioPct = TrenchGridGenerator::totalArea(best.cells) / areaM2 * 100.0;
@@ -296,3 +288,13 @@ RatioFill buildForTargetRatio(const QByteArray& areaWkb, double targetPct, doubl
 }
 
 }  // namespace TrenchLShape
+
+// Beside the ㄱ·ㄴ자 rule it adds; TrenchGridGenerator.cpp is at its line limit.
+bool TrenchGridGenerator::meetsTarget(const std::vector<Cell>& cells, double areaM2, double targetPct) {
+  if (targetPct <= 0.0) return !cells.empty();
+  if (cells.empty() || !(areaM2 > 0.0) || !std::isfinite(areaM2)) return false;
+  const double over = totalArea(cells) - areaM2 * targetPct / 100.0;
+  const double tolerance = std::max(1e-6, areaM2 * 1e-8);
+  if (cells.front().arm == 0.0) return std::abs(over) <= tolerance;
+  return over >= -tolerance && over < cells.front().width * cells.front().length;
+}

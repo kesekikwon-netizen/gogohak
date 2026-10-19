@@ -19,9 +19,10 @@ struct Key {
   double width = 0.0;
   double azimuthDeg = 0.0;
   double armLength = 0.0;  // ㄱ·ㄴ자 plans are not the straight plan for the same area
+  int armBend = 0;
   bool operator==(const Key& other) const {
     return areaHash == other.areaHash && targetPct == other.targetPct && width == other.width &&
-           azimuthDeg == other.azimuthDeg && armLength == other.armLength;
+           azimuthDeg == other.azimuthDeg && armLength == other.armLength && armBend == other.armBend;
   }
 };
 
@@ -43,9 +44,10 @@ QList<Entry>& entries() {
 
 std::atomic<int> g_computeCount{0};
 
-Key makeKey(const QByteArray& areaWkb, double targetPct, double width, double azimuthDeg, double armLength) {
+Key makeKey(const QByteArray& areaWkb, double targetPct, double width, double azimuthDeg, double armLength,
+            int armBend) {
   return Key{QCryptographicHash::hash(areaWkb, QCryptographicHash::Sha1), targetPct, width,
-             azimuthDeg, armLength};
+             azimuthDeg, armLength, armBend};
 }
 
 bool find(const Key& key, TrenchGridGenerator::RatioFill* out) {
@@ -63,20 +65,20 @@ bool find(const Key& key, TrenchGridGenerator::RatioFill* out) {
 }  // namespace
 
 bool lookup(const QByteArray& areaWkb, double targetPct, double width, double azimuthDeg,
-            TrenchGridGenerator::RatioFill* out, double armLength) {
+            TrenchGridGenerator::RatioFill* out, double armLength, int armBend) {
   if (areaWkb.isEmpty()) return false;
-  return find(makeKey(areaWkb, targetPct, width, azimuthDeg, armLength), out);
+  return find(makeKey(areaWkb, targetPct, width, azimuthDeg, armLength, armBend), out);
 }
 
 TrenchGridGenerator::RatioFill ratioPlan(const QByteArray& areaWkb, double targetPct, double width,
-                                         double azimuthDeg, double armLength) {
+                                         double azimuthDeg, double armLength, int armBend) {
   if (areaWkb.isEmpty())
-    return TrenchGridGenerator::buildForTargetRatio(areaWkb, targetPct, width, azimuthDeg, armLength);
-  const Key key = makeKey(areaWkb, targetPct, width, azimuthDeg, armLength);
+    return TrenchGridGenerator::buildForTargetRatio(areaWkb, targetPct, width, azimuthDeg, armLength, armBend);
+  const Key key = makeKey(areaWkb, targetPct, width, azimuthDeg, armLength, armBend);
   TrenchGridGenerator::RatioFill plan;
   if (find(key, &plan)) return plan;
   // Computed outside the lock: two threads asking for the same new plan both search once.
-  plan = TrenchGridGenerator::buildForTargetRatio(areaWkb, targetPct, width, azimuthDeg, armLength);
+  plan = TrenchGridGenerator::buildForTargetRatio(areaWkb, targetPct, width, azimuthDeg, armLength, armBend);
   ++g_computeCount;
   QMutexLocker lock(&cacheMutex());
   QList<Entry>& list = entries();

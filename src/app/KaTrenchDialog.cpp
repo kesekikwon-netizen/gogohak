@@ -55,12 +55,14 @@ KaTrenchDialog::KaTrenchDialog(QWidget* parent) : QDialog(parent) {
   m_terrainInfo->setWordWrap(true);
   form->addRow(m_terrainInfo);
 
-  // ㄱ·ㄴ자 트렌치 (사용자 요청 2026-10-19): 한 모서리에서 직각으로 꺾인 두 팔 15 m + 15 m, 폭 2 m.
+  // ㄱ·ㄴ자 트렌치 (사용자 요청 2026-10-19): 한 모서리에서 직각으로 꺾인 두 팔 15 m + 15 m, 폭 2 m, 꺾는 방향 네 가지.
   m_shape = new QComboBox(this);
   m_shape->setObjectName(QStringLiteral("trenchShape"));
-  m_shape->addItem(QStringLiteral("곧은 트렌치"), 0.0);
-  m_shape->addItem(QStringLiteral("ㄱ·ㄴ자 트렌치 (15 m + 15 m)"), 15.0);
-  m_shape->setToolTip(QStringLiteral("ㄱ·ㄴ자는 구역 안에 온전히 들어가는 것만 놓고, 비율에 맞춰 두 팔을 똑같이 조금 줄입니다."));
+  m_shape->addItem(QStringLiteral("곧은 트렌치"), 0);  // data: 0 곧은, 1 + Spec::armBend for the Ls
+  for (const QString& bend : {QStringLiteral("ㄴ자"), QStringLiteral("ㄱ자"), QStringLiteral("ㄴ자 좌우 반대"),
+                              QStringLiteral("ㄱ자 좌우 반대")})
+    m_shape->addItem(bend + QStringLiteral(" 트렌치 (15 m + 15 m)"), m_shape->count());
+  m_shape->setToolTip(QStringLiteral("ㄱ·ㄴ자는 팔 15 m 그대로 구역 안에 온전히 들어가는 것만 놓아, 비율이 목표를 조금 넘습니다."));
   form->addRow(QStringLiteral("모양"), m_shape);
 
   m_size = new QComboBox(this);
@@ -259,7 +261,8 @@ TrenchGridGenerator::Spec KaTrenchDialog::spec() const {
   TrenchGridGenerator::Spec sp;
   sp.trenchWidth = 2.0;
   sp.trenchLength = m_size->currentData().toDouble();
-  sp.armLength = m_shape->currentData().toDouble();
+  sp.armLength = m_shape->currentData().toInt() > 0 ? 15.0 : 0.0;
+  sp.armBend = qMax(0, m_shape->currentData().toInt() - 1);
   sp.balkWidth = m_balk->value();
   sp.rows = m_rows->value();
   sp.cols = m_cols->value();

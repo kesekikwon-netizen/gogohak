@@ -1937,7 +1937,8 @@ bool MainWindow::applyTrenchFromDialog() {
     QString noGridReason;  // [pkg B2] F047: why nothing fits (e.g. a self-crossing boundary)
     if (m_trenchDlg->ratioMode()) {
       // [pkg B2] F097: the plan the dialog preview already searched (cached), not a second search.
-      const auto plan = TrenchPlanCache::ratioPlan(m_trenchDlg->areaWkb(), target, 2.0, sp.azimuthDeg, sp.armLength);
+      const auto plan =
+          TrenchPlanCache::ratioPlan(m_trenchDlg->areaWkb(), target, 2.0, sp.azimuthDeg, sp.armLength, sp.armBend);
       if (plan.cells.empty()) {
         notify(Notice::Warning, QStringLiteral("시굴격자"), plan.error);
         return false;
@@ -2102,10 +2103,7 @@ void MainWindow::applyTrenchByRatio(double targetPct) {
 bool MainWindow::applyTrenchCells(const std::vector<TrenchGridGenerator::Cell>& cells,
                                   double areaM2, double targetPct, const QString& sourceCrs) {
 #if KA_HGIS_HAS_QGIS
-  if (cells.empty() || (targetPct > 0.0 &&
-      (!(areaM2 > 0.0) || !std::isfinite(areaM2) ||
-       std::abs(TrenchGridGenerator::totalArea(cells) - areaM2 * targetPct / 100.0) >
-           std::max(1e-6, areaM2 * 1e-8)))) {
+  if (!TrenchGridGenerator::meetsTarget(cells, areaM2, targetPct)) {
     notify(Notice::Warning, QStringLiteral("시굴격자"),
            QStringLiteral("목표 면적에 맞는 격자를 계산하지 못했습니다. 방향과 규격을 확인해 다시 적용하세요. 기존 격자는 유지됩니다."));
     return false;

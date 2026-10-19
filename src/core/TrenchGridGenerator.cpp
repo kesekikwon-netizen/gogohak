@@ -441,8 +441,9 @@ SlopeAspect upslopeAspect(const std::vector<ElevSample>& samples, double minSlop
 }
 
 RatioFill buildForTargetRatio(const QByteArray& areaWkb, double targetPct, double width,
-                              double azimuthDeg, double armLength) {
-  if (armLength != 0.0) return TrenchLShape::buildForTargetRatio(areaWkb, targetPct, width, azimuthDeg, armLength);
+                              double azimuthDeg, double armLength, int armBend) {
+  if (armLength != 0.0)
+    return TrenchLShape::buildForTargetRatio(areaWkb, targetPct, width, azimuthDeg, armLength, armBend);
   RatioFill best;
   if (areaWkb.isEmpty() || !validDimensions(width, kMaxLength) ||
       !std::isfinite(targetPct) || targetPct <= 0.0 || targetPct > 100.0 ||

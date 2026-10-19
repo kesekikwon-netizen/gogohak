@@ -1,6 +1,7 @@
-// ㄱ·ㄴ자 시굴트렌치 (사용자 요청 2026-10-19): two 15 m arms, 2 m wide, laid inside the survey area
-// at the 시굴 10% area like the straight grid. One trench is one closed 7-point polygon, so it moves,
-// deletes and saves as one feature; width × length (centreline) is its area.
+// ㄱ·ㄴ자 시굴트렌치 (사용자 요청 2026-10-19): two 15 m arms, 2 m wide, bent one of four ways (ㄴ, ㄱ and
+// their mirrors), laid inside the survey area. The arms stay exactly 15 m, so the 10% plan is the fewest
+// whole Ls reaching 10% (just over it). One trench is one closed 7-point polygon, so it moves, deletes
+// and saves as one feature; width × length (centreline) is its area.
 #include <cmath>
 #include <memory>
 
@@ -71,6 +72,9 @@ class TestTrenchLShape : public QObject {
   Q_OBJECT
 private slots:
   void oneLHasTwoFifteenMetreArms();
+  void bendTurnsTheArmsFourWays_data();
+  void bendTurnsTheArmsFourWays();
+  void targetCheckIsExactForStraightAndJustOverForL();
   void tenPercentFillStaysInsideWithoutOverlap_data();
   void tenPercentFillStaysInsideWithoutOverlap();
   void tenPercentFillSpreadsOverTheArea();
@@ -99,18 +103,66 @@ void TestTrenchLShape::oneLHasTwoFifteenMetreArms() {
   QVERIFY(TrenchGridGenerator::cellsValid(cells));
 }
 
+void TestTrenchLShape::bendTurnsTheArmsFourWays_data() {
+  QTest::addColumn<int>("bend");
+  QTest::addColumn<double>("armX");  // direction of the arm along the grid's east (ring[0] → ring[1])
+  QTest::addColumn<double>("armY");  // direction of the arm along the grid's north (ring[0] → ring[5])
+  QTest::newRow("ㄴ") << 0 << 1.0 << 1.0;
+  QTest::newRow("ㄱ") << 1 << -1.0 << -1.0;
+  QTest::newRow("ㄴ 좌우 반대") << 2 << -1.0 << 1.0;
+  QTest::newRow("ㄱ 좌우 반대") << 3 << 1.0 << -1.0;
+}
+
+// Every bend fills the same 15 m square from the origin; only the corner and the arms change.
+void TestTrenchLShape::bendTurnsTheArmsFourWays() {
+  QFETCH(int, bend);
+  QFETCH(double, armX);
+  QFETCH(double, armY);
+  auto spec = lSpec();
+  spec.armBend = bend;
+  const auto cells = TrenchGridGenerator::build(spec);
+  QCOMPARE(int(cells.size()), 1);
+  const auto& r = cells.front().ring;
+  QVERIFY(TrenchGridGenerator::cellsValid(cells));
+  QCOMPARE((r[1].first - r[0].first) / 15.0, armX);
+  QCOMPARE((r[5].second - r[0].second) / 15.0, armY);
+  for (const auto& point : r)
+    QVERIFY(point.first >= 200000.0 - 1e-9 && point.first <= 200015.0 + 1e-9 && point.second >= 450000.0 - 1e-9 &&
+            point.second <= 450015.0 + 1e-9);
+  QVERIFY(std::abs(cellPolygon(cells.front()).get_Area() - 56.0) < 1e-6);
+}
+
+// Straight trenches are shortened to the exact target; whole 15 m Ls can only reach it from above,
+// by less than one more L.
+void TestTrenchLShape::targetCheckIsExactForStraightAndJustOverForL() {
+  const auto straight = TrenchGridGenerator::build(TrenchGridGenerator::Spec{});  // one 2 × 20 m = 40 ㎡
+  QVERIFY(TrenchGridGenerator::meetsTarget(straight, 400.0, 10.0));
+  QVERIFY(!TrenchGridGenerator::meetsTarget(straight, 390.0, 10.0));
+  const auto ls = TrenchGridGenerator::build(lSpec());  // one L = 56 ㎡
+  QVERIFY(TrenchGridGenerator::meetsTarget(ls, 560.0, 10.0));
+  QVERIFY(TrenchGridGenerator::meetsTarget(ls, 300.0, 10.0));   // 30 ㎡ asked: 56 is the fewest whole Ls
+  QVERIFY(!TrenchGridGenerator::meetsTarget(ls, 600.0, 10.0));  // under 10%
+  auto two = lSpec();
+  two.cols = 2;
+  QVERIFY(!TrenchGridGenerator::meetsTarget(TrenchGridGenerator::build(two), 200.0, 10.0));  // 20 ㎡: one L would do
+  QVERIFY(TrenchGridGenerator::meetsTarget(ls, 1000.0, 0.0));   // no target (직접 지정)
+}
+
 void TestTrenchLShape::tenPercentFillStaysInsideWithoutOverlap_data() {
   QTest::addColumn<QByteArray>("areaWkb");
   QTest::addColumn<double>("azimuth");
-  QTest::newRow("5187-square") << squareWkb(200000, 450000, 200200, 450200) << 0.0;
-  QTest::newRow("rotated-slope") << squareWkb(200000, 450000, 200200, 450200) << 30.0;
-  QTest::newRow("concave") << wktWkb(QStringLiteral("POLYGON((0 0,160 0,160 60,60 60,60 160,0 160,0 0))")) << 0.0;
+  QTest::addColumn<int>("bend");
+  QTest::newRow("5187-square") << squareWkb(200000, 450000, 200200, 450200) << 0.0 << 0;
+  QTest::newRow("rotated-slope-ㄱ") << squareWkb(200000, 450000, 200200, 450200) << 30.0 << 1;
+  QTest::newRow("concave-mirror") << wktWkb(QStringLiteral("POLYGON((0 0,160 0,160 60,60 60,60 160,0 160,0 0))"))
+                                  << 0.0 << 2;
 }
 
 void TestTrenchLShape::tenPercentFillStaysInsideWithoutOverlap() {
   QFETCH(QByteArray, areaWkb);
   QFETCH(double, azimuth);
-  const auto plan = TrenchGridGenerator::buildForTargetRatio(areaWkb, 10.0, 2.0, azimuth, 15.0);
+  QFETCH(int, bend);
+  const auto plan = TrenchGridGenerator::buildForTargetRatio(areaWkb, 10.0, 2.0, azimuth, 15.0, bend);
   QVERIFY2(!plan.cells.empty(), qPrintable(plan.error));
   QVERIFY(plan.error.isEmpty());
   QVERIFY(TrenchGridGenerator::cellsValid(plan.cells));
@@ -121,8 +173,8 @@ void TestTrenchLShape::tenPercentFillStaysInsideWithoutOverlap() {
   for (const auto& cell : plan.cells) {
     QCOMPARE(int(cell.ring.size()), 7);
     QCOMPARE(cell.width, 2.0);
-    QVERIFY2(cell.arm <= 15.0 + 1e-9 && cell.arm >= 13.0, qPrintable(QString::number(cell.arm)));
-    QVERIFY(std::abs(edge(cell, 0, 1) - cell.arm) < 1e-7 && std::abs(edge(cell, 0, 5) - cell.arm) < 1e-7);
+    QCOMPARE(cell.arm, 15.0);
+    QVERIFY(std::abs(edge(cell, 0, 1) - 15.0) < 1e-7 && std::abs(edge(cell, 0, 5) - 15.0) < 1e-7);
     OGRPolygon polygon = cellPolygon(cell);
     Geometry outside(polygon.Difference(area.get()));
     QVERIFY(outside);
@@ -135,12 +187,14 @@ void TestTrenchLShape::tenPercentFillStaysInsideWithoutOverlap() {
   const double unionArea = OGR_G_Area(OGRGeometry::ToHandle(united.get()));
   const double targetArea = OGR_G_Area(OGRGeometry::ToHandle(area.get())) * 0.10;
   QVERIFY2(std::abs(sum - unionArea) < 1e-6, "trenches must not overlap");
-  QVERIFY2(std::abs(unionArea - targetArea) < std::max(1e-6, targetArea * 1e-8),
+  // The fewest whole Ls reaching 10%: at least the target, short of it without one of them.
+  QVERIFY2(unionArea >= targetArea - 1e-6 && unionArea - 56.0 < targetArea,
            qPrintable(QStringLiteral("actual %1, target %2").arg(unionArea, 0, 'g', 17).arg(targetArea, 0, 'g', 17)));
-  QVERIFY(std::abs(TrenchGridGenerator::totalArea(plan.cells) - targetArea) < std::max(1e-6, targetArea * 1e-8));
-  QVERIFY(std::abs(plan.ratioPct - 10.0) < 1e-7);
+  QVERIFY(std::abs(TrenchGridGenerator::totalArea(plan.cells) - unionArea) < 1e-6);
+  QVERIFY(std::abs(plan.ratioPct - unionArea / plan.areaM2 * 100.0) < 1e-9);
+  QVERIFY(TrenchGridGenerator::meetsTarget(plan.cells, plan.areaM2, 10.0));
   QCOMPARE(plan.arm, longest);
-  qInfo() << "ㄱ·ㄴ자" << plan.cells.size() << "개 · 팔" << plan.arm << "m · 둑" << plan.balk << "m";
+  qInfo() << "ㄱ·ㄴ자" << plan.cells.size() << "개 · 비율" << plan.ratioPct << "% · 둑" << plan.balk << "m";
 }
 
 // The same count with wider gaps is kept, so the Ls reach every edge of the area instead of
@@ -218,13 +272,17 @@ void TestTrenchLShape::planCacheKeepsStraightAndLApart() {
   const QByteArray area = squareWkb(200000, 450000, 200200, 450200);
   const auto straight = TrenchPlanCache::ratioPlan(area, 10.0, 2.0, 0.0);
   const auto lShaped = TrenchPlanCache::ratioPlan(area, 10.0, 2.0, 0.0, 15.0);
+  const auto gieok = TrenchPlanCache::ratioPlan(area, 10.0, 2.0, 0.0, 15.0, 1);
   QVERIFY(!straight.cells.empty() && !lShaped.cells.empty());
   QCOMPARE(int(straight.cells.front().ring.size()), 5);
   QCOMPARE(int(lShaped.cells.front().ring.size()), 7);
-  QCOMPARE(TrenchPlanCache::computeCount(), 2);
+  QVERIFY(gieok.cells.front().ring != lShaped.cells.front().ring);  // another bend is another plan
+  QCOMPARE(TrenchPlanCache::computeCount(), 3);
   TrenchGridGenerator::RatioFill known;
   QVERIFY(TrenchPlanCache::lookup(area, 10.0, 2.0, 0.0, &known, 15.0));
   QCOMPARE(int(known.cells.front().ring.size()), 7);
+  QVERIFY(TrenchPlanCache::lookup(area, 10.0, 2.0, 0.0, &known, 15.0, 1));
+  QVERIFY(known.cells.front().ring == gieok.cells.front().ring);
 }
 
 int main(int argc, char** argv) {

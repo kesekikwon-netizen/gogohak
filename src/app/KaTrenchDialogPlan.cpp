@@ -37,7 +37,7 @@ void KaTrenchDialog::refreshRows() {
   if (auto* form = qobject_cast<QFormLayout*>(layout())) {
     form->setRowVisible(m_rows, !fill);
     form->setRowVisible(m_cols, !fill);
-    form->setRowVisible(m_size, !ratio && m_shape->currentData().toDouble() == 0.0);
+    form->setRowVisible(m_size, !ratio && m_shape->currentData().toInt() == 0);
     form->setRowVisible(m_balk, !ratio);
     form->setRowVisible(m_prefix, !ratio);
   }
@@ -70,8 +70,9 @@ void KaTrenchDialog::refreshPlan() {
     const double target = targetPct();
     const double az = effectiveAzimuth();
     const double arm = spec().armLength;
+    const int bend = spec().armBend;
     TrenchGridGenerator::RatioFill known;
-    if (TrenchPlanCache::lookup(area, target, 2.0, az, &known, arm)) {
+    if (TrenchPlanCache::lookup(area, target, 2.0, az, &known, arm, bend)) {
       m_planPending = false;
       showRatioPlan(known, az);
       return;
@@ -80,8 +81,8 @@ void KaTrenchDialog::refreshPlan() {
     setSummaryTone("plain");
     m_ratio->setText(QStringLiteral("배치를 계산하는 중입니다…"));
     // The pool is drained in the destructor, so `this` outlives the task.
-    m_planPool->start([this, seq, area, target, az, arm]() {
-      const TrenchGridGenerator::RatioFill plan = TrenchPlanCache::ratioPlan(area, target, 2.0, az, arm);
+    m_planPool->start([this, seq, area, target, az, arm, bend]() {
+      const TrenchGridGenerator::RatioFill plan = TrenchPlanCache::ratioPlan(area, target, 2.0, az, arm, bend);
       QMetaObject::invokeMethod(this, [this, seq, plan, az]() {
         if (seq != m_planSeq) return;
         m_planPending = false;
@@ -125,7 +126,7 @@ void KaTrenchDialog::showRatioPlan(const TrenchGridGenerator::RatioFill& plan, d
       (QStringLiteral("%1 · ") + shape + QStringLiteral(" · 총 %5㎡ · 비율 %6% (목표 %7%) · 방위 %8°"))
           .arg(surveyKind() == SurveyKind::Trial ? QStringLiteral("시굴조사") : QStringLiteral("표본조사"))
           .arg(plan.cells.size())
-          .arg(QLocale().toString(plan.arm > 0.0 ? plan.arm : plan.length, 'f', plan.arm > 0.0 ? 1 : 2))
+          .arg(plan.arm > 0.0 ? QLocale().toString(plan.arm, 'g', 4) : QLocale().toString(plan.length, 'f', 2))
           .arg(QLocale().toString(plan.balk, 'f', 0))
           .arg(QLocale().toString(TrenchGridGenerator::totalArea(plan.cells), 'f', 2))
           .arg(QLocale().toString(plan.ratioPct, 'f', 1))

@@ -25,6 +25,8 @@ struct Spec {
   // ㄱ·ㄴ자 트렌치: outer length of each of the two arms (m); 0 = straight trench.
   // trenchLength is not used then; balkWidth is the gap between the L squares.
   double armLength = 0.0;
+  // ㄱ·ㄴ자 꺾는 방향: 0 ㄴ, 1 ㄱ, 2 ㄴ 좌우 반대, 3 ㄱ 좌우 반대 (seen with the grid's north up).
+  int armBend = 0;
 };
 
 struct Cell {
@@ -114,9 +116,14 @@ struct RatioFill {
   double arm = 0.0;  // ㄱ·ㄴ자: longest actual arm; 0 for straight trenches
   QString error;  // nonempty when no valid plan can be made
 };
-// armLength > 0 lays ㄱ·ㄴ자 trenches of that arm instead (arms shortened equally to the target).
+// armLength > 0 lays whole ㄱ·ㄴ자 trenches of that arm, bent by armBend, instead: the fewest
+// reaching the target, so the total is just over it.
 RatioFill buildForTargetRatio(const QByteArray& areaWkb, double targetPct, double width = 2.0,
-                              double azimuthDeg = 0.0, double armLength = 0.0);
+                              double azimuthDeg = 0.0, double armLength = 0.0, int armBend = 0);
+
+// The cells cover targetPct of areaM2 as a plan of that kind must: straight trenches exactly,
+// whole ㄱ·ㄴ자 trenches at least and by less than one more trench. targetPct 0 = no target.
+bool meetsTarget(const std::vector<Cell>& cells, double areaM2, double targetPct);
 
 // Sum of trench areas (w × len per cell, square metres).
 double totalArea(const std::vector<Cell>& cells);
