@@ -1285,11 +1285,12 @@ function parseUploadedDocumentWithCraft({
  * true OOXML Word footnotes (`references.footnote`) at the exact page where each citation occurs.
  */
 function formatVerifiedCitationLine(paper, defaultPages = "") {
-  const author = (paper.author || "").trim() || "연구자";
-  const year = (paper.year || "").trim() || "최근";
-  const title = (paper.title || "").trim();
-  const journal = (paper.journal || "").trim() || "학술지";
-  const pagesRaw = (paper.pages || defaultPages || "").trim();
+  const { sanitizeArchaeologyTypographyAndFonts } = require("./archaeology_visuals_enricher");
+  const author = sanitizeArchaeologyTypographyAndFonts((paper.author || "").trim()) || "연구자";
+  const year = sanitizeArchaeologyTypographyAndFonts((paper.year || "").trim()) || "최근";
+  const title = sanitizeArchaeologyTypographyAndFonts((paper.title || "").trim());
+  const journal = sanitizeArchaeologyTypographyAndFonts((paper.journal || "").trim()) || "학술지";
+  const pagesRaw = sanitizeArchaeologyTypographyAndFonts((paper.pages || defaultPages || "").trim());
   const pagesFormatted = pagesRaw
     ? pagesRaw.endsWith("쪽")
       ? pagesRaw
@@ -1299,7 +1300,8 @@ function formatVerifiedCitationLine(paper, defaultPages = "") {
 }
 
 function repairUnknownAuthorsInCitationLine(lineText, collectedPapers = []) {
-  let out = String(lineText || "").trim();
+  const { sanitizeArchaeologyTypographyAndFonts } = require("./archaeology_visuals_enricher");
+  let out = sanitizeArchaeologyTypographyAndFonts(String(lineText || "").trim());
   if (!out) return out;
   const titleMatch = /「([^」]{3,})」/.exec(out);
   if (titleMatch && Array.isArray(collectedPapers) && collectedPapers.length > 0) {
@@ -1323,11 +1325,14 @@ function prepareMarkdownAndFootnotesForWordCraft(rawMarkdown) {
   const {
     compactChartLabel,
     normalizeWcDiagramSpec,
+    sanitizeArchaeologyTypographyAndFonts,
     repairCollapsedMarkdownTables,
     replaceInlineFootnoteSafely,
   } = require("./archaeology_visuals_enricher");
 
-  let md = repairCollapsedMarkdownTables(String(rawMarkdown || "").trim());
+  let md = sanitizeArchaeologyTypographyAndFonts(
+    repairCollapsedMarkdownTables(String(rawMarkdown || "").trim())
+  );
   if (!md) {
     return {
       wcMarkdown: "# 원고\n\n내용 없음",
@@ -1357,17 +1362,19 @@ function prepareMarkdownAndFootnotesForWordCraft(rawMarkdown) {
       ) {
         const idx = charts.length + 1;
         const token = `[[WC_CHART_${idx}]]`;
-        const chartTitle = spec.title || `고고학 정량 데이터 비교 차트 ${idx}`;
+        const chartTitle = sanitizeArchaeologyTypographyAndFonts(
+          spec.title || `고고학 정량 데이터 비교 차트 ${idx}`
+        );
         const cleanCategories = Array.isArray(spec.data && spec.data.categories)
-          ? spec.data.categories.map((c) => compactChartLabel(c, 12))
+          ? spec.data.categories.map((c) => compactChartLabel(sanitizeArchaeologyTypographyAndFonts(c), 12))
           : [];
         const cleanSeries = ((spec.data && spec.data.series) || []).map((s) => ({
           ...s,
-          name: compactChartLabel(s.name || "", 12),
+          name: compactChartLabel(sanitizeArchaeologyTypographyAndFonts(s.name || ""), 12),
         }));
         const normalizedSpec = {
-          width: 450,
-          height: 230,
+          width: 440,
+          height: 185,
           legend: "bottom",
           dataLabels: true,
           ...spec,
@@ -1385,15 +1392,16 @@ function prepareMarkdownAndFootnotesForWordCraft(rawMarkdown) {
       if (tag === "wc-diagram" || normDiag) {
         const idx = diagrams.length + 1;
         const token = `[[WC_DIAGRAM_${idx}]]`;
-        const diagTitle =
+        const diagTitle = sanitizeArchaeologyTypographyAndFonts(
           (normDiag && normDiag.title) ||
-          spec.title ||
-          `고고학 구조·층위·편년 변천 모식도 ${idx}`;
+            spec.title ||
+            `고고학 구조·층위·편년 변천 모식도 ${idx}`
+        );
         const normalizedSpec = {
           layout: (normDiag && normDiag.layout) || spec.layout || "process",
           colors: (normDiag && normDiag.colors) || spec.colors || "accent1",
-          width: 450,
-          height: 220,
+          width: 440,
+          height: 175,
           items: (normDiag && normDiag.items) || (Array.isArray(spec.items) ? spec.items : []),
         };
         diagrams.push({ token, spec: normalizedSpec });
@@ -1730,7 +1738,12 @@ async function exportManuscriptToWordCraftAndPdfCraft(options = {}) {
     "layout.size=" + JSON.stringify({ name: "A4" }),
     "--cmd",
     "design.themeFonts=" +
-      JSON.stringify({ heading: "Malgun Gothic", body: "Malgun Gothic" }),
+      JSON.stringify({
+        heading: "Malgun Gothic",
+        body: "Malgun Gothic",
+        eastAsia: "Malgun Gothic",
+        ascii: "Malgun Gothic",
+      }),
     "--cmd",
     "references.noteOptions=" +
       JSON.stringify({
@@ -5247,8 +5260,25 @@ async function runArchaeologyDiscussionPipeline({
         updateStudioUiState().catch(() => {});
       }
 
+      try {
+        const { syncUnifiedPipelineToEvidenceStore } = require("./v2/index.js");
+        const syncRes = syncUnifiedPipelineToEvidenceStore({
+          baseOutputDir: pipelineState.outputDir,
+          docType: pipelineState.docType,
+          userFocus,
+          reportText: craftExtractedReportText,
+          datingText: craftExtractedDatingText,
+          collectedPapers: pipelineState.collectedPapers,
+          manuscriptMd: currentManuscript || "",
+        });
+        if (syncRes && syncRes.ok) {
+          pipelineState.latestV2JobId = syncRes.jobId;
+          pipelineState.latestV2JobDir = syncRes.jobDir;
+        }
+      } catch (_) {}
+
       addPipelineLog(
-        `✅ [/goal 교차검증 완료 (${verification.passedCount}/${verification.totalCriteria} 기준 충족 · ${verification.score}점)] 판단 근거 검증이 완료되어 루프를 종료하고 WordCraft(.docx) 문서를 생성합니다.`,
+        `✅ [/goal · V1~V8 통합 교차검증 완료 (${verification.passedCount}/${verification.totalCriteria} 기준 충족 · ${verification.score}점)] 근거 대조표(crosswalk.md)·유적 라이브러리 저장 및 WordCraft(.docx) 문서를 생성합니다.`,
         "PHASE_4_EXPORT_MASTER",
         92
       );

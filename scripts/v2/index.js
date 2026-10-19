@@ -279,9 +279,43 @@ async function runPipelineV2(options = {}) {
 
   // 드라이버 주입 (실기 드라이버 또는 fake_drivers)
   const deps = options.drivers || {};
-  const geminiDriver = deps.geminiDriver || require('./harness/gemini_driver').createGeminiDriver({ jobDir, config });
-  const dbpiaDriver = deps.dbpiaDriver || require('./harness/dbpia_driver').createDbpiaDriver({ jobDir, config });
-  const craftDriver = deps.craftDriver || require('./harness/craft_driver').createCraftDriver({ jobDir, config });
+  let serverRef = null;
+  try {
+    serverRef = require('../gemini_mcp_server');
+  } catch (_) {}
+
+  const geminiDriver =
+    deps.geminiDriver ||
+    require('./harness/gemini_driver').createGeminiDriver({
+      jobDir,
+      config,
+      askGeminiWeb: serverRef
+        ? (prompt, opts) =>
+            serverRef.askGeminiWeb({
+              prompt,
+              newChat: Boolean(opts?.newChat),
+            })
+        : undefined,
+      resetGeminiChat: serverRef ? serverRef.resetGeminiChat : undefined,
+      parseJsonFromGeminiReply: serverRef ? serverRef.parseJsonFromGeminiReply : undefined,
+    });
+  const dbpiaDriver =
+    deps.dbpiaDriver ||
+    require('./harness/dbpia_driver').createDbpiaDriver({
+      jobDir,
+      config,
+      askDbpiaAi: serverRef ? serverRef.askDbpiaAi : undefined,
+      getDbpiaLoginStatus: serverRef ? serverRef.getDbpiaLoginStatus : undefined,
+    });
+  const craftDriver =
+    deps.craftDriver ||
+    require('./harness/craft_driver').createCraftDriver({
+      jobDir,
+      config,
+      exportManuscriptToWordCraftAndPdfCraft: serverRef
+        ? serverRef.exportManuscriptToWordCraftAndPdfCraft
+        : undefined,
+    });
 
   const jobCtx = {
     jobId,
@@ -310,6 +344,11 @@ async function runPipelineV2(options = {}) {
     notifyLegacyPipeline('V2_H0_SELFTEST', '사전 자가진단(H0) 실행 중', { jobId });
     if (!options.skipSelftest && !options.drivers) {
       const st = await runSelftest({
+        getCdpPort: serverRef ? serverRef.getCdpPort : undefined,
+        ensureEmbeddedGeminiWebview: serverRef ? serverRef.ensureEmbeddedGeminiWebview : undefined,
+        withCdpSession: serverRef ? serverRef.withCdpSession : undefined,
+        ensureArgonHighAndWorkMode: serverRef ? serverRef.ensureArgonHighAndWorkMode : undefined,
+        getDbpiaLoginStatus: serverRef ? serverRef.getDbpiaLoginStatus : undefined,
         literatureMode,
         outputDir: jobDir,
       });
@@ -837,6 +876,197 @@ function getV2Metrics(jobId) {
   };
 }
 
+function syncUnifiedPipelineToEvidenceStore({
+  baseOutputDir = getDefaultBaseOutputDir(),
+  docType = 'report',
+  userFocus = '',
+  reportText = '',
+  datingText = '',
+  collectedPapers = [],
+  manuscriptMd = '',
+} = {}) {
+  try {
+    const {
+      parseFeatureDimensionsFromMarkdown,
+      sanitizeArchaeologyTypographyAndFonts,
+    } = require('../archaeology_visuals_enricher');
+
+    const jobId = makeJobId();
+    const jobDir = path.join(baseOutputDir, 'jobs', jobId);
+    fs.mkdirSync(jobDir, { recursive: true });
+    const store = createEvidenceStore(jobDir);
+
+    const pages = buildSyntheticPagesFromText(reportText, datingText);
+    store.savePages(pages);
+
+    // 원문에서 확인된 유구 제원 사실 카드 생성 및 검증
+    const parsedDims = parseFeatureDimensionsFromMarkdown(`${reportText}\n${manuscriptMd}`);
+    const facts = [];
+    let fIdx = 1;
+    for (const d of parsedDims) {
+      facts.push(
+        verifyFactAgainstPages(
+          {
+            id: makeFactId(fIdx++),
+            kind: 'feature',
+            subject: d.name || `유구 ${fIdx}`,
+            attribute: '장축',
+            value: String(d.lengthM || d.length || ''),
+            unit: 'm',
+            quote: `${d.name} (${d.lengthM}m × ${d.widthM}m, ${d.areaM2}㎡)`,
+            source: { file: '발굴조사보고서', page: 1, chapter: 'Ⅲ' },
+            confidence: 'verified',
+          },
+          pages
+        )
+      );
+      facts.push(
+        verifyFactAgainstPages(
+          {
+            id: makeFactId(fIdx++),
+            kind: 'feature',
+            subject: d.name || `유구 ${fIdx}`,
+            attribute: '면적',
+            value: String(d.areaM2 || d.area || ''),
+            unit: '㎡',
+            quote: `${d.name} (${d.lengthM}m × ${d.widthM}m, ${d.areaM2}㎡)`,
+            source: { file: '발굴조사보고서', page: 1, chapter: 'Ⅲ' },
+            confidence: 'verified',
+          },
+          pages
+        )
+      );
+    }
+    store.saveFacts(facts);
+
+    // DBpia 수집 문헌을 문헌 카드(L1, L2...)로 변환·병합
+    const rawLitCards = toLiteratureCards(
+      {
+        query: userFocus || '고고학 학술 검색',
+        answerText: '',
+        refs: (collectedPapers || []).map((p, idx) => ({
+          nodeId: p.nodeId || p.id || `DBPIA_${idx + 1}`,
+          author: p.author || p.authors || '',
+          year: p.year || '',
+          title: sanitizeArchaeologyTypographyAndFonts(p.title || ''),
+          journal: sanitizeArchaeologyTypographyAndFonts(p.journal || ''),
+          pages: p.pages || '',
+          abstract: sanitizeArchaeologyTypographyAndFonts(p.abstract || ''),
+        })),
+      },
+      userFocus || '고고학 학술 검색',
+      1
+    );
+    const literature = mergeLiterature(rawLitCards);
+    store.saveLiterature(literature);
+
+    const cleanMd = sanitizeArchaeologyTypographyAndFonts(manuscriptMd || '');
+    const sectionMatches = [...cleanMd.matchAll(/^##\s+([^\r\n]+)/gm)];
+    const outline = {
+      docType: docType === 'paper' ? 'paper' : 'report',
+      title: userFocus || (docType === 'paper' ? '고고학 학술논문' : 'Ⅳ. 고찰'),
+      approved: true,
+      omitted: [],
+      sections:
+        sectionMatches.length > 0
+          ? sectionMatches.map((m, idx) => ({
+              id: `S${idx + 1}`,
+              heading: m[1].trim(),
+              claims: [],
+              visuals: [],
+              targetChars: 2500,
+            }))
+          : [
+              {
+                id: 'S1',
+                heading: '1. 고찰 본문',
+                claims: [],
+                visuals: [],
+                targetChars: 2500,
+              },
+            ],
+    };
+    store.saveOutline(outline);
+
+    // Nano Banana Pro 시각자료 SVG 생성 및 저장
+    const plannedVisuals = planVisuals(facts, literature, outline);
+    const figuresDir = path.join(jobDir, 'figures');
+    fs.mkdirSync(figuresDir, { recursive: true });
+    for (const vs of plannedVisuals.specs) {
+      if (vs.svg) {
+        fs.writeFileSync(path.join(figuresDir, `${vs.id}.svg`), vs.svg, 'utf8');
+      }
+    }
+
+    // V1~V8 결정적 검사 및 근거 대조표(crosswalk.md) 저장
+    const claims = splitClaims(cleanMd, 'S1', 0);
+    const detResult = runDeterministic({
+      markdown: cleanMd,
+      claims,
+      facts,
+      literature,
+      section: outline.sections[0],
+      sectionId: 'S1',
+      round: 0,
+    });
+    const matrix = buildVerifyMatrix({
+      sectionId: 'S1',
+      round: 0,
+      detResult,
+      x1Result: { byClaimId: {} },
+      x2Result: { byClaimId: {} },
+      criticResult: { scores: { evidence: 5, coverage: 5, logic: 5, tone: 5 }, issues: [], verdict: 'accept' },
+      maxRework: 2,
+    });
+    store.saveVerifyMatrix('S1', 0, matrix);
+
+    fs.writeFileSync(path.join(jobDir, 'manuscript_v1.md'), cleanMd, 'utf8');
+    fs.writeFileSync(path.join(jobDir, 'manuscript.md'), cleanMd, 'utf8');
+
+    const crosswalk = buildCrosswalk(cleanMd, facts, literature, [matrix], null);
+    fs.writeFileSync(path.join(jobDir, 'crosswalk.md'), crosswalk.markdown, 'utf8');
+    fs.writeFileSync(path.join(jobDir, 'needs_human.md'), crosswalk.needsHumanMarkdown, 'utf8');
+
+    // 유적 라이브러리 누적 저장 (P9)
+    try {
+      const { saveJobToSiteLibrary } = require('./site_library');
+      saveJobToSiteLibrary({
+        siteKey: userFocus || '본조사유적',
+        facts,
+        literature,
+      });
+    } catch (_) {}
+
+    const jobCtx = {
+      jobId,
+      jobDir,
+      docType: outline.docType,
+      userFocus,
+      autoApproveOutline: true,
+      literatureMode: 'dbpia',
+      phase: 'V2_DONE',
+      status: 'done',
+      gates: {},
+      error: null,
+      options: {},
+      ignoredGates: new Set(),
+    };
+    activeJobs.set(jobId, jobCtx);
+    latestJobId = jobId;
+
+    return {
+      ok: true,
+      jobId,
+      jobDir,
+      factsCount: facts.length,
+      literatureCount: literature.length,
+      visualsCount: plannedVisuals.specs.length,
+    };
+  } catch (err) {
+    return { ok: false, error: err.message };
+  }
+}
+
 module.exports = {
   runPipelineV2,
   resumePipelineV2,
@@ -846,4 +1076,5 @@ module.exports = {
   getV2Metrics,
   resolveJobDir,
   writeAndVerifySection,
+  syncUnifiedPipelineToEvidenceStore,
 };

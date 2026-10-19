@@ -136,10 +136,183 @@ function normalizeWcDiagramSpec(spec) {
   return null;
 }
 
-function repairCollapsedMarkdownTables(rawMd) {
-  const cleanedMathMd = String(rawMd || "")
+function sanitizeArchaeologyTypographyAndFonts(rawText) {
+  if (!rawText) return "";
+  let s = String(rawText);
+
+  // 1) CJK 호환용 한자(U+F900..U+FAFF), 부수 보충(U+2E80..U+2FD5), 전각 영숫자(U+FF01..U+FF5E)를
+  //    표준 통합 한자(U+4E00..U+9FFF) 및 반각 문자로 정규화하여 표·각주 내부 폰트 깨짐(SimSun/MingLiU 대체) 방지
+  //    (로마숫자 Ⅰ~Ⅴ U+2160..U+2169 및 ㎡ U+33A1 등은 보존)
+  s = s.replace(/[\u2E80-\u2FD5\uF900-\uFAFF\uFF01-\uFF5E]/g, (ch) =>
+    ch.normalize("NFKC")
+  );
+
+  // 2) DBpia 서지 메타데이터에서 중점(·)이나 물결표(~)가 '?'로 깨진 오타 복원 (예: 原三國?百濟 -> 原三國·百濟, 2?3세기 -> 2~3세기)
+  s = s.replace(/([가-힣一-龥])\?(?=[가-힣一-龥])/g, "$1·");
+  s = s.replace(/(\d)\?(?=\d)/g, "$1~");
+
+  // 3) 표·본문 내부의 LaTeX 수식 기호를 표준 학술 유니코드 기호로 치환
+  s = s
     .replace(/([^\s\\]+)\\pi\s*\\times\s*a\s*\\times\s*b\1/g, "$1")
+    .replace(/\$\\pm\$|\\pm/g, "±")
+    .replace(/\$\\times\$|\\times/g, "×")
+    .replace(/\$\\sim\$|\\sim/g, "~")
+    .replace(/\$\\approx\$|\\approx/g, "≈")
+    .replace(/\$2\\sigma\$|2\\sigma/g, "2σ")
+    .replace(/\$1\\sigma\$|1\\sigma/g, "1σ")
+    .replace(/\\text\{([^}]*)\}/g, "$1")
+    .replace(/\$([0-9.,±×~a-zA-Z°%㎡㎝m\s\-]+)\$/g, "$1")
     .replace(/(\\[a-zA-Z]+(?:\s*\\[a-zA-Z]+|\s+[a-zA-Z0-9])+)/g, "");
+
+  // 4) 코드블록(```wc-chart, ```wc-diagram 등) 외부의 인라인 백틱(`...`), 표 내부 <br> 및 조사 중복 오타 교정
+  const lines = s.split(/\r?\n/);
+  let inFence = false;
+  for (let i = 0; i < lines.length; i++) {
+    let line = lines[i];
+    const trimmed = line.trim();
+    if (trimmed.startsWith("```")) {
+      inFence = !inFence;
+      continue;
+    }
+    if (inFence) continue;
+
+    // 인라인 백틱(`...`) 제거: WordCraft/HTML에서 고정폭 코딩 폰트(Consolas/굴림체)로 바뀌어 표 안 폰트가 달라지는 현상 차단
+    line = line.replace(/`([^`\r\n]{1,120})`/g, "$1");
+
+    // 마크다운 표 행 내부 정리
+    if (trimmed.startsWith("|") && trimmed.endsWith("|")) {
+      line = line
+        .replace(/<br\s*\/?>/gi, " · ")
+        .replace(/[\u200B-\u200D\uFEFF]/g, "")
+        .replace(/\*\*\s*\*\*/g, "");
+      const cells = line.split("|");
+      for (let c = 1; c < cells.length - 1; c++) {
+        const boldMatches = cells[c].match(/\*\*/g);
+        if (boldMatches && boldMatches.length % 2 === 1) {
+          cells[c] = cells[c].replace(/\*\*/g, "");
+        }
+      }
+      line = cells.join("|");
+    }
+
+    // 5) 고고학 보고서·논문 빈출 조사 중복 및 띄어쓰기·문장부호 오타 교정
+    line = line
+      .replace(/\b(주거지|유적|유구|유물|토기|고분|석곽묘|목곽묘|수혈|시루|아궁이|부뚜막|보고서|선행연구)의\s+의\b/g, "$1의")
+      .replace(/([가-힣])(은|는|이|가|을|를|에|에서|으로|로)\s+\2(?=\s)/g, "$1$2")
+      .replace(/경질\s+무문\s*토기/g, "경질무문토기")
+      .replace(/타날문\s+토기/g, "타날문토기")
+      .replace(/무문\s+토기/g, "무문토기")
+      .replace(/원삼국\s+시대/g, "원삼국시대")
+      .replace(/청동기\s+시대/g, "청동기시대")
+      .replace(/삼국\s+시대/g, "삼국시대")
+      .replace(/방사성\s*탄소\s*연대/g, "방사성탄소연대")
+      .replace(/(주거지|유구|유물|토기|고분)\s+들/g, "$1들")
+      .replace(/(확인|추정|판단|사료|파악|검토|관찰|구분|비정)\s+(되었다|된다|되며|되고|된\b)/g, "$1$2")
+      .replace(/([다됨함음임쪽])\.\.+/g, "$1.")
+      .replace(/,\s*\./g, ".");
+
+    lines[i] = line;
+  }
+
+  return lines.join("\n");
+}
+
+function insertBlocksDistributedAcrossSection(sectionText, blocksToInsert = []) {
+  const cleanBlocks = (blocksToInsert || []).map((b) => String(b || "").trim()).filter(Boolean);
+  if (cleanBlocks.length === 0) return sectionText;
+  const raw = String(sectionText || "");
+  if (!raw.trim()) return cleanBlocks.join("\n\n");
+
+  // 문단/블록 단위로 분리하되 표·코드블록은 하나의 덩어리로 유지
+  const chunks = [];
+  const lines = raw.split(/\r?\n/);
+  let buf = [];
+  let inFence = false;
+  let inTable = false;
+
+  const flushBuf = () => {
+    if (buf.length > 0) {
+      chunks.push(buf.join("\n"));
+      buf = [];
+    }
+  };
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const t = line.trim();
+    if (t.startsWith("```")) {
+      inFence = !inFence;
+      buf.push(line);
+      if (!inFence) flushBuf();
+      continue;
+    }
+    if (inFence) {
+      buf.push(line);
+      continue;
+    }
+    if (t.startsWith("|") && t.endsWith("|")) {
+      if (!inTable) {
+        flushBuf();
+        inTable = true;
+      }
+      buf.push(line);
+      continue;
+    } else if (inTable) {
+      flushBuf();
+      inTable = false;
+    }
+    if (!t) {
+      flushBuf();
+      continue;
+    }
+    // 소제목(#)은 다음 문단과 결합되도록 버퍼 유지
+    buf.push(line);
+    if (!/^#{1,6}\s/.test(t) && !/^\*\*[0-9가-하]+\)/.test(t)) {
+      flushBuf();
+    }
+  }
+  flushBuf();
+
+  // 산문 문단 인덱스 찾기
+  const proseIndices = [];
+  chunks.forEach((ch, idx) => {
+    const t = ch.trim();
+    if (!t.startsWith("```") && !t.startsWith("|") && t.length >= 60) {
+      proseIndices.push(idx);
+    }
+  });
+
+  if (proseIndices.length <= 1) {
+    return raw.trimEnd() + "\n\n" + cleanBlocks.join("\n\n") + "\n";
+  }
+
+  // 산문 문단 사이사이에 시각자료(표·차트·모식도)를 균등 배분하여 연속 배치를 방지
+  const insertAfterMap = new Map();
+  for (let b = 0; b < cleanBlocks.length; b++) {
+    const ratio = (b + 1) / (cleanBlocks.length + 1);
+    const targetProsePos = Math.min(
+      proseIndices.length - 1,
+      Math.max(0, Math.floor(proseIndices.length * ratio))
+    );
+    const chunkIdx = proseIndices[targetProsePos];
+    if (!insertAfterMap.has(chunkIdx)) insertAfterMap.set(chunkIdx, []);
+    insertAfterMap.get(chunkIdx).push(cleanBlocks[b]);
+  }
+
+  const outChunks = [];
+  for (let i = 0; i < chunks.length; i++) {
+    outChunks.push(chunks[i]);
+    if (insertAfterMap.has(i)) {
+      for (const blk of insertAfterMap.get(i)) {
+        outChunks.push(blk);
+      }
+    }
+  }
+  return outChunks.join("\n\n") + "\n";
+}
+
+function repairCollapsedMarkdownTables(rawMd) {
+  const cleanedMathMd = sanitizeArchaeologyTypographyAndFonts(rawMd);
   const lines = cleanedMathMd.split(/\r?\n/);
   const out = [];
   let i = 0;
@@ -705,46 +878,50 @@ function ensureRichArchaeologyVisualsAndTables(
   const existingTables =
     body.match(/(?:^|\n)\|[^\n]+\|\r?\n\|[\s:\-|]+\|/g) || [];
 
+  const sec2Match = /\n(?=#{2,4}\s*(?:2\.|Ⅱ\.))/.exec(body);
   const sec3Boundary = /\n(?=#{2,4}\s*(?:3\.|Ⅲ\.))/.exec(body);
 
   const sec2Additions = [];
   if (existingTables.length === 0 && table1Md) {
     sec2Additions.push(
-      `\n\n${siteTitle}에서 확인된 주요 유구들의 구조 및 공반유물 속성을 종합 정리하면 아래 \`<표 1>\`과 같다.\n\n` +
+      `${siteTitle}에서 확인된 주요 유구들의 구조 및 공반유물 속성을 종합 정리하면 아래 <표 1>과 같다.\n\n` +
         table1Md
     );
   }
   if (existingCharts.length === 0 && chart1Spec) {
     sec2Additions.push(
-      `\n\n${siteTitle} 관련 DBpia 검증 선행연구들의 발표 시기 및 연구 논거 분포를 정량 비교하면 아래 차트와 같다.\n\n\`\`\`wc-chart\n` +
+      `${siteTitle} 관련 DBpia 검증 선행연구들의 발표 시기 및 연구 논거 분포를 정량 비교하면 아래 차트와 같다.\n\n\`\`\`wc-chart\n` +
         JSON.stringify(chart1Spec) +
         "\n```"
     );
   }
   if (existingCharts.length < 2 && chart2Spec) {
     sec2Additions.push(
-      `\n\n또한 ${siteTitle}에서 확인된 주요 유구들의 평면 규모(장축·단축 m 및 면적 ㎡) 실측치를 비교하면 아래 차트와 같다.\n\n\`\`\`wc-chart\n` +
+      `또한 ${siteTitle}에서 확인된 주요 유구들의 평면 규모(장축·단축 m 및 면적 ㎡) 실측치를 비교하면 아래 차트와 같다.\n\n\`\`\`wc-chart\n` +
         JSON.stringify(chart2Spec) +
         "\n```"
     );
   }
   if (existingDiagrams.length === 0 && diag1Spec) {
     sec2Additions.push(
-      `\n\n${siteTitle} 조사구역의 퇴적 층위와 유구 축조·폐기 공정을 도식화하면 다음 모식도와 같다.\n\n\`\`\`wc-diagram\n` +
+      `${siteTitle} 조사구역의 퇴적 층위와 유구 축조·폐기 공정을 도식화하면 다음 모식도와 같다.\n\n\`\`\`wc-diagram\n` +
         JSON.stringify(diag1Spec) +
         "\n```"
     );
   }
   if (sec2Additions.length > 0 && sec3Boundary) {
+    const s2Start = sec2Match && sec2Match.index < sec3Boundary.index ? sec2Match.index : 0;
+    const sec2Slice = body.slice(s2Start, sec3Boundary.index);
     body =
-      body.slice(0, sec3Boundary.index) +
-      sec2Additions.join("") +
+      body.slice(0, s2Start) +
+      insertBlocksDistributedAcrossSection(sec2Slice, sec2Additions) +
       "\n" +
       body.slice(sec3Boundary.index);
   } else if (sec2Additions.length > 0) {
-    body += sec2Additions.join("");
+    body = insertBlocksDistributedAcrossSection(body, sec2Additions);
   }
 
+  const sec3MatchUpdated = /\n(?=#{2,4}\s*(?:3\.|Ⅲ\.))/.exec(body);
   const sec4BoundaryUpdated = /\n(?=#{2,4}\s*(?:4\.|Ⅳ\.))/.exec(body);
 
   const sec3Additions = [];
@@ -753,7 +930,7 @@ function ensureRichArchaeologyVisualsAndTables(
   ).length;
   if (currentTableCount < 2 && table2Md && !body.includes("제작기법 속성 및 상대편년 비교표")) {
     sec3Additions.push(
-      `\n\n${siteTitle}에서 출토된 주요 유물의 분류별 제작기법 속성과 상대편년 단계를 종합 정리하면 다음과 같다.\n\n` +
+      `${siteTitle}에서 출토된 주요 유물의 분류별 제작기법 속성과 상대편년 단계를 종합 정리하면 다음과 같다.\n\n` +
         table2Md
     );
   }
@@ -762,14 +939,14 @@ function ensureRichArchaeologyVisualsAndTables(
     (sec3Additions.length > 0 ? 1 : 0);
   if (afterTable2Count < 3 && table3Md && !body.includes("입지·유구 구조·유물 조합상")) {
     sec3Additions.push(
-      `\n\n아울러 ${siteTitle}과 주변 비교유적군의 입지·유구 구조·출토유물 조합상을 종합 대비하면 아래 \`<표 3>\`과 같다.\n\n` +
+      `아울러 ${siteTitle}과 주변 비교유적군의 입지·유구 구조·출토유물 조합상을 종합 대비하면 아래 <표 3>과 같다.\n\n` +
         table3Md
     );
   }
   const midDiagCount = (body.match(/```wc-diagram[\s\S]*?```/gi) || []).length;
   if (midDiagCount < 2 && diag2Spec) {
     sec3Additions.push(
-      `\n\n층위·유구 구조와 출토유물 조합에 기반한 단계별 통시적 변천 양상을 모식화하면 아래와 같다.\n\n\`\`\`wc-diagram\n` +
+      `층위·유구 구조와 출토유물 조합에 기반한 단계별 통시적 변천 양상을 모식화하면 아래와 같다.\n\n\`\`\`wc-diagram\n` +
         JSON.stringify(diag2Spec) +
         "\n```"
     );
@@ -777,21 +954,27 @@ function ensureRichArchaeologyVisualsAndTables(
   const currentChartCount = (body.match(/```wc-chart[\s\S]*?```/gi) || []).length;
   if (currentChartCount < 3 && chart3Spec) {
     sec3Additions.push(
-      `\n\n아울러 본 고찰의 편년 및 성격 규명에 활용된 DBpia AI 검증 선행연구들의 주제 영역별 학술 논거 분포를 시각화하면 아래 차트와 같다.\n\n\`\`\`wc-chart\n` +
+      `아울러 본 고찰의 편년 및 성격 규명에 활용된 DBpia AI 검증 선행연구들의 주제 영역별 학술 논거 분포를 시각화하면 아래 차트와 같다.\n\n\`\`\`wc-chart\n` +
         JSON.stringify(chart3Spec) +
         "\n```"
     );
   }
   if (sec3Additions.length > 0 && sec4BoundaryUpdated) {
+    const s3Start =
+      sec3MatchUpdated && sec3MatchUpdated.index < sec4BoundaryUpdated.index
+        ? sec3MatchUpdated.index
+        : 0;
+    const sec3Slice = body.slice(s3Start, sec4BoundaryUpdated.index);
     body =
-      body.slice(0, sec4BoundaryUpdated.index) +
-      sec3Additions.join("") +
+      body.slice(0, s3Start) +
+      insertBlocksDistributedAcrossSection(sec3Slice, sec3Additions) +
       "\n" +
       body.slice(sec4BoundaryUpdated.index);
   } else if (sec3Additions.length > 0) {
-    body += sec3Additions.join("");
+    body = insertBlocksDistributedAcrossSection(body, sec3Additions);
   }
 
+  const sec4MatchUpdated = /\n(?=#{2,4}\s*(?:4\.|Ⅳ\.))/.exec(body);
   const conclusionBoundaryUpdated =
     /\n(?=#{2,4}\s*(?:3\)\s*맺음말|4\)\s*맺음말|5\.\s*맺음말|Ⅴ\.))/.exec(body);
 
@@ -799,7 +982,7 @@ function ensureRichArchaeologyVisualsAndTables(
   const currentDiagCount = (body.match(/```wc-diagram[\s\S]*?```/gi) || []).length;
   if (currentDiagCount < 3 && diag3Spec) {
     sec4Additions.push(
-      `\n\nDBpia 수집 문헌과의 교차검증을 통해 복원한 ${siteTitle} 및 주변 비교유적군의 관계 구조를 모식화하면 다음과 같다.\n\n\`\`\`wc-diagram\n` +
+      `DBpia 수집 문헌과의 교차검증을 통해 복원한 ${siteTitle} 및 주변 비교유적군의 관계 구조를 모식화하면 다음과 같다.\n\n\`\`\`wc-diagram\n` +
         JSON.stringify(diag3Spec) +
         "\n```"
     );
@@ -809,21 +992,29 @@ function ensureRichArchaeologyVisualsAndTables(
   ).length;
   if (updatedTableCount < 4 && table4Md && !body.includes("<표 4>")) {
     sec4Additions.push(
-      `\n\n또한 본 고찰에서 수집·교차검증한 DBpia 핵심 선행연구들의 주요 학술 쟁점과 ${siteTitle}에의 적용 결과를 종합 대비하면 \`<표 4>\`와 같다.\n\n` +
+      `또한 본 고찰에서 수집·교차검증한 DBpia 핵심 선행연구들의 주요 학술 쟁점과 ${siteTitle}에의 적용 결과를 종합 대비하면 <표 4>와 같다.\n\n` +
         table4Md
     );
   }
   if (sec4Additions.length > 0 && conclusionBoundaryUpdated) {
+    const s4Start =
+      sec4MatchUpdated && sec4MatchUpdated.index < conclusionBoundaryUpdated.index
+        ? sec4MatchUpdated.index
+        : 0;
+    const sec4Slice = body.slice(s4Start, conclusionBoundaryUpdated.index);
     body =
-      body.slice(0, conclusionBoundaryUpdated.index) +
-      sec4Additions.join("") +
+      body.slice(0, s4Start) +
+      insertBlocksDistributedAcrossSection(sec4Slice, sec4Additions) +
       "\n" +
       body.slice(conclusionBoundaryUpdated.index);
   } else if (sec4Additions.length > 0) {
-    body += sec4Additions.join("");
+    const s4Start = sec4MatchUpdated ? sec4MatchUpdated.index : 0;
+    body =
+      body.slice(0, s4Start) +
+      insertBlocksDistributedAcrossSection(body.slice(s4Start), sec4Additions);
   }
 
-  return body + tail;
+  return sanitizeArchaeologyTypographyAndFonts(body + tail);
 }
 
 function replaceInlineFootnoteSafely(bodyText, num, token, supNum) {
@@ -922,8 +1113,8 @@ function compileAndOpenInWordCraft(mdPath) {
         charts.push({
           token,
           spec: {
-            width: 450,
-            height: 230,
+            width: 440,
+            height: 185,
             legend: "bottom",
             dataLabels: true,
             ...spec,
@@ -950,8 +1141,8 @@ function compileAndOpenInWordCraft(mdPath) {
           spec: {
             layout: (normDiag && normDiag.layout) || spec.layout || "process",
             colors: (normDiag && normDiag.colors) || spec.colors || "accent1",
-            width: 450,
-            height: 220,
+            width: 440,
+            height: 175,
             items: (normDiag && normDiag.items) || spec.items || [],
           },
         });
@@ -975,7 +1166,7 @@ function compileAndOpenInWordCraft(mdPath) {
       const lm = /^\s*(\d+)\)\s+(.+)$/.exec(rawLine.trim());
       if (lm) {
         const num = Number(lm[1]);
-        const text = lm[2].trim();
+        const text = sanitizeArchaeologyTypographyAndFonts(lm[2].trim());
         const token = `[[WC_FN_${num}]]`;
         const rep = replaceInlineFootnoteSafely(bodyPart, num, token, toSuper(num));
         bodyPart = rep.text;
@@ -995,7 +1186,7 @@ function compileAndOpenInWordCraft(mdPath) {
   fs.mkdirSync(path.dirname(wcSrcPath), { recursive: true });
   fs.writeFileSync(
     wcSrcPath,
-    bodyPart.trim() + "\n\n" + afterPart.trim(),
+    sanitizeArchaeologyTypographyAndFonts(bodyPart.trim() + "\n\n" + afterPart.trim()),
     "utf8"
   );
 
@@ -1004,12 +1195,17 @@ function compileAndOpenInWordCraft(mdPath) {
     "--file",
     wcSrcPath,
     "--author",
-    "ARCHAEO STUDIO 5.0",
+    "ARCHAEO STUDIO 6.1",
     "--cmd",
     "layout.size=" + JSON.stringify({ name: "A4" }),
     "--cmd",
     "design.themeFonts=" +
-      JSON.stringify({ heading: "Malgun Gothic", body: "Malgun Gothic" }),
+      JSON.stringify({
+        heading: "Malgun Gothic",
+        body: "Malgun Gothic",
+        eastAsia: "Malgun Gothic",
+        ascii: "Malgun Gothic",
+      }),
     "--cmd",
     "references.noteOptions=" +
       JSON.stringify({
@@ -1345,6 +1541,8 @@ function renderNanoBananaArchaeologySvg({ kind = "chart", spec = {}, cards = [] 
 module.exports = {
   compactChartLabel,
   normalizeWcDiagramSpec,
+  sanitizeArchaeologyTypographyAndFonts,
+  insertBlocksDistributedAcrossSection,
   repairCollapsedMarkdownTables,
   replaceInlineFootnoteSafely,
   parseFeatureDimensionsFromMarkdown,
