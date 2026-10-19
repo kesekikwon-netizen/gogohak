@@ -4,6 +4,7 @@
 
 class QApplication;
 class QMenu;
+class QToolButton;
 class QWidget;
 
 // 「화면 보기」 options: 새 모양, 고대비 화면 and 큰 글씨. KaTheme itself defaults to the stock Strata
@@ -16,5 +17,8 @@ void saveDisplayOptions(const DisplayOptions& options);
 void applySavedDisplayOptions(QApplication* app);
 // The 「화면 보기」 submenu. Each tick saves the choice and restyles the app at once.
 QMenu* createDisplayOptionsMenu(QWidget* parent);
+// The small 「테마 ▾」 button (화면 테마, KaThemeColors.h): one tick per theme; a pick saves ui/colorTheme
+// and restyles the app at once.
+QToolButton* createColorThemeButton(QWidget* parent);
 
 }  // namespace KaTheme

@@ -1,11 +1,14 @@
 #include "KaThemeOptions.h"
+#include "KaThemeColors.h"
 
 #include <QAction>
+#include <QActionGroup>
 #include <QApplication>
 #include <QEvent>
 #include <QIcon>
 #include <QMenu>
 #include <QSettings>
+#include <QToolButton>
 #include <QWidget>
 
 #ifdef Q_OS_WIN
@@ -23,6 +26,7 @@ namespace {
 const QString kHighContrastKey = QStringLiteral("ui/highContrast");
 const QString kLargeTextKey = QStringLiteral("ui/largeText");
 const QString kPaperLookKey = QStringLiteral("ui/paperLook");
+const QString kColorThemeKey = QStringLiteral("ui/colorTheme");
 
 QApplication* application() {
   return qobject_cast<QApplication*>(QCoreApplication::instance());
@@ -48,7 +52,7 @@ private:
     const HWND handle = reinterpret_cast<HWND>(window->internalWinId());  // 0 until the window exists
     if (!handle || QGuiApplication::platformName() != QLatin1String("windows"))
       return;  // the offscreen platform's window id is not an HWND
-    const bool paper = displayOptions().paperLook;
+    const bool paper = displayOptions().paperLook || displayOptions().colorTheme != ColorTheme::Default;
     const auto ref = [](const QColor& c) { return COLORREF(RGB(c.red(), c.green(), c.blue())); };
     const COLORREF face = paper ? ref(tokens().chrome) : COLORREF(0xFFFFFFFF);  // DWMWA_COLOR_DEFAULT
     const COLORREF text = paper ? ref(tokens().ink) : COLORREF(0xFFFFFFFF);
@@ -77,6 +81,7 @@ DisplayOptions savedDisplayOptions() {
   options.highContrast = settings.value(kHighContrastKey, false).toBool();
   options.largeText = settings.value(kLargeTextKey, false).toBool();
   options.paperLook = settings.value(kPaperLookKey, false).toBool();
+  options.colorTheme = colorThemeFromKey(settings.value(kColorThemeKey).toString());
   return options;
 }
 
@@ -85,6 +90,7 @@ void saveDisplayOptions(const DisplayOptions& options) {
   settings.setValue(kHighContrastKey, options.highContrast);
   settings.setValue(kLargeTextKey, options.largeText);
   settings.setValue(kPaperLookKey, options.paperLook);
+  settings.setValue(kColorThemeKey, colorThemeKey(options.colorTheme));
 }
 
 void applySavedDisplayOptions(QApplication* app) {
@@ -137,6 +143,7 @@ QMenu* createDisplayOptionsMenu(QWidget* parent) {
     options.paperLook = paper->isChecked();
     options.highContrast = contrast->isChecked();
     options.largeText = large->isChecked();
+    options.colorTheme = displayOptions().colorTheme;  // 「테마 ▾」 owns the theme
     saveDisplayOptions(options);
     setDisplayOptions(application(), options);
     refreshWindowIcons();
@@ -145,6 +152,39 @@ QMenu* createDisplayOptionsMenu(QWidget* parent) {
   QObject::connect(contrast, &QAction::triggered, menu, choose);
   QObject::connect(large, &QAction::triggered, menu, choose);
   return menu;
+}
+
+QToolButton* createColorThemeButton(QWidget* parent) {
+  auto* button = new QToolButton(parent);
+  button->setObjectName(QStringLiteral("btnColorTheme"));
+  button->setText(QStringLiteral("테마 ▾"));
+  button->setToolTip(QStringLiteral("화면 색을 고릅니다. 지도와 저장·내보내는 파일의 색은 바뀌지 않습니다"));
+  button->setAccessibleName(QStringLiteral("화면 테마 고르기"));
+  button->setPopupMode(QToolButton::InstantPopup);
+  button->setToolButtonStyle(Qt::ToolButtonTextOnly);
+  auto* menu = new QMenu(button);
+  menu->setObjectName(QStringLiteral("colorThemeMenu"));
+  auto* group = new QActionGroup(menu);
+  for (const ColorTheme theme : colorThemes()) {
+    auto* action = menu->addAction(colorThemeLabel(theme));
+    action->setObjectName(QStringLiteral("actionTheme_") + colorThemeKey(theme));
+    action->setCheckable(true);
+    action->setData(static_cast<int>(theme));
+    group->addAction(action);
+    QObject::connect(action, &QAction::triggered, menu, [theme]() {
+      DisplayOptions options = displayOptions();
+      options.colorTheme = theme;
+      saveDisplayOptions(options);
+      setDisplayOptions(application(), options);
+      refreshWindowIcons();
+    });
+  }
+  QObject::connect(menu, &QMenu::aboutToShow, menu, [menu]() {
+    for (QAction* action : menu->actions())
+      action->setChecked(action->data().toInt() == static_cast<int>(displayOptions().colorTheme));
+  });
+  button->setMenu(menu);
+  return button;
 }
 
 }  // namespace KaTheme

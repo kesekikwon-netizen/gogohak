@@ -1,4 +1,5 @@
 #include "KaTheme.h"
+#include "KaThemeColors.h"
 #include "KaThemeFonts.h"
 #include "KaThemePaper.h"
 
@@ -182,6 +183,10 @@ Tokens tokensFor(const DisplayOptions& options) {
   Tokens t = options.highContrast ? highContrastTokens() : strataTokens();
   if (options.paperLook) {
     applyPaperLook(t, options.highContrast);
+    fillLegacyAliases(t);
+  }
+  if (options.colorTheme != ColorTheme::Default) {
+    applyColorTheme(t, options.colorTheme, options.highContrast);
     fillLegacyAliases(t);
   }
   return t;

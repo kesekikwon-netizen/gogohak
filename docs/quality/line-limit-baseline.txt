@@ -92,3 +92,5 @@
 321 tests/test_survey_point_dialogs.cpp
 355 src/app/KaStartPage.cpp
 301 src/app/KaSubmitFlow.cpp
+304 src/app/KaTheme.cpp
+395 tests/test_theme_options.cpp

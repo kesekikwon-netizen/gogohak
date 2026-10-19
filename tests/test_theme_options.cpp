@@ -14,6 +14,8 @@
 #include <QTemporaryDir>
 #include "app/KaTheme.h"
 #include "app/KaThemeOptions.h"
+#include "app/KaThemeColors.h"
+#include <QToolButton>
 
 namespace {
 
@@ -45,6 +47,9 @@ private slots:
   void paperLook_inksStayReadable();
   void paperLook_sheetResolves();
   void paperLook_menuEntryAndStartupDefault();
+  void colorTheme_defaultKeepsTheLook();
+  void colorTheme_inksStayReadable();
+  void colorTheme_buttonSavesAndRestores();
 
 private:
   QTemporaryDir m_settings;
@@ -293,6 +298,97 @@ void TestThemeOptions::paperLook_menuEntryAndStartupDefault() {
   QVERIFY2(!KaTheme::displayOptions().paperLook, "an explicit off survives the next start");
   look->trigger();  // tick again
   QVERIFY(KaTheme::displayOptions().paperLook && KaTheme::savedDisplayOptions().paperLook);
+}
+
+// 화면 테마 (2026-10-19): 기본 + 하늘 눈밭 · 번개 노랑 · 벚꽃 파스텔. A theme only rewrites the chrome tokens.
+void TestThemeOptions::colorTheme_defaultKeepsTheLook() {
+  QCOMPARE(KaTheme::DisplayOptions().colorTheme, KaTheme::ColorTheme::Default);
+  for (const bool paper : {false, true}) {
+    KaTheme::DisplayOptions options;
+    options.paperLook = paper;
+    const KaTheme::Tokens base = KaTheme::tokensFor(options);
+    options.colorTheme = KaTheme::ColorTheme::Default;
+    QCOMPARE(KaTheme::tokensFor(options).accent, base.accent);
+    for (const KaTheme::ColorTheme theme : KaTheme::colorThemes()) {
+      if (theme == KaTheme::ColorTheme::Default) continue;
+      options.colorTheme = theme;
+      const KaTheme::Tokens t = KaTheme::tokensFor(options);
+      QVERIFY2(t.accent != base.accent && t.desk != base.desk, qPrintable(KaTheme::colorThemeKey(theme)));
+      QCOMPARE(t.sky1, t.accent);  // the legacy aliases follow the theme
+      QCOMPARE(t.canvasNeutral, base.canvasNeutral);  // the map is not chrome
+      QCOMPARE(t.danger, base.danger);
+      QCOMPARE(t.ok, base.ok);
+      QCOMPARE(t.warn, base.warn);
+    }
+  }
+}
+
+void TestThemeOptions::colorTheme_inksStayReadable() {
+  for (const KaTheme::ColorTheme theme : KaTheme::colorThemes())
+    for (const bool paper : {false, true})
+      for (const bool high : {false, true}) {
+        KaTheme::DisplayOptions options;
+        options.colorTheme = theme;
+        options.paperLook = paper;
+        options.highContrast = high;
+        if (theme == KaTheme::ColorTheme::Default && !paper) continue;  // the stock look has its own checks above
+        const KaTheme::Tokens t = KaTheme::tokensFor(options);
+        const QByteArray name = KaTheme::colorThemeKey(theme).toUtf8() + (paper ? " paper" : "") + (high ? " high" : "");
+        QVERIFY2(luminance(t.hover) > luminance(t.selected) && luminance(t.selected) > luminance(t.pressed), name);
+        for (const QColor& wash : {t.surface, t.hover, t.selected, t.pressed, t.stripe, t.altRow, t.chrome, t.desk,
+                                   t.dialogGround, t.accentWash, t.tile, t.tileHover, t.tileShown}) {
+          QVERIFY2(contrast(t.ink, wash) >= 4.5, name + " ink on " + wash.name().toLatin1());
+          QVERIFY2(contrast(t.inkMuted, wash) >= 4.5, name + " muted on " + wash.name().toLatin1());
+        }
+        QVERIFY2(contrast(t.inkDisabled, t.disabledSurface) >= 4.5, name);
+        QVERIFY2(contrast(t.primaryText, t.primary) >= 4.5 && contrast(t.primaryText, t.primaryHover) >= 4.5 &&
+                     contrast(t.primaryText, t.primaryPressed) >= 4.5, name + " main button");
+        QVERIFY2(contrast(t.heroButtonText, t.heroButton) >= 4.5, name + " home button");
+        QVERIFY2(contrast(t.surface, t.accent) >= 4.5, name + " white on accent");
+        QVERIFY2(contrast(t.ribbonActiveInk, t.chrome) >= 4.5 && contrast(t.ribbonActiveInk, t.hover) >= 4.5, name);
+        QVERIFY2(contrast(t.ribbonGroupInk, t.chrome) >= 4.5 && contrast(t.ribbonLabelInk, t.pressed) >= 4.5, name);
+        QVERIFY2(contrast(t.tabInk, t.surface) >= 4.5 && contrast(t.tabInk, t.desk) >= 4.5, name + " tabs");
+        QVERIFY2(contrast(t.glyph, t.tile) >= 4.5 && contrast(t.glyph, t.tileHover) >= 4.5, name + " ribbon glyph");
+        QVERIFY2(contrast(t.glyphOn, t.tileOn) >= 4.5 && contrast(t.glyphShown, t.tileShown) >= 4.5, name);
+        QVERIFY2(contrast(t.tileOnBorder, t.tile) >= 3.0, name);
+        QVERIFY2(contrast(t.railText, t.rail) >= 4.5 && contrast(t.railMuted, t.rail) >= 4.5, name + " home hero");
+        QVERIFY2(contrast(t.railText, t.band) >= 4.5, name + " download band");
+        QVERIFY(contrast(t.ok, t.successSurface) >= 4.5);
+        QVERIFY(contrast(t.warn, t.warnSurface) >= 4.5);
+        QVERIFY(contrast(t.danger, t.dangerSurface) >= 4.5);
+        QVERIFY2(contrast(t.progressFill, t.surface) >= 3.0 && contrast(t.progressFill, t.pressed) >= 3.0, name);
+        if (high) QVERIFY2(contrast(t.border, t.surface) >= 3.0 && contrast(t.inkMuted, t.surface) >= 7.0, name);
+      }
+}
+
+// 「테마 ▾」: one tick per theme, saved as ui/colorTheme; an unknown or missing value is 기본.
+void TestThemeOptions::colorTheme_buttonSavesAndRestores() {
+  QSettings().remove(QStringLiteral("ui/colorTheme"));
+  QCOMPARE(KaTheme::savedDisplayOptions().colorTheme, KaTheme::ColorTheme::Default);
+  QWidget host;
+  QToolButton* button = KaTheme::createColorThemeButton(&host);
+  QVERIFY(button && button->menu());
+  QCOMPARE(button->text(), QStringLiteral("테마 ▾"));
+  QCOMPARE(button->menu()->actions().size(), 4);
+  auto* blossom = button->menu()->findChild<QAction*>(QStringLiteral("actionTheme_blossom"));
+  QVERIFY(blossom && blossom->isCheckable());
+  blossom->trigger();
+  QCOMPARE(KaTheme::displayOptions().colorTheme, KaTheme::ColorTheme::BlossomPastel);
+  QCOMPARE(QSettings().value(QStringLiteral("ui/colorTheme")).toString(), QStringLiteral("blossom"));
+  QVERIFY(qApp->styleSheet().contains(KaTheme::tokens().desk.name()));
+  // 화면 보기 keeps the theme when another tick changes.
+  QMenu* display = KaTheme::createDisplayOptionsMenu(&host);
+  display->findChild<QAction*>(QStringLiteral("actionLargeText"))->trigger();
+  QCOMPARE(KaTheme::savedDisplayOptions().colorTheme, KaTheme::ColorTheme::BlossomPastel);
+  QCOMPARE(KaTheme::displayOptions().colorTheme, KaTheme::ColorTheme::BlossomPastel);
+  KaTheme::setDisplayOptions(qApp, KaTheme::DisplayOptions());
+  KaTheme::applySavedDisplayOptions(qApp);
+  QCOMPARE(KaTheme::displayOptions().colorTheme, KaTheme::ColorTheme::BlossomPastel);
+  QSettings().setValue(QStringLiteral("ui/colorTheme"), QStringLiteral("no-such-theme"));
+  QCOMPARE(KaTheme::savedDisplayOptions().colorTheme, KaTheme::ColorTheme::Default);
+  button->menu()->findChild<QAction*>(QStringLiteral("actionTheme_default"))->trigger();
+  QCOMPARE(QSettings().value(QStringLiteral("ui/colorTheme")).toString(), QStringLiteral("default"));
+  QSettings().remove(QStringLiteral("ui/largeText"));
 }
 
 QTEST_MAIN(TestThemeOptions)

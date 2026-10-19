@@ -53,6 +53,9 @@ struct Tokens {
   QColor glossReflection, glossShoulder, accentReflection;
 };
 
+// 화면 테마 (「테마 ▾」, KaThemeColors.h): screen chrome colours only. Default keeps the look below.
+enum class ColorTheme { Default, SkySnow, BoltYellow, BlossomPastel };
+
 // Optional display profile. The default is the stock Strata look; every option is
 // opt-in and none changes chip sizes or the 10 px layer list. bundledFonts is off:
 // the chrome uses Malgun Gothic, whose Windows hinting stays crisp at 11-13 px. The
@@ -64,6 +67,7 @@ struct DisplayOptions {
   bool largeText = false;     // 13 px body text becomes 15 px
   bool bundledFonts = false;  // IBM Plex Sans KR / Mono from data/fonts when registered
   bool paperLook = false;     // 새 모양: paper ground, slate ink, one clay accent (KaThemePaper.h)
+  ColorTheme colorTheme = ColorTheme::Default;
   bool operator==(const DisplayOptions&) const = default;
 };
 

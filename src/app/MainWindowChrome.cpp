@@ -18,6 +18,7 @@
 #include "KaStartPage.h"
 #include "KaStatusBar.h"
 #include "KaSurveyBadge.h"
+#include "KaThemeOptions.h"
 #include "core/EditBufferSummary.h"
 #include "core/LayerOps.h"
 #include "core/LayerStyleDefaults.h"
@@ -25,6 +26,7 @@
 #include "core/SurveyFacts.h"
 
 #include <QFileInfo>
+#include <QHBoxLayout>
 #include <QSettings>
 #include <QShortcut>
 #include <QSplitter>
@@ -138,10 +140,17 @@ void MainWindow::setupStrataShell() {
     }
     syncBasemapCard();
   });
-  // 3. 「조사 열림 · 이름」 badge at the right end of the tab bar; a click goes to the map.
+  // 3. 「조사 열림 · 이름」 badge and the small 「테마 ▾」 at the right end of the tab bar; a badge click goes to the map.
   if (m_viewTabs) {
-    m_surveyBadge = new KaSurveyBadge(m_viewTabs);
-    m_viewTabs->setCornerWidget(m_surveyBadge, Qt::TopRightCorner);
+    auto* corner = new QWidget(m_viewTabs);
+    corner->setObjectName(QStringLiteral("viewTabsCorner"));
+    auto* cornerRow = new QHBoxLayout(corner);
+    cornerRow->setContentsMargins(0, 0, 0, 0);
+    cornerRow->setSpacing(6);
+    m_surveyBadge = new KaSurveyBadge(corner);
+    cornerRow->addWidget(m_surveyBadge);
+    cornerRow->addWidget(KaTheme::createColorThemeButton(corner));
+    m_viewTabs->setCornerWidget(corner, Qt::TopRightCorner);
     connect(m_surveyBadge, &KaSurveyBadge::clicked, this, &MainWindow::showMapWorkspace);
   }
   // 「→ 제출 5179」 in the status bar looked clickable and did nothing (2026-10-10): it opens 검수·제출 like Ctrl+E.
