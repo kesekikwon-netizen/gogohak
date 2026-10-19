@@ -6,8 +6,10 @@
 #include <QTransform>
 #include <QVector>
 
+#include <qgsgeometry.h>
 #include <qgspointxy.h>
 
+class QgsGeometryEngine;
 class QgsLayoutItemMap;
 
 // Places layout number badges (heritage site numbers) in map units.
@@ -17,7 +19,9 @@ class QgsLayoutItemMap;
 //   or hidden under the legend would still be listed in the legend.
 // A badge that cannot stay on its site moves to the nearest free slot on rings
 // around it. The ring count grows with the number of placed badges, so a dense
-// cluster never falls back to stacking badges on one spot.
+// cluster never falls back to stacking badges on one spot. A badge whose site
+// area is given takes the nearest free slot inside that area first: it sits on
+// its own site and needs no leader line.
 class LayoutBadgePlacer {
 public:
   // mapToScene: map coordinates -> layout scene (mm). allowedScene empty = no paper limit.
@@ -30,7 +34,10 @@ public:
   // to the nearest free slot (place()). Lone sites go first so they keep their
   // site (sites chained closer than the clear distance are the crowded ones).
   // Badges then trade places until no two leader lines on the sheet cross.
-  QVector<QgsPointXY> placeAll(const QVector<QgsPointXY>& origins, const QVector<double>& badgeDiametersMm);
+  // siteAreas (map units, optional, one per origin): crowded badges with the
+  // smallest areas pick first, each inside its own area where a slot is free.
+  QVector<QgsPointXY> placeAll(const QVector<QgsPointXY>& origins, const QVector<double>& badgeDiametersMm,
+                               const QVector<QgsGeometry>& siteAreas = {});
   // Occupy a position without searching (e.g. a site whose transform failed).
   void occupy(const QgsPointXY& point);
   int count() const { return m_count; }
@@ -46,6 +53,8 @@ public:
   static constexpr int kMaxRings = 60;
 
 private:
+  QgsPointXY place(const QgsPointXY& origin, double badgeDiameterMm, const QgsGeometryEngine* site,
+                   const QgsRectangle& siteBox);
   bool isFree(const QgsPointXY& point) const;
   bool fits(const QgsPointXY& point, double badgeDiameterMm) const;
   quint64 cellKey(qint64 cx, qint64 cy) const;

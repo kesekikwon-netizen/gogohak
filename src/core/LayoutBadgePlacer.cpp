@@ -4,13 +4,16 @@
 #include <QList>
 #include <QRectF>
 
+#include <qgsgeometryengine.h>
 #include <qgslayout.h>
 #include <qgslayoutitemlegend.h>
 #include <qgslayoutitemmap.h>
 
 #include <algorithm>
 #include <cmath>
+#include <memory>
 #include <numeric>
+#include <vector>
 
 namespace {
 constexpr double kPi = 3.14159265358979323846;
@@ -74,15 +77,36 @@ void LayoutBadgePlacer::occupy(const QgsPointXY& point) {
 }
 
 QgsPointXY LayoutBadgePlacer::place(const QgsPointXY& origin, double badgeDiameterMm) {
+  return place(origin, badgeDiameterMm, nullptr, QgsRectangle());
+}
+
+QgsPointXY LayoutBadgePlacer::place(const QgsPointXY& origin, double badgeDiameterMm, const QgsGeometryEngine* site,
+                                    const QgsRectangle& siteBox) {
   QgsPointXY chosen = origin;
   bool found = false;
   bool haveFree = false;
   QgsPointXY firstFree;
+  // With a site area, the nearest free slot off the site is only kept until a
+  // free slot inside the site turns up.
+  bool haveOutside = false;
+  QgsPointXY nearestOutside;
+  auto inside = [&](const QgsPointXY& candidate) {
+    if (!siteBox.contains(candidate)) return false;
+    const QgsPoint point(candidate);
+    return site->intersects(&point);
+  };
   auto consider = [&](const QgsPointXY& candidate) {
     if (!isFree(candidate)) return false;
     if (fits(candidate, badgeDiameterMm)) {
-      chosen = candidate;
-      return true;
+      if (!site || inside(candidate)) {
+        chosen = candidate;
+        return true;
+      }
+      if (!haveOutside) {
+        haveOutside = true;
+        nearestOutside = candidate;
+      }
+      return false;
     }
     if (!haveFree) {
       haveFree = true;
@@ -95,8 +119,18 @@ QgsPointXY LayoutBadgePlacer::place(const QgsPointXY& origin, double badgeDiamet
   // holds about 2*pi*n spots, so this many rings always has a free slot. On a
   // limited paper the search also reaches across it, so a badge whose site is
   // under a legend card wider than the base rings still gets clear of it.
-  const int rings = std::min(kMaxRings, std::max(kBaseRings + m_count, m_reachRings));
+  int rings = std::min(kMaxRings, std::max(kBaseRings + m_count, m_reachRings));
+  // Distance to the far corner of the site area.
+  const double siteReach = site ? std::hypot(std::max(std::abs(siteBox.xMinimum() - origin.x()),
+                                                      std::abs(siteBox.xMaximum() - origin.x())),
+                                             std::max(std::abs(siteBox.yMinimum() - origin.y()),
+                                                      std::abs(siteBox.yMaximum() - origin.y())))
+                                : 0.0;
+  if (site) rings = std::min(kMaxRings, std::max(rings, static_cast<int>(std::ceil(siteReach / m_step))));
   for (int ring = 1; !found && ring <= rings; ++ring) {
+    // Off-site slots are only worth taking near the site; stop once the rings
+    // pass the site area with an off-site slot in hand.
+    if (site && haveOutside && m_step * ring > siteReach) break;
     const int count = slotsOnRing(ring);
     const double radius = m_step * ring;
     for (int slot = 0; slot < count && !found; ++slot) {
@@ -104,6 +138,10 @@ QgsPointXY LayoutBadgePlacer::place(const QgsPointXY& origin, double badgeDiamet
       found = consider(QgsPointXY(origin.x() + std::cos(angle) * radius,
                                   origin.y() + std::sin(angle) * radius));
     }
+  }
+  if (!found && haveOutside) {
+    chosen = nearestOutside;
+    found = true;
   }
   // No slot is both clear and fully on the paper: keep the circles apart
   // (overlap is never allowed) at the nearest clear slot.
@@ -114,9 +152,31 @@ QgsPointXY LayoutBadgePlacer::place(const QgsPointXY& origin, double badgeDiamet
 }
 
 QVector<QgsPointXY> LayoutBadgePlacer::placeAll(const QVector<QgsPointXY>& origins,
-                                                const QVector<double>& badgeDiametersMm) {
+                                                const QVector<double>& badgeDiametersMm,
+                                                const QVector<QgsGeometry>& siteAreas) {
   const int n = origins.size();
   QVector<QgsPointXY> placed(n);
+  // Prepared site areas (polygons only); points and lines keep the ring search.
+  std::vector<std::unique_ptr<QgsGeometryEngine>> engines(n);
+  QVector<QgsRectangle> boxes(n);
+  QVector<double> areas(n, 0.0);
+  for (int i = 0; i < n && i < siteAreas.size(); ++i) {
+    const QgsGeometry& area = siteAreas.at(i);
+    if (area.isEmpty() || area.type() != Qgis::GeometryType::Polygon) continue;
+    engines[i].reset(QgsGeometry::createGeometryEngine(area.constGet()));
+    engines[i]->prepareGeometry();
+    boxes[i] = area.boundingBox();
+    areas[i] = area.area();
+  }
+  auto placeOne = [&](int i) { return place(origins.at(i), badgeDiametersMm.value(i), engines[i].get(), boxes.at(i)); };
+  // Line length to a slot: none inside the badge's own area.
+  auto cost = [&](int i, const QgsPointXY& at) {
+    if (engines[i] && boxes.at(i).contains(at)) {
+      const QgsPoint point(at);
+      if (engines[i]->intersects(&point)) return 0.0;
+    }
+    return origins.at(i).distance(at);
+  };
   // Crowds: sites chained closer than the clear distance (union-find over step cells).
   QVector<int> root(n);
   std::iota(root.begin(), root.end(), 0);
@@ -141,9 +201,17 @@ QVector<QgsPointXY> LayoutBadgePlacer::placeAll(const QVector<QgsPointXY>& origi
   // Lone sites first, so no crowd takes a site's own place; then the crowded
   // ones in number order, each on its site or the nearest free slot around it.
   for (int i = 0; i < n; ++i)
-    if (crowds.at(find(i)).size() == 1) placed[i] = place(origins.at(i), badgeDiametersMm.value(i));
+    if (crowds.at(find(i)).size() == 1) placed[i] = placeOne(i);
+  // Small areas have the fewest slots on their site, so they choose first.
+  QVector<int> crowded;
   for (int i = 0; i < n; ++i)
-    if (crowds.at(find(i)).size() > 1) placed[i] = place(origins.at(i), badgeDiametersMm.value(i));
+    if (crowds.at(find(i)).size() > 1) crowded.append(i);
+  std::stable_sort(crowded.begin(), crowded.end(), [&](int a, int b) {
+    const bool aArea = engines[a] != nullptr, bArea = engines[b] != nullptr;
+    if (aArea != bArea) return !aArea;
+    return aArea && areas.at(a) < areas.at(b);
+  });
+  for (int i : crowded) placed[i] = placeOne(i);
   // Two badges trade places whenever that shortens their leader lines. Crossing
   // lines always get shorter by trading, so none stay crossed; a badge on its
   // own site never gains from a trade, so it stays there.
@@ -152,9 +220,9 @@ QVector<QgsPointXY> LayoutBadgePlacer::placeAll(const QVector<QgsPointXY>& origi
     traded = false;
     for (int a = 0; a < n; ++a) {
       for (int b = a + 1; b < n; ++b) {
-        const double now = origins.at(a).distance(placed.at(a)) + origins.at(b).distance(placed.at(b));
+        const double now = cost(a, placed.at(a)) + cost(b, placed.at(b));
         if (now <= m_step * 1e-6) continue;
-        const double then = origins.at(a).distance(placed.at(b)) + origins.at(b).distance(placed.at(a));
+        const double then = cost(a, placed.at(b)) + cost(b, placed.at(a));
         if (then >= now - m_step * 1e-6) continue;
         if (!fits(placed.at(b), badgeDiametersMm.value(a)) || !fits(placed.at(a), badgeDiametersMm.value(b))) continue;
         std::swap(placed[a], placed[b]);

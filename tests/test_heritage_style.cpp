@@ -927,6 +927,43 @@ private slots:
     QCOMPARE(offset, 3);
   }
 
+  void layoutNumbersSitInsideTheirOwnAreaWithoutLeaderLines() {
+    // 같은 면을 덮는 유적 네 개: 번호는 면 안 빈자리에 붙고 지시선이 없다(2026-10-19 현장 요청).
+    QgsProject project;
+    auto* layer = makeLayer({QStringLiteral("가"), QStringLiteral("나"), QStringLiteral("다"), QStringLiteral("라")});
+    QVERIFY(layer->startEditing());
+    const QgsRectangle zone(190000., 550000., 190400., 550060.);
+    QgsFeatureIterator it = layer->getFeatures();
+    QgsFeature f;
+    while (it.nextFeature(f)) {
+      QgsGeometry same = QgsGeometry::fromRect(zone);
+      QVERIFY(layer->changeGeometry(f.id(), same));
+    }
+    QVERIFY(layer->commitChanges());
+    HeritageStyle::apply(layer, HeritageDataset::BuriedHeritageArea, QStringLiteral("nm"));
+    LayerOps::markReferenceLayer(layer);
+    project.addMapLayer(layer, false);
+    project.layerTreeRoot()->addGroup(QStringLiteral("참조 지도"))
+        ->addGroup(HeritageStyle::layerName(HeritageDataset::BuriedHeritageArea))->addLayer(layer);
+    QgsPrintLayout layout(&project);
+    auto* map = makeLayoutMap(layout, {layer}, QgsRectangle(189500., 549500., 190900., 550900.));
+    HeritageLayoutNumbers numbers;
+    QVERIFY2(numbers.update(map, true), qPrintable(numbers.error()));
+    QCOMPARE(numbers.entries().size(), 4);
+    const QgsGeometry area = QgsGeometry::fromRect(zone);
+    QgsFeature pin;
+    auto pins = numbers.numberLayer()->getFeatures();
+    int count = 0;
+    while (pins.nextFeature(pin)) {
+      const QgsPointXY at = pin.geometry().asPoint();
+      QVERIFY2(area.contains(&at), qPrintable(at.toString()));
+      QVERIFY(at.distance(QgsPointXY(pin.attribute(QStringLiteral("ox")).toDouble(),
+                                     pin.attribute(QStringLiteral("oy")).toDouble())) <= 0.5);
+      ++count;
+    }
+    QCOMPARE(count, 4);
+  }
+
   void layoutNumbersKeepDenseClusterOnShortRings() {
     QgsProject project;
     auto* layer = new QgsVectorLayer(

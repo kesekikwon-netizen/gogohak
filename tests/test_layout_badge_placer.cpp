@@ -5,6 +5,7 @@
 
 #include <cmath>
 
+#include <qgsgeometry.h>
 #include <qgspointxy.h>
 
 #include "core/LayoutBadgePlacer.h"
@@ -149,6 +150,19 @@ private slots:
                    qPrintable(QStringLiteral("round %1: leader lines %2 and %3 cross").arg(round).arg(i).arg(j)));
       }
     }
+  }
+
+  void crowdedBadgesSitInsideTheirOwnAreaFirst() {
+    // 같은 자리에 몰린 유적 여덟 개가 동쪽으로 긴 띠 모양 면을 함께 덮는다. 번호는
+    // 둘레로 흩어지지 않고 제 면 안 빈자리에 앉는다(2026-10-19 현장 요청).
+    LayoutBadgePlacer placer(QTransform(), QPainterPath(), kStep);
+    const QVector<QgsPointXY> sites(8, QgsPointXY(100., 100.));
+    const QgsGeometry strip = QgsGeometry::fromRect(QgsRectangle(95., 95., 200., 105.));
+    const QVector<QgsPointXY> placed =
+        placer.placeAll(sites, QVector<double>(sites.size(), kBadgeMm), QVector<QgsGeometry>(sites.size(), strip));
+    for (const QgsPointXY& at : placed)
+      QVERIFY2(strip.contains(&at), qPrintable(at.toString()));
+    verifyClear(placed, kStep);
   }
 
   void loneSiteNextToACrowdKeepsItsOwnSite() {

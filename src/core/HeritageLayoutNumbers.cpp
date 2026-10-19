@@ -240,6 +240,8 @@ struct Site {
   double originY = 0.;
   int index = 0;
   int originalIndex = -1;
+  QVector<QgsGeometry> pieces;  // On-paper polygon parts, layer CRS.
+  QgsGeometry area;              // Their union in map CRS: the badge may sit anywhere on it.
   QColor color;
   std::shared_ptr<QgsSymbol> symbol;
 };
@@ -687,6 +689,7 @@ bool HeritageLayoutNumbers::update(QgsLayoutItemMap* map, bool force) {
   m_error.clear();
   QVector<Entry> entries;
   QVector<NumberPin> pins;
+  QVector<QgsGeometry> pinAreas;
   QMap<QString, QString> overrides = map->layerStyleOverrides();
   // Remove our previous styles when a heritage layer is hidden or removed.
   for (auto it = m_drawingSources.cbegin(); it != m_drawingSources.cend(); ++it)
@@ -818,6 +821,7 @@ bool HeritageLayoutNumbers::update(QgsLayoutItemMap* map, bool force) {
         }
         const QString id = QString::number(feature.id());
         site.ids.append(id);
+        if (clipped.type() == Qgis::GeometryType::Polygon) site.pieces.append(clipped);
         site.values.append(QVariant::fromValue(feature.id()));
         const double weight = std::max({clipped.area(), clipped.length(), 1.});
         if (weight > site.labelWeight) {
@@ -841,7 +845,12 @@ bool HeritageLayoutNumbers::update(QgsLayoutItemMap* map, bool force) {
           const QgsPointXY origin = toMap.transform(QgsPointXY(it->labelX, it->labelY));
           it->originX = origin.x();
           it->originY = origin.y();
+          if (!it->pieces.isEmpty()) {
+            it->area = QgsGeometry::unaryUnion(it->pieces);
+            it->area.transform(toMap);
+          }
         } catch (const QgsCsException&) {
+          it->area = QgsGeometry();
         }
       }
     }
@@ -901,6 +910,7 @@ bool HeritageLayoutNumbers::update(QgsLayoutItemMap* map, bool force) {
       pins.append(NumberPin{site.originX, site.originY, site.originX, site.originY, circleSize(number),
                             number, site.labelId.toLongLong(), site.name, layer->id(),
                             site.color.name(QColor::HexArgb), inkFor(site.color).name()});
+      pinAreas.append(site.area);
       if (single) fallbackCategories.append(QgsRendererCategory(site.values, site.symbol->clone(), site.name));
     }
     if (single && !sites.isEmpty() && sites.first().symbol) {
@@ -954,10 +964,18 @@ bool HeritageLayoutNumbers::update(QgsLayoutItemMap* map, bool force) {
       invertible ? LayoutBadgePlacer::withoutBlocks(visibleMapOnPaper(map, m_exporting), legendBlocks)
                  : QPainterPath(),
       ((widestMm + kNumberGapMm) / 1000.0) * (map->scale() > 0. ? map->scale() : 5000.));
-  const QVector<QgsPointXY> placed = placer.placeAll(origins, sizes);
+  const QVector<QgsPointXY> placed = placer.placeAll(origins, sizes, pinAreas);
   for (int i = 0; i < pins.size(); ++i) {
     pins[i].x = placed.at(i).x();
     pins[i].y = placed.at(i).y();
+    // On its own area the badge needs no leader line; off it, the line runs
+    // to the nearest edge of the area, not to a point deep inside.
+    const QgsGeometry& area = pinAreas.at(i);
+    if (area.isEmpty()) continue;
+    const QgsGeometry at = QgsGeometry::fromPointXY(placed.at(i));
+    const QgsPointXY anchor = area.intersects(at) ? placed.at(i) : area.nearestPoint(at).asPoint();
+    pins[i].originX = anchor.x();
+    pins[i].originY = anchor.y();
   }
   m_entries = std::move(entries);
   m_overrides = std::move(overrides);
