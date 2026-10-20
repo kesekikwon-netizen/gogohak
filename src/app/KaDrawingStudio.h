@@ -86,7 +86,8 @@ public:
   bool isMapAdjusting() const { return m_adjustingMap; }
   // Coordinate grid (crosses and border ruler). Off by default; once turned on
   // it is stored on the sheet so reopening and PDF export keep it.
-  void setGridOptions(bool enabled, double intervalM, bool showNumbers);
+  // followMap: the map's coordinate grid (same step and nodes) instead of an interval of its own.
+  void setGridOptions(bool enabled, double intervalM, bool showNumbers, bool followMap = false);
   bool eventFilter(QObject* watched, QEvent* event) override;
 
 public slots:
@@ -233,6 +234,7 @@ private:
   bool m_gridEnabled = false;
   bool m_gridShowNums = false;
   double m_gridIntervalM = 0.0;
+  bool m_gridFollowMap = false;  // 지도 좌표격자와 같게 (사용자 요청 2026-10-20)
   QToolButton* m_gridBtn = nullptr;
   QToolButton* m_legendTile = nullptr;
   QToolButton* m_titleTile = nullptr;

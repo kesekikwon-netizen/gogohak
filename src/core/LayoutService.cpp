@@ -749,6 +749,20 @@ void LayoutService::applySheetScaleBarInk(QgsLayoutItemScaleBar* sb) {
   sb->setBackgroundColor(QColor(paper));
 }
 
+void LayoutService::applyMapCoordinateGrid(QgsLayoutItemMap* map, double stepM, double originX, double originY,
+                                          bool showCoords) {
+  if (!map || !(stepM > 0.0) || !std::isfinite(originX) || !std::isfinite(originY)) return;
+  applySurveyFrameGrid(map, stepM, true, showCoords);
+  const QList<QgsLayoutItemMapGrid*> grids = map->grids()->asList();
+  if (grids.isEmpty() || !grids.front()) return;
+  QgsLayoutItemMapGrid* g = grids.front();
+  // Lines through the map grid's nodes: QGIS grids start at a multiple of the interval plus the offset.
+  const auto offset = [stepM](double origin) { return origin - std::floor(origin / stepM) * stepM; };
+  g->setOffsetX(offset(originX));
+  g->setOffsetY(offset(originY));
+  g->setStyle(Qgis::MapGridStyle::Lines);  // full lines, as on the map
+}
+
 double LayoutService::niceGridIntervalMeters(double scaleDenominator, double mapWidthMm) {
   if (!(scaleDenominator > 0.0) || !std::isfinite(scaleDenominator))
     return 100.0;

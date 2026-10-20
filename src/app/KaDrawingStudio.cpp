@@ -1,5 +1,6 @@
 #include "KaDrawingStudio.h"
 #include "KaWindowSize.h"
+#include "KaCanvasGridOverlay.h"
 #include "core/KaLogExcept.h"
 #include "KaLayerInformation.h"
 #include <QDomDocument>
@@ -1417,6 +1418,20 @@ void KaDrawingStudio::applyImportedCoordCallouts() {
     showStatus(QStringLiteral("맵에서 찍은 좌표점 %1개를 도면에 올렸습니다.").arg(pts.size()));
 }
 
+namespace {
+// The map's metre coordinate grid when it is on and north-up (a turned grid cannot go on a sheet grid).
+const KaCanvasGridOverlay* northUpMapGrid(QgsMapCanvas* canvas) {
+  if (!canvas) return nullptr;
+  for (QGraphicsItem* item : canvas->items()) {
+    const auto* grid = dynamic_cast<const KaCanvasGridOverlay*>(item);
+    if (grid && grid->isEnabled() && grid->config().type == KaCanvasGridOverlay::Type::ProjectedMeters &&
+        std::abs(std::remainder(grid->config().rotationDeg, 360.0)) < 1e-9)
+      return grid;
+  }
+  return nullptr;
+}
+}  // namespace
+
 void KaDrawingStudio::focusGridSettings() {
   QDialog dlg(this);
   dlg.setWindowTitle(QStringLiteral("격자 설정"));
@@ -1437,8 +1452,19 @@ void KaDrawingStudio::focusGridSettings() {
   step->setSpecialValueText(QStringLiteral("자동(축척에 맞춤)"));
   step->setValue(m_gridIntervalM);
   step->setKeyboardTracking(false);
-  auto apply = [this, on, nums, step]() {
-    setGridOptions(on->isChecked(), step->value(), nums->isChecked());
+  // 지도 좌표격자와 같게 (사용자 요청 2026-10-20): the grid the 시굴격자 is laid on, on the sheet too.
+  const KaCanvasGridOverlay* mapGrid = northUpMapGrid(m_mapCanvas);
+  auto* follow = new QCheckBox(mapGrid ? QStringLiteral("지도 좌표격자와 같게 (%1 m)").arg(mapGrid->stepMeters(), 0, 'g', 6)
+                                       : QStringLiteral("지도 좌표격자와 같게"), &dlg);
+  follow->setObjectName(QStringLiteral("gridFollowMap"));
+  follow->setEnabled(mapGrid != nullptr);
+  follow->setChecked(m_gridFollowMap && mapGrid != nullptr);
+  follow->setToolTip(mapGrid ? QStringLiteral("지도 화면의 좌표격자와 같은 간격·같은 선으로 도면에 격자선을 긋습니다.")
+                             : QStringLiteral("지도에 미터 좌표격자를 켜면 쓸 수 있습니다(회전한 격자는 안 됩니다)."));
+  step->setEnabled(!follow->isChecked());
+  auto apply = [this, on, nums, step, follow]() {
+    step->setEnabled(!follow->isChecked());
+    setGridOptions(on->isChecked(), step->value(), nums->isChecked(), follow->isChecked());
     if (m_status)
       showStatus(!m_gridEnabled ? QStringLiteral("좌표 격자를 껐습니다.")
                  : m_gridIntervalM > 0.0
@@ -1447,6 +1473,7 @@ void KaDrawingStudio::focusGridSettings() {
   };
   connect(on, &QCheckBox::toggled, &dlg, [apply](bool) { apply(); });
   connect(nums, &QCheckBox::toggled, &dlg, [apply](bool) { apply(); });
+  connect(follow, &QCheckBox::toggled, &dlg, [apply](bool) { apply(); });
   connect(step, QOverload<double>::of(&QDoubleSpinBox::valueChanged), &dlg,
           [apply](double) { apply(); });
   connect(step, &QDoubleSpinBox::editingFinished, &dlg, [apply]() { apply(); });
@@ -1455,6 +1482,7 @@ void KaDrawingStudio::focusGridSettings() {
   stepRow->addWidget(new QLabel(QStringLiteral("간격"), &dlg));
   stepRow->addWidget(step, 1);
   root->addLayout(stepRow);
+  root->addWidget(follow);
   root->addWidget(nums);
   auto* box = new QDialogButtonBox(QDialogButtonBox::Close, &dlg);
   box->button(QDialogButtonBox::Close)->setText(QStringLiteral("닫기"));
@@ -1468,12 +1496,14 @@ namespace {
 const QString kGridEnabledProperty = QStringLiteral("ka_hgis/grid_enabled");
 const QString kGridIntervalProperty = QStringLiteral("ka_hgis/grid_interval_m");
 const QString kGridNumbersProperty = QStringLiteral("ka_hgis/grid_numbers");
+const QString kGridFollowMapProperty = QStringLiteral("ka_hgis/grid_follow_map");
 }  // namespace
 
-void KaDrawingStudio::setGridOptions(bool enabled, double intervalM, bool showNumbers) {
-  const bool changed = enabled != m_gridEnabled || showNumbers != m_gridShowNums ||
+void KaDrawingStudio::setGridOptions(bool enabled, double intervalM, bool showNumbers, bool followMap) {
+  const bool changed = enabled != m_gridEnabled || showNumbers != m_gridShowNums || followMap != m_gridFollowMap ||
                        std::abs(intervalM - m_gridIntervalM) > 1e-9;
   m_gridEnabled = enabled;
+  m_gridFollowMap = followMap;
   m_gridShowNums = showNumbers;
   m_gridIntervalM = std::max(0.0, intervalM);
   // Remember the choice on the sheet so reopening or exporting keeps it.
@@ -1481,6 +1511,7 @@ void KaDrawingStudio::setGridOptions(bool enabled, double intervalM, bool showNu
     ly->setCustomProperty(kGridEnabledProperty, m_gridEnabled);
     ly->setCustomProperty(kGridIntervalProperty, m_gridIntervalM);
     ly->setCustomProperty(kGridNumbersProperty, m_gridShowNums);
+    ly->setCustomProperty(kGridFollowMapProperty, m_gridFollowMap);
   }
   if (auto* map = mapItem())
     applyCrsGrid(map);
@@ -1497,6 +1528,7 @@ void KaDrawingStudio::loadGridSettings() {
   m_gridEnabled = ly && ly->customProperty(kGridEnabledProperty, false).toBool();
   m_gridShowNums = ly && ly->customProperty(kGridNumbersProperty, false).toBool();
   m_gridIntervalM = ly ? std::max(0.0, ly->customProperty(kGridIntervalProperty, 0.0).toDouble()) : 0.0;
+  m_gridFollowMap = ly && ly->customProperty(kGridFollowMapProperty, false).toBool();
   syncGridButton();
 }
 
@@ -1956,7 +1988,12 @@ void KaDrawingStudio::applyCrsGrid(QgsLayoutItemMap* map) {
                              : (m_scaleSpin ? static_cast<double>(m_scaleSpin->value()) : 1000.0);
     interval = LayoutService::niceGridIntervalMeters(denom, mapWmm);
   }
-  LayoutService::applySurveyFrameGrid(map, interval, true, m_gridShowNums);
+  const KaCanvasGridOverlay* mapGrid = m_gridFollowMap ? northUpMapGrid(m_mapCanvas) : nullptr;
+  if (mapGrid)
+    LayoutService::applyMapCoordinateGrid(map, mapGrid->stepMeters(), mapGrid->config().originX,
+                                          mapGrid->config().originY, m_gridShowNums);
+  else
+    LayoutService::applySurveyFrameGrid(map, interval, true, m_gridShowNums);
   map->invalidateCache();
   map->refresh();
   map->update();

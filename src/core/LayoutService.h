@@ -154,6 +154,11 @@ public:
   // crosses=false면 내부 눈금 없이 도곽·주기만 그린다(위치도처럼 배경이 촘촘할 때).
   static void applySurveyFrameGrid(QgsLayoutItemMap* map, double intervalM, bool crosses,
                                    bool showCoords);
+  // 지도 좌표격자를 도면에 (사용자 요청 2026-10-20): the same 도곽 frame and numbers, but the grid of the
+  // map's coordinate grid (KaCanvasGridOverlay, the one the 시굴격자 is laid on): stepM apart through the
+  // node (originX, originY), drawn as full thin lines. North-up grids only.
+  static void applyMapCoordinateGrid(QgsLayoutItemMap* map, double stepM, double originX, double originY,
+                                     bool showCoords);
   // 도곽 격자 간격(m): 종이에서 한 칸이 25~70mm가 되는 1-2-5 계열 값.
   static double niceGridIntervalMeters(double scaleDenominator, double mapWidthMm);
   // 좌표계 한글 원점명(중부원점(GRS80) 등). 표제란·도면 라벨 공용.
