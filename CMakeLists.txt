@@ -1836,6 +1836,7 @@ if(KA_HGIS_BUILD_TESTS)
     drawingStudio_fieldPageGrowsA4LandscapeByOneCentimetre
     drawingStudio_heritageRefreshRequestsCoalesceAndReuseOnRevisit
     drawingStudioAboveLabelsMapDrawsGeometryWithoutDuplicateNumberLabels
+    drawingStudio_centerLayerMovesAboveLabelsMapToo
     drawingStudio_largeScaleChipsApplyToMapAndInput
     drawingInspectorUsesHeightWithoutOverlapping
     drawingStudioPrintSplitsTheDrawingIntoSheets

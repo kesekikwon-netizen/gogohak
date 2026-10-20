@@ -2535,6 +2535,74 @@ private slots:
     }
   }
 
+  // 「레이어를 가운데」는 축척을 그대로 둔 채 옮긴다. 주변유적 덧지도도 같이 옮겨야
+  // 조사구역만 가운데로 오고 유적은 옛 자리에 남는 일이 없다.
+  void drawingStudio_centerLayerMovesAboveLabelsMapToo() {
+    QgsProject project;
+    project.setCrs(QgsCoordinateReferenceSystem(QStringLiteral("EPSG:5187")));
+    auto* references = project.layerTreeRoot()->addGroup(QStringLiteral("참조 지도"));
+    auto* heritage = new QgsVectorLayer(QStringLiteral("Polygon?crs=EPSG:5187&field=nm:string(80)"),
+        QStringLiteral("합성 유적"), QStringLiteral("memory"));
+    QVERIFY(heritage->isValid());
+    QVERIFY(heritage->startEditing());
+    QgsFeature site(heritage->fields());
+    site.setAttribute(QStringLiteral("nm"), QStringLiteral("합성 유적명"));
+    site.setGeometry(QgsGeometry::fromRect(QgsRectangle(190020., 560020., 190140., 560140.)));
+    QVERIFY(heritage->addFeature(site));
+    QVERIFY(heritage->commitChanges());
+    QVERIFY(HeritageStyle::apply(heritage, HeritageDataset::DesignatedHeritage, QStringLiteral("nm")).ok);
+    QVERIFY(LayerOps::applyNameAttributeLabels(heritage, QStringLiteral("nm"), 5., false));
+    LayerOps::markReferenceLayer(heritage);
+    project.addMapLayer(heritage, false);
+    references->addGroup(HeritageStyle::layerName(HeritageDataset::DesignatedHeritage))->addLayer(heritage);
+    // 조사구역은 지도 화면 한쪽 끝에 있어 「레이어를 가운데」가 지도를 옮기게 한다.
+    auto* survey = new QgsVectorLayer(QStringLiteral("Polygon?crs=EPSG:5187"),
+        QStringLiteral("조사구역"), QStringLiteral("memory"));
+    QVERIFY(survey->isValid());
+    QVERIFY(survey->startEditing());
+    QgsFeature area(survey->fields());
+    area.setGeometry(QgsGeometry::fromRect(QgsRectangle(190200., 560200., 190240., 560240.)));
+    QVERIFY(survey->addFeature(area));
+    QVERIFY(survey->commitChanges());
+    survey->setCustomProperty(QStringLiteral("ka_hgis/layer_key"), QStringLiteral("survey_area"));
+    project.addMapLayer(survey);
+    LayerOps::applyLayerOrderToLabels(&project, nullptr);
+    QVERIFY(LayerOps::layersDrawnAboveLabels(&project).contains(heritage));
+
+    QgsMapCanvas canvas;
+    canvas.setRenderFlag(false);
+    canvas.setDestinationCrs(project.crs());
+    canvas.setLayers({survey, heritage});
+    canvas.setExtent(QgsRectangle(189950., 559950., 190250., 560250.));
+    KaDrawingStudio studio(&project, &canvas, 297., 210.);
+    studio.setAttribute(Qt::WA_DontShowOnScreen);
+    studio.show();
+    auto* view = studio.findChild<QgsLayoutView*>();
+    QVERIFY(view && view->currentLayout());
+    auto* layout = view->currentLayout();
+    QTRY_VERIFY_WITH_TIMEOUT(layout->itemById(QStringLiteral("ka_map")), 5000);
+    auto* base = dynamic_cast<QgsLayoutItemMap*>(layout->itemById(QStringLiteral("ka_map")));
+    QVERIFY(base);
+    // 축척 글자는 지도 칸을 다 차린 뒤에 붙는다. 사용자가 단추를 누를 때와 같은 상태.
+    QTRY_VERIFY_WITH_TIMEOUT(layout->itemById(QStringLiteral("ka_scale")), 5000);
+    auto* overlay = dynamic_cast<QgsLayoutItemMap*>(layout->itemById(QStringLiteral("ka_map_above")));
+    QVERIFY(overlay);
+    QTRY_VERIFY_WITH_TIMEOUT(overlay->extent().center().compare(base->extent().center(), 0.5), 5000);
+    const QgsPointXY before = base->extent().center();
+    const double scaleBefore = base->scale();
+
+    studio.centerSurveyInMap();
+
+    QVERIFY2(base->extent().center().distance(before) > 50., "본지도가 조사구역 쪽으로 옮겨져야 한다");
+    QCOMPARE(qRound(base->scale()), qRound(scaleBefore));
+    // 축척이 그대로여도 덧지도는 바로 따라와야 한다(자동 축척을 눌러야 맞던 버그).
+    QVERIFY2(overlay->extent().center().compare(base->extent().center(), 0.5),
+             qPrintable(QStringLiteral("덧지도 중심 %1 / 본지도 중심 %2")
+                            .arg(overlay->extent().center().toString(1),
+                                 base->extent().center().toString(1))));
+    QCOMPARE(overlay->scale(), base->scale());
+  }
+
   void drawingStudio_largeScaleChipsApplyToMapAndInput() {
     QgsProject project;
     project.setCrs(QgsCoordinateReferenceSystem(QStringLiteral("EPSG:5187")));

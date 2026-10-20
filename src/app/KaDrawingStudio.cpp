@@ -2875,8 +2875,13 @@ void KaDrawingStudio::syncScaleDecorations() {
     }
   }
   syncScaleChips();
-  // 같은 축척으로 다시 맞추면 번호·범례를 다시 만들지 않는다.
-  if (m_scaleSyncTimer && scaleChanged)
+  // 축척은 그대로 두고 지도만 옮겨도(레이어를 가운데, 지도 조정) 주변유적 덧지도가
+  // 바로 따라와야 한다. 예전에는 축척이 바뀔 때만 맞춰 유적이 옛 자리에 남았다.
+  const QByteArray aboveBefore = m_aboveMapDigest;
+  syncAboveLabelsMap(map);
+  const bool moved = m_aboveMapDigest != aboveBefore;
+  // 같은 축척·같은 자리로 다시 맞추면 번호·범례를 다시 만들지 않는다.
+  if (m_scaleSyncTimer && (scaleChanged || moved))
     m_scaleSyncTimer->start();
 }
 
