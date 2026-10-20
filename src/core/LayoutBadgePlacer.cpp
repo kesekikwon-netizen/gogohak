@@ -29,8 +29,9 @@ LayoutBadgePlacer::LayoutBadgePlacer(const QTransform& mapToScene, const QPainte
       m_allowed(allowedScene),
       m_limited(!allowedScene.isEmpty()),
       m_step(std::isfinite(stepMapUnits) && stepMapUnits > 0.0 ? stepMapUnits : 1.0) {
-  if (!m_limited) return;
   const double stepMm = QLineF(m_toScene.map(QPointF(0.0, 0.0)), m_toScene.map(QPointF(m_step, 0.0))).length();
+  if (stepMm > 1e-9) m_unitsPerMm = m_step / stepMm;
+  if (!m_limited) return;
   const QRectF box = m_allowed.boundingRect();
   const double reachMm = std::hypot(box.width(), box.height());
   if (stepMm > 1e-9 && std::isfinite(reachMm))
@@ -47,7 +48,18 @@ quint64 LayoutBadgePlacer::cellKey(qint64 cx, qint64 cy) const {
   return (quint64(quint32(qint32(cx))) << 32) | quint64(quint32(qint32(cy)));
 }
 
+QRectF LayoutBadgePlacer::boxAt(const QgsPointXY& point) const {
+  const QSizeF box = m_boxesMm.value(m_current) * m_unitsPerMm;
+  return QRectF(point.x() - box.width() * 0.5, point.y() - box.height() * 0.5, box.width(), box.height());
+}
+
 bool LayoutBadgePlacer::isFree(const QgsPointXY& point) const {
+  if (!m_boxesMm.isEmpty()) {
+    const QRectF box = boxAt(point);
+    for (const QRectF& other : m_placedBoxes)
+      if (box.intersects(other)) return false;
+    return true;
+  }
   const qint64 cx = qint64(std::floor(point.x() / m_step));
   const qint64 cy = qint64(std::floor(point.y() / m_step));
   const double clear = m_step * kClearShare;
@@ -65,6 +77,11 @@ bool LayoutBadgePlacer::isFree(const QgsPointXY& point) const {
 bool LayoutBadgePlacer::fits(const QgsPointXY& point, double badgeDiameterMm) const {
   if (!m_limited) return true;
   const QPointF centre = m_toScene.map(QPointF(point.x(), point.y()));
+  if (!m_boxesMm.isEmpty()) {
+    const QSizeF box = m_boxesMm.value(m_current);
+    const double w = box.width() * 0.5 + kEdgeMarginMm, h = box.height() * 0.5 + kEdgeMarginMm;
+    return m_allowed.contains(QRectF(centre.x() - w, centre.y() - h, 2.0 * w, 2.0 * h));
+  }
   const double r = std::max(0.5, badgeDiameterMm * 0.5) + kEdgeMarginMm;
   return m_allowed.contains(QRectF(centre.x() - r, centre.y() - r, 2.0 * r, 2.0 * r));
 }
@@ -73,6 +90,7 @@ void LayoutBadgePlacer::occupy(const QgsPointXY& point) {
   const qint64 cx = qint64(std::floor(point.x() / m_step));
   const qint64 cy = qint64(std::floor(point.y() / m_step));
   m_cells[cellKey(cx, cy)].append(point);
+  if (!m_boxesMm.isEmpty()) m_placedBoxes.append(boxAt(point));
   ++m_count;
 }
 
@@ -168,7 +186,10 @@ QVector<QgsPointXY> LayoutBadgePlacer::placeAll(const QVector<QgsPointXY>& origi
     boxes[i] = area.boundingBox();
     areas[i] = area.area();
   }
-  auto placeOne = [&](int i) { return place(origins.at(i), badgeDiametersMm.value(i), engines[i].get(), boxes.at(i)); };
+  auto placeOne = [&](int i) {
+    m_current = i;
+    return place(origins.at(i), badgeDiametersMm.value(i), engines[i].get(), boxes.at(i));
+  };
   // Line length to a slot: none inside the badge's own area.
   auto cost = [&](int i, const QgsPointXY& at) {
     if (engines[i] && boxes.at(i).contains(at)) {
@@ -215,7 +236,8 @@ QVector<QgsPointXY> LayoutBadgePlacer::placeAll(const QVector<QgsPointXY>& origi
   // Two badges trade places whenever that shortens their leader lines. Crossing
   // lines always get shorter by trading, so none stay crossed; a badge on its
   // own site never gains from a trade, so it stays there.
-  bool traded = true;
+  // Name boxes differ in width: a trade could put a long name over a neighbour.
+  bool traded = m_boxesMm.isEmpty();
   for (int pass = 0; traded && pass < kMaxRings; ++pass) {
     traded = false;
     for (int a = 0; a < n; ++a) {
@@ -231,6 +253,15 @@ QVector<QgsPointXY> LayoutBadgePlacer::placeAll(const QVector<QgsPointXY>& origi
     }
   }
   return placed;
+}
+
+QVector<QgsPointXY> LayoutBadgePlacer::placeAllBoxes(const QVector<QgsPointXY>& origins,
+                                                     const QVector<QSizeF>& boxesMm,
+                                                     const QVector<QgsGeometry>& siteAreas) {
+  m_boxesMm = boxesMm;
+  QVector<double> widest;
+  for (const QSizeF& box : boxesMm) widest.append(std::max(box.width(), box.height()));
+  return placeAll(origins, widest, siteAreas);
 }
 
 QVector<QPolygonF> LayoutBadgePlacer::legendBlocks(QgsLayoutItemMap* map, bool exporting) {

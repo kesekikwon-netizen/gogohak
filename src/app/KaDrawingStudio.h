@@ -247,6 +247,7 @@ private:
   QSpinBox* m_legendFont = nullptr;
   QCheckBox* m_legendBold = nullptr;
   QCheckBox* m_legendItalic = nullptr;
+  QCheckBox* m_heritageNames = nullptr;
   QDoubleSpinBox* m_northSize = nullptr;
   QDoubleSpinBox* m_decorationSize = nullptr;
   QSpinBox* m_scaleSpin = nullptr;

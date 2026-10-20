@@ -964,6 +964,80 @@ private slots:
     QCOMPARE(count, 4);
   }
 
+  void layoutNamesReplaceNumbersAtLargeScaleWhenChosen() {
+    // 1:5,000 이하에서 「이름으로 표시」를 고르면 번호 대신 유적 이름을 쓰고, 범례는
+    // 번호 목록 없이 유적 종류만 남긴다. 1:5,000보다 작은 축척은 번호 그대로(2026-10-20).
+    QgsProject project;
+    const QStringList names = {QStringLiteral("경주 가 유물산포지"), QStringLiteral("경주 나 고분군"),
+                               QStringLiteral("경주 다 건물지"), QStringLiteral("경주 라 요지")};
+    auto* layer = makeLayer(names);
+    QVERIFY(layer->startEditing());
+    const QgsRectangle zone(190000., 550000., 190400., 550060.);
+    QgsFeatureIterator it = layer->getFeatures();
+    QgsFeature f;
+    while (it.nextFeature(f)) {
+      QgsGeometry same = QgsGeometry::fromRect(zone);
+      QVERIFY(layer->changeGeometry(f.id(), same));
+    }
+    QVERIFY(layer->commitChanges());
+    HeritageStyle::apply(layer, HeritageDataset::BuriedHeritageArea, QStringLiteral("nm"));
+    LayerOps::markReferenceLayer(layer);
+    project.addMapLayer(layer, false);
+    project.layerTreeRoot()->addGroup(QStringLiteral("참조 지도"))
+        ->addGroup(HeritageStyle::layerName(HeritageDataset::BuriedHeritageArea))->addLayer(layer);
+    QgsPrintLayout layout(&project);
+    auto* map = makeLayoutMap(layout, {layer}, QgsRectangle(189900., 549800., 190500., 550400.));
+    map->setScale(2500.);
+    layout.setCustomProperty(HeritageLayoutNumbers::namesPropertyKey(), true);
+    HeritageLayoutNumbers numbers;
+    QVERIFY2(numbers.update(map, true), qPrintable(numbers.error()));
+    QVERIFY(numbers.showsNames());
+    QCOMPARE(numbers.entries().size(), 4);
+    auto glyphField = [&]() {
+      auto* renderer = dynamic_cast<QgsSingleSymbolRenderer*>(numbers.numberLayer()->renderer());
+      if (!renderer || !renderer->symbol()) return QString();
+      QString field;
+      for (auto* symbolLayer : renderer->symbol()->symbolLayers()) {
+        if (!dynamic_cast<QgsFontMarkerSymbolLayer*>(symbolLayer)) continue;
+        field = symbolLayer->dataDefinedProperties().property(QgsSymbolLayer::Property::Character).field();
+      }
+      return field;
+    };
+    QCOMPARE(glyphField(), QStringLiteral("nm"));
+    // 이름 상자(가로 w, 세로 size mm)는 서로 덮지 않고 모두 유적 면 안에 앉는다.
+    const QgsGeometry area = QgsGeometry::fromRect(zone);
+    QVector<QgsRectangle> boxes;
+    QgsFeature pin;
+    auto pins = numbers.numberLayer()->getFeatures();
+    while (pins.nextFeature(pin)) {
+      const QgsPointXY at = pin.geometry().asPoint();
+      QVERIFY2(area.contains(&at), qPrintable(at.toString()));
+      QVERIFY(names.contains(pin.attribute(QStringLiteral("nm")).toString()));
+      const double w = pin.attribute(QStringLiteral("w")).toDouble() * 2.5;
+      const double h = pin.attribute(QStringLiteral("size")).toDouble() * 2.5;
+      QVERIFY(w > h);
+      boxes.append(QgsRectangle(at.x() - w / 2., at.y() - h / 2., at.x() + w / 2., at.y() + h / 2.));
+    }
+    QCOMPARE(boxes.size(), 4);
+    for (int i = 0; i < boxes.size(); ++i)
+      for (int j = i + 1; j < boxes.size(); ++j)
+        QVERIFY2(!boxes.at(i).intersects(boxes.at(j)), "site names must not cover each other");
+    auto* legend = new QgsLayoutItemLegend(&layout);
+    layout.addLayoutItem(legend);
+    legend->setLinkedMap(map);
+    LayoutService::tuneSheetLegend(legend);
+    numbers.applyLegend(legend);
+    QStringList rows;
+    for (auto* node : legend->model()->rootGroup()->findLayers())
+      rows << nodeLabels(legend->model()->layerLegendNodes(node));
+    QCOMPARE(rows, QStringList{HeritageStyle::layerName(HeritageDataset::BuriedHeritageArea)});
+
+    map->setScale(10000.);
+    QVERIFY2(numbers.update(map), qPrintable(numbers.error()));
+    QVERIFY(!numbers.showsNames());
+    QCOMPARE(glyphField(), QStringLiteral("num"));
+  }
+
   void layoutNumbersKeepDenseClusterOnShortRings() {
     QgsProject project;
     auto* layer = new QgsVectorLayer(

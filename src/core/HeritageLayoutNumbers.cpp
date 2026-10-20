@@ -53,6 +53,8 @@
 #include <qgsvectorlayer.h>
 #include <qgsvectorlayerlabeling.h>
 
+#include <QFont>
+#include <QFontMetricsF>
 #include <QGraphicsItem>
 #include <QMetaType>
 #include <QSet>
@@ -105,6 +107,19 @@ QColor inkFor(const QColor& color) {
 
 double circleSize(int number) {
   return qMax(2.3, 1.0 + QString::number(number).size() * 0.725) * 1.3;
+}
+
+// Site names (1:5,000 and larger, when the sheet asks for names): black text
+// with a white halo, no box. The box is the text plus the halo, in mm.
+constexpr double kNameSizeMm = 2.2;
+constexpr double kNameHaloMm = 0.5;
+
+QSizeF nameBoxMm(const QString& name) {
+  QFont font(QStringLiteral("Malgun Gothic"));
+  font.setPixelSize(1000);
+  const QFontMetricsF metrics(font);
+  return QSizeF(metrics.horizontalAdvance(name) / 1000. * kNameSizeMm + kNameHaloMm,
+                kNameSizeMm * 1.15 + kNameHaloMm);
 }
 
 void prepareLayoutSymbol(QgsSymbol* symbol, HeritageDataset dataset)
@@ -354,6 +369,10 @@ QString HeritageLayoutNumbers::entryKey(const QString& layerId, int number) {
 
 QString HeritageLayoutNumbers::datasetPropertyKey() {
   return QStringLiteral("ka_hgis/heritage_dataset");
+}
+
+QString HeritageLayoutNumbers::namesPropertyKey() {
+  return QStringLiteral("ka_hgis/heritage_names_large_scale");
 }
 
 void HeritageLayoutNumbers::tagDataset(QgsMapLayer* layer, HeritageDataset dataset) {
@@ -608,6 +627,9 @@ bool HeritageLayoutNumbers::update(QgsLayoutItemMap* map, bool force) {
   QgsProject* project = map->layout()->project();
   const auto layers = numberedSourceLayers(map);
   const QgsGeometry nearSurvey = surveyNeighbourhood(project, map->crs());
+  // 표시 축척이 1:5,000이면 QGIS 축척이 5000.3처럼 조금 넘어도 이름을 쓴다.
+  const bool names = map->layout()->customProperty(namesPropertyKey(), false).toBool() && map->scale() > 0. &&
+                     map->scale() < kNamesMaxScale + 0.5;
   QByteArray signature;
   QDataStream stream(&signature, QIODevice::WriteOnly);
   // Round the view so a repeated refresh of the same screen does not miss the
@@ -621,7 +643,7 @@ bool HeritageLayoutNumbers::update(QgsLayoutItemMap* map, bool force) {
          << whole(extent.xMaximum()) << whole(extent.yMaximum())
          << map->crs().authid() << whole(map->scale())
          << whole(paperBox.xMinimum()) << whole(paperBox.yMinimum())
-         << whole(paperBox.xMaximum()) << whole(paperBox.yMaximum());
+         << whole(paperBox.xMaximum()) << whole(paperBox.yMaximum()) << names;
   const QgsRectangle nearBox = nearSurvey.boundingBox();
   stream << nearSurvey.isEmpty() << whole(nearBox.xMinimum()) << whole(nearBox.yMinimum())
          << whole(nearBox.xMaximum()) << whole(nearBox.yMaximum());
@@ -686,6 +708,7 @@ bool HeritageLayoutNumbers::update(QgsLayoutItemMap* map, bool force) {
   const QString digest = QString::fromLatin1(QCryptographicHash::hash(signature, QCryptographicHash::Sha256).toHex());
   if (!force && digest == m_signature) return m_error.isEmpty();
   m_error.clear();
+  m_names = names;
   QVector<Entry> entries;
   QVector<NumberPin> pins;
   QVector<QgsGeometry> pinAreas;
@@ -906,8 +929,9 @@ bool HeritageLayoutNumbers::update(QgsLayoutItemMap* map, bool force) {
       for (const auto& id : site.ids) featureIds.insert(id.toLongLong());
       entries.append({layer->id(), datasetName, site.name, number, index, site.color, featureIds});
       // 같은 이름은 번호 하나. 점 하나로 그리고, 번호 자리는 아래에서 한꺼번에 정한다.
-      pins.append(NumberPin{site.originX, site.originY, site.originX, site.originY, circleSize(number),
-                            number, site.labelId.toLongLong(), site.name, layer->id(),
+      const QSizeF nameBox = names ? nameBoxMm(site.name) : QSizeF();
+      pins.append(NumberPin{site.originX, site.originY, site.originX, site.originY,
+                            names ? nameBox.height() : circleSize(number), nameBox.width(), number, site.labelId.toLongLong(), site.name, layer->id(),
                             site.color.name(QColor::HexArgb), inkFor(site.color).name()});
       pinAreas.append(site.area);
       if (single) fallbackCategories.append(QgsRendererCategory(site.values, site.symbol->clone(), site.name));
@@ -948,10 +972,13 @@ bool HeritageLayoutNumbers::update(QgsLayoutItemMap* map, bool force) {
   // All badges of the sheet at once: each on its site, moved only to clear another.
   QVector<QgsPointXY> origins;
   QVector<double> sizes;
+  QVector<QSizeF> boxes;
   double widestMm = 0.;
   for (const NumberPin& pin : pins) {
     origins.append(QgsPointXY(pin.originX, pin.originY));
     sizes.append(pin.size);
+    boxes.append(QSizeF(pin.width + kNumberGapMm, pin.size + kNumberGapMm));
+    // Name rows step by their height; badges by the widest circle.
     widestMm = std::max(widestMm, pin.size);
   }
   // One placer for the whole sheet: badges of different layers never cover
@@ -963,7 +990,8 @@ bool HeritageLayoutNumbers::update(QgsLayoutItemMap* map, bool force) {
       invertible ? LayoutBadgePlacer::withoutBlocks(visibleMapOnPaper(map, m_exporting), legendBlocks)
                  : QPainterPath(),
       ((widestMm + kNumberGapMm) / 1000.0) * (map->scale() > 0. ? map->scale() : 5000.));
-  const QVector<QgsPointXY> placed = placer.placeAll(origins, sizes, pinAreas);
+  const QVector<QgsPointXY> placed =
+      names ? placer.placeAllBoxes(origins, boxes, pinAreas) : placer.placeAll(origins, sizes, pinAreas);
   for (int i = 0; i < pins.size(); ++i) {
     pins[i].x = placed.at(i).x();
     pins[i].y = placed.at(i).y();
@@ -1000,13 +1028,20 @@ void HeritageLayoutNumbers::publishNumberPins(QgsLayoutItemMap* map, const QVect
   const QString auth = map && map->crs().isValid() && !map->crs().authid().isEmpty()
                            ? map->crs().authid()
                            : QStringLiteral("EPSG:5186");
-  if (!m_numberLayer || m_numberLayer->crs().authid() != auth) {
+  const bool created = !m_numberLayer || m_numberLayer->crs().authid() != auth;
+  if (created) {
     delete m_numberLayer;
     m_numberLayer = new QgsVectorLayer(
         QStringLiteral("Point?crs=%1&field=num:integer&field=nm:string(80)&field=layer:string(64)"
-                       "&field=ox:double&field=oy:double&field=size:double&field=fill:string(16)&field=ink:string(16)&field=fid:string(32)")
+                       "&field=ox:double&field=oy:double&field=size:double&field=w:double"
+                       "&field=fill:string(16)&field=ink:string(16)&field=fid:string(32)")
             .arg(auth),
         QStringLiteral("도면번호"), QStringLiteral("memory"));
+    m_numberLayer->setLabelsEnabled(false);
+    m_numberLayer->setCustomProperty(QStringLiteral("ka_hgis/omit_sheet_legend"), true);
+  }
+  if (created || m_pinsShowNames != m_names) {
+    m_pinsShowNames = m_names;
     auto marker = QgsMarkerSymbol::createSimple({
         {QStringLiteral("name"), QStringLiteral("circle")},
         {QStringLiteral("color"), QStringLiteral("#888888")},
@@ -1028,9 +1063,25 @@ void HeritageLayoutNumbers::publishNumberPins(QgsLayoutItemMap* map, const QVect
     // No leader lines: a badge sits on its site or on the nearest free spot
     // next to it (2026-10-19 현장 요청 「선을 긋지 말고 제위치에」).
     marker->appendSymbolLayer(glyph);
+    if (m_names) {
+      // 이름은 상자 없이 검은 글자에 흰 테두리: 흰 글자를 흰 선으로 굵게 먼저 그리고 그 위에 검은 글자.
+      QgsSymbolLayerList text;
+      for (const bool halo : {true, false}) {
+        auto* glyphs = new QgsFontMarkerSymbolLayer(QStringLiteral("Malgun Gothic"), QStringLiteral("가"), kNameSizeMm,
+                                                    halo ? Qt::white : Qt::black);
+        glyphs->setSizeUnit(Qgis::RenderUnit::Millimeters);
+        glyphs->setDataDefinedProperty(QgsSymbolLayer::Property::Character, QgsProperty::fromField(QStringLiteral("nm")));
+        if (halo) {
+          glyphs->setStrokeColor(Qt::white);
+          glyphs->setStrokeWidth(kNameHaloMm);
+          glyphs->setStrokeWidthUnit(Qgis::RenderUnit::Millimeters);
+          glyphs->setPenJoinStyle(Qt::RoundJoin);
+        }
+        text << glyphs;
+      }
+      marker = std::make_unique<QgsMarkerSymbol>(text);
+    }
     m_numberLayer->setRenderer(new QgsSingleSymbolRenderer(marker.release()));
-    m_numberLayer->setLabelsEnabled(false);
-    m_numberLayer->setCustomProperty(QStringLiteral("ka_hgis/omit_sheet_legend"), true);
   }
   if (!m_numberLayer->isValid()) return;
   m_numberLayer->startEditing();
@@ -1048,6 +1099,7 @@ void HeritageLayoutNumbers::publishNumberPins(QgsLayoutItemMap* map, const QVect
     feature.setAttribute(QStringLiteral("ox"), pin.originX);
     feature.setAttribute(QStringLiteral("oy"), pin.originY);
     feature.setAttribute(QStringLiteral("size"), pin.size);
+    feature.setAttribute(QStringLiteral("w"), pin.width);
     feature.setAttribute(QStringLiteral("fill"), pin.fill);
     feature.setAttribute(QStringLiteral("ink"), pin.ink);
     feature.setAttribute(QStringLiteral("fid"), QString::number(pin.sourceId));
@@ -1152,7 +1204,8 @@ void HeritageLayoutNumbers::applyLegend(QgsLayoutItemLegend* legend) const {
     int numbered = 0;
     for (const auto& entry : m_entries)
       if (entry.layerId == layer->id() && entry.number > 0) ++numbered;
-    if (model->layerLegendNodes(node).size() != numbered) current = false;
+    // Names on the map: one row per dataset instead of one per number.
+    if (model->layerLegendNodes(node).size() != (m_names ? std::min(numbered, 1) : numbered)) current = false;
   }
   if (current) return;
   // Numbered rows already passed the paper-footprint intersection test.
@@ -1183,9 +1236,11 @@ void HeritageLayoutNumbers::applyLegend(QgsLayoutItemLegend* legend) const {
       if (!idMatch && !datasetMatch) continue;
       if (m_tracking && !m_visibleKeys.contains(entryKey(entry.layerId, entry.number))) continue;
       order.append(entry.legendIndex);
-      series += QString::number(entry.number) + QLatin1Char('\t') + entry.name + QLatin1Char('\t')
+      series += QString::number(m_names ? 0 : entry.number) + QLatin1Char('\t')
+          + (m_names ? datasetName : entry.name) + QLatin1Char('\t')
           + QString::number(entry.legendIndex) + QLatin1Char('\t')
           + entry.color.name(QColor::HexArgb) + QLatin1Char('\n');
+      if (m_names) break;
     }
     const QString seriesKey = QStringLiteral("ka_hgis/legend_series");
     if (order.isEmpty()) {
@@ -1223,6 +1278,20 @@ void HeritageLayoutNumbers::applyLegend(QgsLayoutItemLegend* legend) const {
         const bool datasetMatch = !legendLayerIds.contains(entry.layerId) && entry.dataset == datasetName;
         if (!idMatch && !datasetMatch) continue;
         if (m_tracking && !m_visibleKeys.contains(entryKey(entry.layerId, entry.number))) continue;
+        if (m_names) {
+          // 이름을 쓴 도면의 범례는 번호 없이 유적 종류와 색만.
+          auto swatch = QgsMarkerSymbol::createSimple({
+              {QStringLiteral("name"), QStringLiteral("square")},
+              {QStringLiteral("color"), entry.color.name(QColor::HexArgb)},
+              {QStringLiteral("outline_color"), QStringLiteral("#000000")},
+              {QStringLiteral("outline_width"), QStringLiteral("0.15")},
+              {QStringLiteral("outline_width_unit"), QStringLiteral("MM")},
+              {QStringLiteral("size"), QStringLiteral("3")}});
+          QgsMapLayerLegendUtils::setLegendNodeCustomSymbol(node, entry.legendIndex, swatch.get());
+          QgsMapLayerLegendUtils::setLegendNodeUserLabel(node, entry.legendIndex, datasetName);
+          QgsMapLayerLegendUtils::setLegendNodeSymbolSize(node, entry.legendIndex, QSizeF(3., 3.));
+          break;
+        }
         auto marker = QgsMarkerSymbol::createSimple({
             {QStringLiteral("name"), QStringLiteral("circle")},
             {QStringLiteral("color"), entry.color.name(QColor::HexArgb)},

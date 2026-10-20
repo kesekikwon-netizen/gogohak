@@ -3,6 +3,8 @@
 #include <QHash>
 #include <QPainterPath>
 #include <QPolygonF>
+#include <QRectF>
+#include <QSizeF>
 #include <QTransform>
 #include <QVector>
 
@@ -38,6 +40,10 @@ public:
   // smallest areas pick first, each inside its own area where a slot is free.
   QVector<QgsPointXY> placeAll(const QVector<QgsPointXY>& origins, const QVector<double>& badgeDiametersMm,
                                const QVector<QgsGeometry>& siteAreas = {});
+  // Same as placeAll for name labels: each box (width x height, mm) is kept off
+  // every other box instead of a circle step. Boxes keep their slots (no trading).
+  QVector<QgsPointXY> placeAllBoxes(const QVector<QgsPointXY>& origins, const QVector<QSizeF>& boxesMm,
+                                    const QVector<QgsGeometry>& siteAreas = {});
   // Occupy a position without searching (e.g. a site whose transform failed).
   void occupy(const QgsPointXY& point);
   int count() const { return m_count; }
@@ -58,6 +64,7 @@ private:
   bool isFree(const QgsPointXY& point) const;
   bool fits(const QgsPointXY& point, double badgeDiameterMm) const;
   quint64 cellKey(qint64 cx, qint64 cy) const;
+  QRectF boxAt(const QgsPointXY& point) const;
 
   QTransform m_toScene;
   QPainterPath m_allowed;
@@ -68,4 +75,10 @@ private:
   int m_reachRings = 0;
   int m_count = 0;
   QHash<quint64, QVector<QgsPointXY>> m_cells;
+  // Name labels (placeAllBoxes): box sizes in mm, the one being placed, and the
+  // boxes already placed in map units.
+  double m_unitsPerMm = 1.0;
+  QVector<QSizeF> m_boxesMm;
+  int m_current = -1;
+  QVector<QRectF> m_placedBoxes;
 };

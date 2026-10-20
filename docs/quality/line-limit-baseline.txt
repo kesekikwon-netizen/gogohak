@@ -38,7 +38,7 @@
 633 src/core/GeorefService.cpp
 337 src/core/HeritageImport.cpp
 640 src/core/HeritageIntranetFlow.cpp
-1308 src/core/HeritageLayoutNumbers.cpp
+1364 src/core/HeritageLayoutNumbers.cpp
 353 src/core/HeritageRegionResolver.cpp
 393 src/core/KaPortableRuntime.cpp
 357 src/core/KaSafeQgis.cpp
@@ -70,7 +70,7 @@
 369 tests/test_heritage_download_retry.cpp
 456 tests/test_heritage_flow.cpp
 549 tests/test_heritage_import.cpp
-2663 tests/test_heritage_style.cpp
+2736 tests/test_heritage_style.cpp
 588 tests/test_layer_information.cpp
 680 tests/test_layer_state.cpp
 524 tests/test_network_services.cpp

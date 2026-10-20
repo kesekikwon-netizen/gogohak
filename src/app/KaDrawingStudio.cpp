@@ -623,6 +623,10 @@ void KaDrawingStudio::attachLayoutToView() {
   connect(ly, &QgsLayout::selectedItemChanged, this, &KaDrawingStudio::onLayoutSelectionChanged,
           Qt::UniqueConnection);
   loadGridSettings();
+  if (m_heritageNames) {
+    const QSignalBlocker block(m_heritageNames);
+    m_heritageNames->setChecked(ly->customProperty(HeritageLayoutNumbers::namesPropertyKey(), false).toBool());
+  }
   updateInspector(nullptr);
 }
 
@@ -962,6 +966,21 @@ void KaDrawingStudio::buildUi() {
   fontRow->addWidget(m_legendBold);
   fontRow->addWidget(m_legendItalic);
   legendLay->addLayout(fontRow);
+  m_heritageNames = new QCheckBox(QStringLiteral("1:5,000 이하에서 유적 이름으로 표시"), m_cardLegend);
+  m_heritageNames->setObjectName(QStringLiteral("heritageNamesCheck"));
+  m_heritageNames->setToolTip(QStringLiteral(
+      "켜면 1:5,000과 더 크게 본 축척에서 주변유적 번호 대신 유적 이름을 쓰고, 범례에는 유적 종류만 남깁니다"));
+  if (auto* ly = layout())
+    m_heritageNames->setChecked(ly->customProperty(HeritageLayoutNumbers::namesPropertyKey(), false).toBool());
+  connect(m_heritageNames, &QCheckBox::toggled, this, [this](bool on) {
+    auto* ly = layout();
+    if (!ly || ly->customProperty(HeritageLayoutNumbers::namesPropertyKey(), false).toBool() == on) return;
+    ly->setCustomProperty(HeritageLayoutNumbers::namesPropertyKey(), on);
+    markUserComposed();
+    if (m_project) m_project->setDirty(true);
+    syncHeritageNumbers(true);
+  });
+  legendLay->addWidget(m_heritageNames);
   sideLay->addWidget(m_cardLegend);
 
   m_cardNorth = new QFrame(side);

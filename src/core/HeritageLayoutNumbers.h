@@ -60,6 +60,11 @@ public:
   // Logical dataset tag on a heritage reference layer ("ka_hgis/heritage_dataset").
   // Tree/group titles are labels only; the tag survives a renamed group.
   static QString datasetPropertyKey();
+  // Sheet choice (bool on the layout): at 1:5,000 and larger, write site names
+  // in place of the number badges; the legend then lists the datasets only.
+  static QString namesPropertyKey();
+  static constexpr double kNamesMaxScale = 5000.;
+  bool showsNames() const { return m_names; }
   static void tagDataset(QgsMapLayer* layer, HeritageDataset dataset);
   static std::optional<HeritageDataset> taggedDataset(const QgsMapLayer* layer);
 
@@ -73,6 +78,7 @@ private:
     double originX = 0.;
     double originY = 0.;
     double size = 0.;
+    double width = 0.;  // Name box width in mm; 0 for a number badge.
     int number = 0;
     qint64 sourceId = 0;
     QString name;
@@ -95,6 +101,8 @@ private:
   bool m_previewBusy = false;
   bool m_previewDirty = false;
   bool m_exporting = false;
+  bool m_names = false;
+  bool m_pinsShowNames = false;
   QString m_signature;
   QString m_error;
   QVector<Entry> m_entries;

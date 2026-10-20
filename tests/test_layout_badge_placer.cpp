@@ -1,6 +1,7 @@
 #include <QtTest>
 #include <QPainterPath>
 #include <QSet>
+#include <QSizeF>
 #include <QTransform>
 
 #include <cmath>
@@ -173,6 +174,30 @@ private slots:
     const QVector<QgsPointXY> placed = placer.placeAll(sites, QVector<double>(sites.size(), kBadgeMm));
     QCOMPARE(placed.last(), lone);
     verifyClear(placed, kStep);
+  }
+
+  void nameBoxesNeverCoverEachOther() {
+    // 1:5,000 이하에서 번호 대신 이름을 쓰면 글자 상자는 가로로 길다. 몰린 유적
+    // 이름도 서로 덮지 않고, 홀로 있는 유적 이름은 제자리에 둔다(2026-10-20 현장 요청).
+    const double rowStep = 3.5;
+    LayoutBadgePlacer placer(QTransform(), QPainterPath(), rowStep);
+    QVector<QgsPointXY> sites(5, QgsPointXY(100., 100.));
+    const QgsPointXY lone(100., 200.);
+    sites.append(lone);
+    QVector<QSizeF> boxes;
+    for (int i = 0; i < sites.size(); ++i) boxes.append(QSizeF(20. + i * 4., 3.));
+    const QVector<QgsPointXY> placed = placer.placeAllBoxes(sites, boxes);
+    QCOMPARE(placed.size(), sites.size());
+    QCOMPARE(placed.last(), lone);
+    auto boxAt = [&](int i) {
+      return QRectF(placed.at(i).x() - boxes.at(i).width() / 2., placed.at(i).y() - boxes.at(i).height() / 2.,
+                    boxes.at(i).width(), boxes.at(i).height());
+    };
+    for (int i = 0; i < placed.size(); ++i) {
+      QVERIFY2(placed.at(i).distance(sites.at(i)) <= 30., qPrintable(placed.at(i).toString()));
+      for (int j = i + 1; j < placed.size(); ++j)
+        QVERIFY2(!boxAt(i).intersects(boxAt(j)), qPrintable(QStringLiteral("name %1 covers name %2").arg(i).arg(j)));
+    }
   }
 };
 
