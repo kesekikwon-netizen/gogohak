@@ -347,6 +347,7 @@ private:
   bool refuseReadOnlyLayer(const QString& title, const QgsVectorLayer* layer);
   void onGeometryCaptured(const QgsGeometry& geom);
   void stopCaptureTool();
+  void releaseRemovedLayersForSave();
   // [pkg B1] drawing helpers (KaDrawSketchTools.cpp). 완료·되돌리기·취소 and
   // 연속 그리기 on the draw sub-toolbar; the first three work only while a sketch has points.
   void addDrawSketchButtons();

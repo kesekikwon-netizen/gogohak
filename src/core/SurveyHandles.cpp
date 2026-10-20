@@ -34,6 +34,21 @@ QgsMapLayer* release(QgsMapLayer* layer, const QString& surveyGpkg) {
   return layer;
 }
 
+void releaseForSave(QgsMapLayer* layer, const QString& surveyGpkg) {
+  auto* vl = qobject_cast<QgsVectorLayer*>(layer);
+  if (!vl || !vl->isModified() || vl->providerType() != QLatin1String("ogr")) {
+    release(layer, surveyGpkg);
+    return;
+  }
+  const QVariantMap parts = QgsProviderRegistry::instance()->decodeUri(QStringLiteral("ogr"), vl->source());
+  if (QFileInfo(parts.value(QStringLiteral("path")).toString())
+          .absoluteFilePath()
+          .compare(QFileInfo(surveyGpkg).absoluteFilePath(), Qt::CaseInsensitive) != 0)
+    return;
+  vl->rollBack(false);  // 편집 상태는 남기고(되살리면 다시 편집 중) 바뀐 것만 버린다
+  release(layer, surveyGpkg);
+}
+
 QgsMapLayer* reattach(QgsMapLayer* layer, const QString& surveyGpkg) {
   auto* vl = qobject_cast<QgsVectorLayer*>(layer);
   if (!vl || vl->customProperty(kTable).toString().isEmpty()) return layer;

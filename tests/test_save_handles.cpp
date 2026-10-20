@@ -85,6 +85,36 @@ class TestSaveHandles : public QObject {
     QCOMPARE(after.xmlData(), style.xmlData());
   }
 
+  // 원인 4(2026-10-20 경주시): 저장하지 않은 편집이 있는 조사 레이어(옮긴 시굴격자 등)를 지우면 편집을 잃지
+  // 않으려고 손잡이를 쥔 채 붙들었다. 그 뒤 저장은 원본을 못 바꾸고 「-저장」「-저장-저장」으로 빠졌다.
+  void removedLayerWithUnsavedEdits_doesNotBlockTheSave() {
+    QTemporaryDir dir;
+    const QString gpkg = newSurvey(dir, QStringLiteral("편집지움"));
+    QVERIFY(!gpkg.isEmpty());
+    QgsProject project;
+    project.setCrs(QgsCoordinateReferenceSystem(QStringLiteral("EPSG:5186")));
+    QString error;
+    auto* area = LayerOps::ensureDomainLayer(&project, gpkg, QStringLiteral("survey_area"), QStringLiteral("조사구역"), &error);
+    auto* poly = LayerOps::ensureDomainLayer(&project, gpkg, QStringLiteral("feature_poly"), QStringLiteral("유구면"), &error);
+    QVERIFY2(area && poly, qPrintable(error));
+    QVERIFY(addArea(area, 200000));
+    QVERIFY(savedInPlace(SurveyStorage::persistWorkspace(&project, gpkg, dir.filePath(QStringLiteral("복구사본"))), gpkg));
+    readAll(area);
+    QVERIFY(addArea(area, 200050));  // 저장하지 않은 편집
+    std::unique_ptr<QgsMapLayer> held(SurveyHandles::release(project.takeMapLayer(area), gpkg));
+    QVERIFY2(qobject_cast<QgsVectorLayer*>(held.get())->isModified(), "지운 직후 Ctrl+Z 는 편집째 되살린다");
+    SurveyHandles::releaseForSave(held.get(), gpkg);
+    QVERIFY(addArea(poly, 200100));
+    const auto attempt = SurveyStorage::persistWorkspace(&project, gpkg, dir.filePath(QStringLiteral("복구사본")));
+    QVERIFY2(savedInPlace(attempt, gpkg), qPrintable(attempt.surveyPath + QLatin1Char(' ') + attempt.error));
+    QVERIFY(!QFileInfo::exists(dir.filePath(QStringLiteral("편집지움-저장.gpkg"))));
+    // 저장 뒤 Ctrl+Z: 저장한 파일의 그 표를 다시 연다(지운 레이어의 미저장 편집은 저장에 들어가지 않았다).
+    auto* back = qobject_cast<QgsVectorLayer*>(SurveyHandles::reattach(held.release(), attempt.surveyPath));
+    QVERIFY(back && project.addMapLayer(back));
+    QVERIFY(back->isValid());
+    QCOMPARE(back->featureCount(), 1LL);
+  }
+
   void singleLayerReadThenSaveWithoutEdits_replacesInPlace() {
     QTemporaryDir dir;
     const QString gpkg = newSurvey(dir, QStringLiteral("하나"));

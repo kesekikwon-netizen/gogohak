@@ -69,6 +69,16 @@ QgsVectorLayer* preferredMapLayer(MainWindow* window, QgsLayerTreeView* tree, Qg
 }
 }
 
+void MainWindow::releaseRemovedLayersForSave() {
+  // 저장하지 않은 편집이 있던 지운 레이어는 편집째 붙들어 원본을 쥐었고, 그 뒤 저장은 원본을 못 바꿔
+  // 「-저장」「-저장-저장」 파일로 빠졌다(2026-10-20 경주시). 그 편집은 저장에 들어가지 않으므로 여기서 놓는다.
+  for (const KaUndoAction& action : m_undoActions) {
+    if (action.type != KaUndoAction::LayersRemoved || !action.removedLayers) continue;
+    for (auto& entry : action.removedLayers->entries)
+      if (entry.layer) SurveyHandles::releaseForSave(entry.layer.get(), m_surveyPath);
+  }
+}
+
 void MainWindow::removeSelectedLayers() {
   removeLayersFromTree(m_layerTree);
 }

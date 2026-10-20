@@ -28,7 +28,7 @@
 696 src/app/MainWindowOverlay.cpp
 961 src/app/MainWindowRibbon.cpp
 1819 src/app/MainWindowSession.cpp
-565 src/app/MainWindowUndo.cpp
+575 src/app/MainWindowUndo.cpp
 2588 src/core/BasemapOps.cpp
 340 src/core/CadastralImport.cpp
 352 src/core/CadastralPortal.cpp

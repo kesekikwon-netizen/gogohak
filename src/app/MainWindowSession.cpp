@@ -909,6 +909,7 @@ bool MainWindow::persistSurveyWork() {
     KaCrashGuard::logLine(QStringLiteral("[save] 지도를 그리는 중이라 그리기를 멈추고 저장합니다"));
     m_canvas->stopRendering();
   }
+  releaseRemovedLayersForSave();
   QgsProject* project = QgsProject::instance();
   bool saved = false;
   const auto preserveUnsaved = qScopeGuard([&] {
