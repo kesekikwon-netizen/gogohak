@@ -212,15 +212,14 @@ void KaTrenchMoveTool::canvasPressEvent(QgsMapMouseEvent* e) {
     }
     m_selFid = fid;
     m_selName = name;
-    // Same snapped reference as the drop point, so the move is a whole number of grid steps.
-    m_from = snapPt(click);
+    m_from = click;  // dragDelta snaps the move (whole steps, or the corner onto a grid node)
     m_dragSingle = true;
     rebuildSingleRubber(fid, QgsPointXY(0, 0));
     emit statusMessage(QStringLiteral("%1 선택 — 끌어서 이동, Delete = 삭제").arg(trenchLabel(name)));
     return;
   }
 
-  m_from = snapPt(click);
+  m_from = click;
   m_dragging = true;
   rebuildRubber(QgsPointXY(0, 0));
   emit statusMessage(QStringLiteral("격자를 끌어 옮기세요. 놓으면 전체가 이동합니다."));
@@ -231,22 +230,17 @@ void KaTrenchMoveTool::canvasMoveEvent(QgsMapMouseEvent* e) {
   if (m_mode == Mode::Single) {
     if (!m_dragSingle || FID_IS_NULL(m_selFid))
       return;
-    const QgsPointXY dest = snapPt(e->mapPoint());
-    rebuildSingleRubber(m_selFid, QgsPointXY(dest.x() - m_from.x(), dest.y() - m_from.y()));
+    rebuildSingleRubber(m_selFid, dragDelta(e->mapPoint()));
     return;
   }
-  if (m_dragging) {
-    const QgsPointXY dest = snapPt(e->mapPoint());
-    rebuildRubber(QgsPointXY(dest.x() - m_from.x(), dest.y() - m_from.y()));
-  }
+  if (m_dragging) rebuildRubber(dragDelta(e->mapPoint()));
 }
 
 void KaTrenchMoveTool::canvasReleaseEvent(QgsMapMouseEvent* e) {
   if (!e || e->button() != Qt::LeftButton)
     return;
-  const QgsPointXY dest = snapPt(e->mapPoint());
-  const double dx = dest.x() - m_from.x();
-  const double dy = dest.y() - m_from.y();
+  const QgsPointXY delta = dragDelta(e->mapPoint());
+  const double dx = delta.x(), dy = delta.y();
   const double mupp = canvas() ? std::max(canvas()->mapUnitsPerPixel(), 1e-6) : 1.0;
   if (m_mode == Mode::Whole && m_dragging) {
     m_dragging = false;
@@ -268,6 +262,7 @@ void KaTrenchMoveTool::canvasReleaseEvent(QgsMapMouseEvent* e) {
 }
 
 void KaTrenchMoveTool::keyPressEvent(QKeyEvent* e) {
+  if (nudge(e)) return;
   if (e && (e->key() == Qt::Key_Delete || e->key() == Qt::Key_Backspace) && deleteSelectedTrench()) {
     e->accept();
     return;

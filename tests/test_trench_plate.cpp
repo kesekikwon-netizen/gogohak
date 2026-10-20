@@ -2,6 +2,7 @@
 // beside 회전(방위) whose needle shows the turn from north. 새 모양 only; the stock window keeps its sentence.
 #include <QtTest>
 
+#include <QCheckBox>
 #include <QComboBox>
 #include <QDoubleSpinBox>
 #include <QLabel>
@@ -86,6 +87,28 @@ private slots:
     QVERIFY2(summary.contains(QStringLiteral("ㄱ·ㄴ자")) && summary.contains(QStringLiteral("팔 15 m + 15 m")) &&
                  summary.contains(QStringLiteral("(목표 10%)")),
              qPrintable(summary));
+  }
+
+  // 「좌표격자에 맞추기」 (사용자 요청 2026-10-20): with a metre coordinate grid on the map and a ㄱ·ㄴ자 shape, the
+  // check lays the Ls on the grid's nodes and turn; without a grid, or for straight trenches, it is off.
+  void gridLockLaysTheLsOnTheCoordinateGrid() {
+    KaTrenchDialog dialog;
+    dialog.setArea(squareWkb(200), 40000.0);
+    auto* lock = dialog.findChild<QCheckBox*>(QStringLiteral("trenchGridLock"));
+    auto* shape = dialog.findChild<QComboBox*>(QStringLiteral("trenchShape"));
+    QVERIFY(lock && shape);
+    shape->setCurrentIndex(1);
+    QVERIFY(!lock->isEnabled());  // no coordinate grid on the map yet
+    dialog.setCoordinateGrid(true, TrenchGridSnap::Grid{0.0, 0.0, 20.0, 5.0});
+    QVERIFY(lock->isEnabled());
+    lock->setChecked(true);
+    QVERIFY(dialog.gridLock() && dialog.gridLock()->step == 5.0);
+    QTRY_VERIFY_WITH_TIMEOUT(!dialog.planPending(), 20000);
+    const QString summary = dialog.findChild<QLabel*>(QStringLiteral("trenchSummary"))->text();
+    QVERIFY2(summary.contains(QStringLiteral("좌표격자 5 m")) && summary.contains(QStringLiteral("방위 20°")),
+             qPrintable(summary));
+    shape->setCurrentIndex(0);
+    QVERIFY(!lock->isEnabled() && !dialog.gridLock());
   }
 
   void paperWindowCarriesTheMeterAndTheDial() {

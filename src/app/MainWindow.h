@@ -314,6 +314,8 @@ private:
   void updateHistoricalMapButtons();
   void syncRecordTools();
   // 조사구역 안 DEM 표고로 오르막 방위를 낸다(트렌치 장축 = 등고선 직교).
+  void syncTrenchCoordinateGrid(const QString& areaCrs);
+  void pickTrenchFromSelection();  // MainWindowTrench.cpp
   TrenchGridGenerator::SlopeAspect terrainAspectForArea(const QByteArray& areaWkb,
                                                        const QString& areaCrs);
   void applyStartupMap();

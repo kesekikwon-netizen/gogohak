@@ -55,15 +55,7 @@ KaTrenchDialog::KaTrenchDialog(QWidget* parent) : QDialog(parent) {
   m_terrainInfo->setWordWrap(true);
   form->addRow(m_terrainInfo);
 
-  // ㄱ·ㄴ자 트렌치 (사용자 요청 2026-10-19): 한 모서리에서 직각으로 꺾인 두 팔 15 m + 15 m, 폭 2 m, 꺾는 방향 네 가지.
-  m_shape = new QComboBox(this);
-  m_shape->setObjectName(QStringLiteral("trenchShape"));
-  m_shape->addItem(QStringLiteral("곧은 트렌치"), 0);  // data: 0 곧은, 1 + Spec::armBend for the Ls
-  for (const QString& bend : {QStringLiteral("ㄴ자"), QStringLiteral("ㄱ자"), QStringLiteral("ㄴ자 좌우 반대"),
-                              QStringLiteral("ㄱ자 좌우 반대")})
-    m_shape->addItem(bend + QStringLiteral(" 트렌치 (15 m + 15 m)"), m_shape->count());
-  m_shape->setToolTip(QStringLiteral("ㄱ·ㄴ자는 팔 15 m 그대로 구역 안에 온전히 들어가는 것만 놓아, 비율이 목표를 조금 넘습니다."));
-  form->addRow(QStringLiteral("모양"), m_shape);
+  addShapeRows(form);  // 모양 (곧은 / ㄱ·ㄴ자) and 좌표격자에 맞추기, in KaTrenchDialogPlan.cpp
 
   m_size = new QComboBox(this);
   m_size->addItem(QStringLiteral("2 × 20 m"), 20);
@@ -174,7 +166,6 @@ KaTrenchDialog::KaTrenchDialog(QWidget* parent) : QDialog(parent) {
 
   connect(m_size, QOverload<int>::of(&QComboBox::currentIndexChanged), this,
           [this](int) { schedulePlan(); });
-  connect(m_shape, QOverload<int>::of(&QComboBox::currentIndexChanged), this, [this](int) { schedulePlan(); });
   connect(m_balk, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this,
           [this](double) { schedulePlan(); });
   connect(m_az, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this,
@@ -254,7 +245,7 @@ void KaTrenchDialog::setTerrainAspect(const TrenchGridGenerator::SlopeAspect& as
 }
 
 double KaTrenchDialog::effectiveAzimuth() const {
-  return useTerrainAzimuth() ? m_aspect.azimuthDeg : m_az->value();
+  return gridLock() ? m_grid.rotationDeg : useTerrainAzimuth() ? m_aspect.azimuthDeg : m_az->value();
 }
 
 TrenchGridGenerator::Spec KaTrenchDialog::spec() const {

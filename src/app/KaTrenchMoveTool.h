@@ -15,6 +15,8 @@ class QKeyEvent;
 //  - Single 모드(기본): 트렌치를 클릭해 선택 → 끌어서 하나만 이동,
 //    Delete/Backspace 또는 우클릭 = 그 트렌치만 삭제
 //  - Whole 모드: 끌어다 놓기 = 격자 전체 이동
+//  - 좌표격자가 켜져 있으면 놓을 때 바깥 모서리(첫 꼭짓점)가 교점에 붙고, 화살표 키는 한 칸씩 옮긴다
+//    (KaTrenchMoveToolKeys.cpp, 사용자 요청 2026-10-20)
 // Every move/delete is one undoable edit command (Ctrl+Z); the survey file is written only
 // when the user saves.
 class KaTrenchMoveTool : public QgsMapTool {
@@ -30,6 +32,8 @@ public:
   void setMode(Mode mode);
   Mode mode() const { return m_mode; }
   QgsFeatureId selectedTrench() const { return m_selFid; }
+  // Picks the trench as if it was clicked (Single mode), e.g. after 「도형 선택」 picked it.
+  void selectTrench(QgsFeatureId fid);
   // Deletes the picked trench (one Ctrl+Z step). False when nothing is picked. The window's
   // Delete shortcut reaches the canvas before this tool, so MainWindow routes Delete here.
   bool deleteSelectedTrench();
@@ -58,6 +62,10 @@ private:
   QgsFeatureId hitTrench(const QgsPointXY& p, QString* nameOut = nullptr) const;
   void deleteTrench(QgsFeatureId fid, const QString& name);
   QgsPointXY snapPt(const QgsPointXY& p) const;
+  // How far a drag from m_from to the cursor moves the trenches.
+  QgsPointXY dragDelta(const QgsPointXY& cursor) const;
+  // Arrow keys: one grid cell (1 m without a grid) for the picked trench, or the whole grid.
+  bool nudge(QKeyEvent* e);
   void afterEdit();
 
   QPointer<QgsVectorLayer> m_layer;

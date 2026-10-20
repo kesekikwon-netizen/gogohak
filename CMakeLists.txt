@@ -218,6 +218,7 @@ add_library(ka_core STATIC
   src/core/DemHillshadeFile.cpp
   src/core/TrenchGridGenerator.cpp
   src/core/TrenchLShape.cpp
+  src/core/TrenchGridSnap.cpp
   src/core/TrenchTerrain.cpp
   src/core/TrenchLayerEdit.cpp
   src/core/TrenchPlanCache.cpp
@@ -310,6 +311,7 @@ add_library(ka_core STATIC
   src/core/DemAnalyzer.h
   src/core/TrenchGridGenerator.h
   src/core/TrenchLShape.h
+  src/core/TrenchGridSnap.h
   src/core/TrenchLayerEdit.h
   src/core/TrenchPlanCache.h
   src/core/TilePackService.h
@@ -405,6 +407,7 @@ add_executable(ka-hgis
     src/app/MainWindowUndo.cpp
     src/app/MainWindowRibbon.cpp
     src/app/MainWindowOffline.cpp
+    src/app/MainWindowTrench.cpp
     src/app/MainWindowAlign.cpp
     src/app/MainWindowOverlay.cpp
     src/app/MainWindowFiles.cpp
@@ -511,6 +514,7 @@ add_executable(ka-hgis
   src/app/KaCanvasGridOverlay.cpp
   src/app/KaGridOriginButton.cpp
   src/app/KaTrenchMoveTool.cpp
+  src/app/KaTrenchMoveToolKeys.cpp
   src/app/KaVertexEditTool.cpp
   src/app/KaFeatureSelectTool.cpp
   src/app/KaFeatureSelectPick.cpp
@@ -1017,6 +1021,31 @@ if(KA_HGIS_BUILD_TESTS)
   endif()
   ka_add_qtest(trench_lshape ka_trench_lshape_tests)
   set_tests_properties(trench_lshape PROPERTIES TIMEOUT 120)
+  # 「좌표격자에 맞추기」: ㄱ·ㄴ자 corners on the coordinate grid's nodes (user request 2026-10-20).
+  add_executable(ka_trench_grid_snap_tests tests/test_trench_grid_snap.cpp)
+  target_link_libraries(ka_trench_grid_snap_tests PRIVATE ${KA_TEST_LIBS})
+  target_include_directories(ka_trench_grid_snap_tests PRIVATE ${KA_INCLUDES})
+  target_link_directories(ka_trench_grid_snap_tests PRIVATE ${KA_LIBDIRS})
+  target_compile_definitions(ka_trench_grid_snap_tests PRIVATE ${KA_TEST_DEFS})
+  if (MSVC)
+    target_compile_options(ka_trench_grid_snap_tests PRIVATE /utf-8)
+  endif()
+  ka_add_qtest(trench_grid_snap ka_trench_grid_snap_tests)
+  set_tests_properties(trench_grid_snap PROPERTIES TIMEOUT 120)
+  # 트렌치 쉽게 옮기기: grid-node drop and arrow keys (user request 2026-10-20).
+  add_executable(ka_trench_handle_tests tests/test_trench_handle.cpp
+    src/app/KaTrenchMoveTool.cpp src/app/KaTrenchMoveToolKeys.cpp src/app/KaTrenchMoveTool.h
+    src/app/KaCanvasGridOverlay.cpp src/app/KaCanvasGridOverlay.h
+    src/app/KaCrashGuard.cpp src/app/KaCrashGuard.h)
+  target_link_libraries(ka_trench_handle_tests PRIVATE ${KA_TEST_LIBS})
+  target_include_directories(ka_trench_handle_tests PRIVATE ${KA_INCLUDES})
+  target_link_directories(ka_trench_handle_tests PRIVATE ${KA_LIBDIRS})
+  target_compile_definitions(ka_trench_handle_tests PRIVATE ${KA_TEST_DEFS})
+  if (MSVC)
+    target_compile_options(ka_trench_handle_tests PRIVATE /utf-8)
+  endif()
+  ka_add_qtest(trench_handle ka_trench_handle_tests)
+  set_tests_properties(trench_handle PROPERTIES TIMEOUT 120)
   # 시굴격자 사면 방향 from the 수치지형도 contours when there is no DEM (user request 2026-10-05).
   add_executable(ka_trench_terrain_tests tests/test_trench_terrain.cpp)
   target_link_libraries(ka_trench_terrain_tests PRIVATE ${KA_TEST_LIBS})
@@ -1029,7 +1058,7 @@ if(KA_HGIS_BUILD_TESTS)
   ka_add_qtest(trench_terrain ka_trench_terrain_tests)
 
   add_executable(ka_trench_edit_tests tests/test_trench_edit.cpp
-    src/app/KaTrenchMoveTool.cpp src/app/KaTrenchMoveTool.h
+    src/app/KaTrenchMoveTool.cpp src/app/KaTrenchMoveToolKeys.cpp src/app/KaTrenchMoveTool.h
     src/app/KaTrenchDialog.cpp src/app/KaTrenchDialogPlan.cpp src/app/KaTrenchDialog.h
     src/app/KaTargetMeter.cpp src/app/KaTargetMeter.h src/app/KaAzimuthDial.cpp src/app/KaAzimuthDial.h
     src/app/KaCanvasGridOverlay.cpp src/app/KaCanvasGridOverlay.h
@@ -1929,7 +1958,7 @@ if(KA_HGIS_BUILD_TESTS)
     set_tests_properties(topographic_import PROPERTIES ENVIRONMENT "GDAL_DATA=${OSGEO4W_ROOT}/apps/gdal-dev/share/gdal;PATH=${_ka_path_esc};QGIS_PREFIX_PATH=${QGIS_PREFIX_PATH};QT_QPA_PLATFORM=offscreen" TIMEOUT 300)
     set_tests_properties(reference_status PROPERTIES ENVIRONMENT "GDAL_DATA=${OSGEO4W_ROOT}/apps/gdal-dev/share/gdal;PATH=${_ka_path_esc};QGIS_PREFIX_PATH=${QGIS_PREFIX_PATH};QT_QPA_PLATFORM=offscreen" TIMEOUT 60)
     set_tests_properties(heritage_flow PROPERTIES ENVIRONMENT "PATH=${_ka_path_esc};QT_QPA_PLATFORM=offscreen" TIMEOUT 60)
-    set_tests_properties(trench_plan trench_edit trench_plate trench_lshape PROPERTIES ENVIRONMENT "GDAL_DATA=${OSGEO4W_ROOT}/apps/gdal-dev/share/gdal;PATH=${_ka_path_esc};QGIS_PREFIX_PATH=${QGIS_PREFIX_PATH};QT_QPA_PLATFORM=offscreen")
+    set_tests_properties(trench_plan trench_edit trench_plate trench_lshape trench_grid_snap trench_handle PROPERTIES ENVIRONMENT "GDAL_DATA=${OSGEO4W_ROOT}/apps/gdal-dev/share/gdal;PATH=${_ka_path_esc};QGIS_PREFIX_PATH=${QGIS_PREFIX_PATH};QT_QPA_PLATFORM=offscreen")
     set_tests_properties(heritage_style PROPERTIES ENVIRONMENT "GDAL_DATA=${OSGEO4W_ROOT}/apps/gdal-dev/share/gdal;PATH=${_ka_path_esc};QGIS_PREFIX_PATH=${QGIS_PREFIX_PATH};QT_QPA_PLATFORM=offscreen" TIMEOUT 180)
     set_tests_properties(heritage_form PROPERTIES ENVIRONMENT "PATH=${_ka_path_esc};QT_QPA_PLATFORM=offscreen" TIMEOUT 60)
     set_tests_properties(theme_options theme_render ribbon_overflow ribbon_pixels toolbar_fit icon_glyphs icon_mockup PROPERTIES ENVIRONMENT "PATH=${_ka_path_esc};QT_QPA_PLATFORM=offscreen" TIMEOUT 60)

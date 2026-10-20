@@ -4,6 +4,7 @@
 #include <QDialog>
 
 #include "core/TrenchGridGenerator.h"
+#include "core/TrenchGridSnap.h"
 
 class KaAzimuthDial;
 class KaTargetMeter;
@@ -45,6 +46,11 @@ public:
   void setTerrainAspect(const TrenchGridGenerator::SlopeAspect& aspect);
   bool useTerrainAzimuth() const;
 
+  // 「좌표격자에 맞추기」 (사용자 요청 2026-10-20): the map's metre coordinate grid, or none.
+  void setCoordinateGrid(bool available, const TrenchGridSnap::Grid& grid);
+  // The grid the ㄱ·ㄴ자 10%/2% plan is laid on; null when the check is off or not usable.
+  const TrenchGridSnap::Grid* gridLock() const;
+
   QByteArray areaWkb() const { return m_areaWkb; }
   double areaM2() const { return m_areaM2; }
 
@@ -64,6 +70,7 @@ signals:
 private:
   void schedulePlan();  // update visible rows now, compute the preview once input settles
   void refreshRows();
+  void addShapeRows(class QFormLayout* form);
   void refreshPlan();
   void showRatioPlan(const TrenchGridGenerator::RatioFill& plan, double azimuth);
   void showFillPlan(const std::vector<TrenchGridGenerator::Cell>& cells, const QString& reason);
@@ -76,6 +83,9 @@ private:
   QLabel* m_terrainInfo = nullptr;
   TrenchGridGenerator::SlopeAspect m_aspect;
   QComboBox* m_shape = nullptr;  // 곧은 트렌치 (data 0) or a ㄱ·ㄴ자 bend (data 1 + Spec::armBend)
+  QCheckBox* m_gridSnap = nullptr;
+  bool m_gridAvailable = false;
+  TrenchGridSnap::Grid m_grid;
   QComboBox* m_size = nullptr;
   QDoubleSpinBox* m_balk = nullptr;
   QSpinBox* m_rows = nullptr;

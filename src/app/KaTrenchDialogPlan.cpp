@@ -21,6 +21,35 @@
 
 #include <utility>
 
+void KaTrenchDialog::addShapeRows(QFormLayout* form) {
+  // ㄱ·ㄴ자 트렌치 (사용자 요청 2026-10-19): 한 모서리에서 직각으로 꺾인 두 팔 15 m + 15 m, 폭 2 m, 꺾는 방향 네 가지.
+  m_shape = new QComboBox(this);
+  m_shape->setObjectName(QStringLiteral("trenchShape"));
+  m_shape->addItem(QStringLiteral("곧은 트렌치"), 0);  // data: 0 곧은, 1 + Spec::armBend for the Ls
+  for (const QString& bend : {QStringLiteral("ㄴ자"), QStringLiteral("ㄱ자"), QStringLiteral("ㄴ자 좌우 반대"),
+                              QStringLiteral("ㄱ자 좌우 반대")})
+    m_shape->addItem(bend + QStringLiteral(" 트렌치 (15 m + 15 m)"), m_shape->count());
+  m_shape->setToolTip(QStringLiteral("ㄱ·ㄴ자는 팔 15 m 그대로 구역 안에 온전히 들어가는 것만 놓아, 비율이 목표를 조금 넘습니다."));
+  form->addRow(QStringLiteral("모양"), m_shape);
+  connect(m_shape, QOverload<int>::of(&QComboBox::currentIndexChanged), this, [this](int) { schedulePlan(); });
+
+  // 「좌표격자에 맞추기」 (사용자 요청 2026-10-20): 바깥 모서리를 좌표격자 교점에, 방향을 좌표격자 방향에 둔다.
+  m_gridSnap = new QCheckBox(QStringLiteral("좌표격자에 맞추기"), this);
+  m_gridSnap->setObjectName(QStringLiteral("trenchGridLock"));
+  form->addRow(m_gridSnap);
+  connect(m_gridSnap, &QCheckBox::toggled, this, [this](bool) { schedulePlan(); });
+}
+
+void KaTrenchDialog::setCoordinateGrid(bool available, const TrenchGridSnap::Grid& grid) {
+  m_gridAvailable = available && grid.step > 0.0;
+  m_grid = grid;
+  schedulePlan();
+}
+
+const TrenchGridSnap::Grid* KaTrenchDialog::gridLock() const {
+  return m_gridSnap && m_gridSnap->isEnabled() && m_gridSnap->isChecked() ? &m_grid : nullptr;
+}
+
 void KaTrenchDialog::schedulePlan() {
   refreshRows();
   ++m_planSeq;  // an answer for the previous input is stale from now on
@@ -41,7 +70,13 @@ void KaTrenchDialog::refreshRows() {
     form->setRowVisible(m_balk, !ratio);
     form->setRowVisible(m_prefix, !ratio);
   }
-  m_az->setEnabled(!useTerrainAzimuth());
+  // Only the ㄱ·ㄴ자 10%/2% plan is laid on the coordinate grid.
+  m_gridSnap->setEnabled(m_gridAvailable && ratio && m_shape->currentData().toInt() > 0);
+  m_gridSnap->setToolTip(m_gridAvailable
+      ? QStringLiteral("ㄱ·ㄴ자 시굴·표본에서 꺾인 바깥 모서리를 좌표격자 %1 m 교점에, 방향을 좌표격자 방향에 맞춥니다. "
+                       "트렌치끼리는 1 m 이상 띄웁니다.").arg(QLocale().toString(m_grid.step, 'g', 6))
+      : QStringLiteral("지도에 미터 좌표격자를 켜면 쓸 수 있습니다."));
+  m_az->setEnabled(!useTerrainAzimuth() && !gridLock());
   if (m_dial) {  // the dial shows the direction the grid will be laid in (the terrain's when that is on)
     m_dial->setAzimuth(effectiveAzimuth());
     m_dialNote->setText(KaAzimuthDial::note(effectiveAzimuth()));
@@ -71,8 +106,10 @@ void KaTrenchDialog::refreshPlan() {
     const double az = effectiveAzimuth();
     const double arm = spec().armLength;
     const int bend = spec().armBend;
+    const bool onGrid = gridLock() != nullptr;
+    const TrenchGridSnap::Grid grid = m_grid;
     TrenchGridGenerator::RatioFill known;
-    if (TrenchPlanCache::lookup(area, target, 2.0, az, &known, arm, bend)) {
+    if (TrenchPlanCache::lookup(area, target, 2.0, az, &known, arm, bend, onGrid ? &grid : nullptr)) {
       m_planPending = false;
       showRatioPlan(known, az);
       return;
@@ -81,8 +118,9 @@ void KaTrenchDialog::refreshPlan() {
     setSummaryTone("plain");
     m_ratio->setText(QStringLiteral("배치를 계산하는 중입니다…"));
     // The pool is drained in the destructor, so `this` outlives the task.
-    m_planPool->start([this, seq, area, target, az, arm, bend]() {
-      const TrenchGridGenerator::RatioFill plan = TrenchPlanCache::ratioPlan(area, target, 2.0, az, arm, bend);
+    m_planPool->start([this, seq, area, target, az, arm, bend, onGrid, grid]() {
+      const TrenchGridGenerator::RatioFill plan =
+          TrenchPlanCache::ratioPlan(area, target, 2.0, az, arm, bend, onGrid ? &grid : nullptr);
       QMetaObject::invokeMethod(this, [this, seq, plan, az]() {
         if (seq != m_planSeq) return;
         m_planPending = false;
@@ -131,7 +169,8 @@ void KaTrenchDialog::showRatioPlan(const TrenchGridGenerator::RatioFill& plan, d
           .arg(QLocale().toString(TrenchGridGenerator::totalArea(plan.cells), 'f', 2))
           .arg(QLocale().toString(plan.ratioPct, 'f', 1))
           .arg(QLocale().toString(targetPct(), 'f', 0))
-          .arg(QLocale().toString(azimuth, 'f', 0)));
+          .arg(QLocale().toString(azimuth, 'f', 0)) +
+      (gridLock() ? QStringLiteral(" · 좌표격자 %1 m에 맞춤").arg(QLocale().toString(m_grid.step, 'g', 6)) : QString()));
 }
 
 void KaTrenchDialog::showFillPlan(const std::vector<TrenchGridGenerator::Cell>& cells,

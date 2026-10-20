@@ -1,4 +1,5 @@
 #include "MainWindow.h"
+#include <QTimer>
 #include "KaControlPointDialog.h"
 #include "KaAttributeMapTool.h"
 #include "KaCaptureMapTool.h"
@@ -193,6 +194,7 @@ void MainWindow::startSelectTool() {
             [this](const QString& t) { statusBar()->showMessage(t, 8000); });
     connect(m_featureSelectTool, &KaFeatureSelectTool::selectionChanged, this,
             [this](int count) {
+              if (count == 1) QTimer::singleShot(0, this, &MainWindow::pickTrenchFromSelection);
               if (count == 2) {
                 notify(Notice::Info, QStringLiteral("도형 2개 선택됨"),
                        QStringLiteral("[겹친 곳 지우기](우클릭)는 큰 도형에서 작은 도형 자리를 지우고, "

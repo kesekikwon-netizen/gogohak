@@ -1852,6 +1852,7 @@ void MainWindow::startTrenchGrid() {
   }
   m_trenchDlg->setArea(areaWkb, areaM2);
   m_trenchDlg->setTerrainAspect(terrainAspectForArea(areaWkb, areaCrs));
+  syncTrenchCoordinateGrid(areaCrs);
   {
     auto* trenchVl = LayerOps::findByLayerKey(QgsProject::instance(), QStringLiteral("trial_trench"));
     m_trenchDlg->setGridPlaced(trenchVl && trenchVl->featureCount() > 0);
@@ -1927,6 +1928,7 @@ bool MainWindow::applyTrenchFromDialog() {
       const TrenchGridGenerator::PickedArea pick = trenchFillFromSurveyLayer(areaVl);
       m_trenchDlg->setArea(pick.wkb, pick.areaM2);
       areaCrs = areaVl->crs().authid();
+      syncTrenchCoordinateGrid(areaCrs);
       const QString leftover = leftoverSurveyAreaHint(pick);
       if (!leftover.isEmpty())
         statusBar()->showMessage(leftover, 8000);
@@ -1938,7 +1940,8 @@ bool MainWindow::applyTrenchFromDialog() {
     if (m_trenchDlg->ratioMode()) {
       // [pkg B2] F097: the plan the dialog preview already searched (cached), not a second search.
       const auto plan =
-          TrenchPlanCache::ratioPlan(m_trenchDlg->areaWkb(), target, 2.0, sp.azimuthDeg, sp.armLength, sp.armBend);
+          TrenchPlanCache::ratioPlan(m_trenchDlg->areaWkb(), target, 2.0, sp.azimuthDeg, sp.armLength, sp.armBend,
+                                     m_trenchDlg->gridLock());
       if (plan.cells.empty()) {
         notify(Notice::Warning, QStringLiteral("시굴격자"), plan.error);
         return false;
