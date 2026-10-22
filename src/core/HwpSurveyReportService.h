@@ -69,6 +69,11 @@ public:
   QVector<FieldEntry> fields() const;
   bool setFieldValue(const QString& fieldName, const QString& value);
 
+  // 사용자의 자연어 작성·수정 요청을 받아 한글 문서(단락·표·누름틀)에 즉시 반영한다.
+  bool applyUserRequest(const QString& userPrompt,
+                        const SurveySnapshot& snapshot,
+                        QString* assistantReplyOut = nullptr);
+
   // 내장 Qt6 A4 미리보기용 HTML 렌더링
   QString renderPreviewHtml() const;
 

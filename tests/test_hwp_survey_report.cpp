@@ -80,6 +80,15 @@ class TestHwpSurveyReport : public QObject {
     QVERIFY2(tplSession.openTemplateAndFill(std::filesystem::path(hwpxPath.toStdString()), updated, &err),
              qPrintable(err));
     QVERIFY(tplSession.renderPreviewHtml().contains(QStringLiteral("부여 관북리 유적 정밀발굴조사 (수정본)")));
+
+    // 사용자 직접 요청(프롬프트) 반영 및 일괄 치환 검증
+    QString reply;
+    QVERIFY(tplSession.applyUserRequest(
+        QStringLiteral("고찰에 백제 사비기 왕궁지와의 공간적 위계 관계를 추가해줘"), updated, &reply));
+    QVERIFY(tplSession.renderPreviewHtml().contains(QStringLiteral("백제 사비기 왕궁지")));
+    QVERIFY(tplSession.applyUserRequest(
+        QStringLiteral("'왕궁지'를 '핵심 유구군'으로 바꿔줘"), updated, &reply));
+    QVERIFY(tplSession.renderPreviewHtml().contains(QStringLiteral("핵심 유구군")));
   }
 };
 
