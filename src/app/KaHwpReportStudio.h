@@ -3,12 +3,14 @@
 #include <QDialog>
 #include <memory>
 
+class KaHwpLivePaperWindow;
 class QCheckBox;
 class QLabel;
 class QLineEdit;
 class QMainWindow;
 class QTableWidget;
 class QTextBrowser;
+class QTimer;
 
 namespace HwpSurveyReportService {
 class ReportDocumentSession;
@@ -23,9 +25,11 @@ public:
   static void attach(QMainWindow* mainWindow);
 
   void refreshFromActiveProject();
+  void startLiveOrganizeDemo();
+  void openLivePaperWindow();
   void submitUserPrompt(const QString& promptText);
 
-private slots:
+public slots:
   void onOpenTemplateClicked();
   void onSaveHwpxClicked();
   void onSaveHwp5Clicked();
@@ -33,10 +37,13 @@ private slots:
   void onSendPromptClicked();
 
 private:
-  void syncUiFromSession();
+  void syncUiFromSession(const QString& liveStageLabel = {}, int progressPercent = 100);
   void appendChatMessage(const QString& role, const QString& text);
 
   std::unique_ptr<HwpSurveyReportService::ReportDocumentSession> m_session;
+  KaHwpLivePaperWindow* m_liveWindow = nullptr;
+  QTimer* m_stageTimer = nullptr;
+  int m_currentStage = 4;
   QLabel* m_summaryLabel = nullptr;
   QCheckBox* m_ragSlotCheck = nullptr;
   QTextBrowser* m_chatView = nullptr;

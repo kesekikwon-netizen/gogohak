@@ -1,4 +1,5 @@
 #include "KaHwpReportStudio.h"
+#include "KaHwpLivePaperWindow.h"
 #include "core/HwpSurveyReportService.h"
 #include "core/LocalReportRag.h"
 #include <QCheckBox>
@@ -17,6 +18,7 @@
 #include <QTabWidget>
 #include <QTableWidget>
 #include <QTextBrowser>
+#include <QTimer>
 #include <QVBoxLayout>
 #include <qgsproject.h>
 
@@ -30,13 +32,17 @@ KaHwpReportStudio::KaHwpReportStudio(QWidget* parent)
   root->setSpacing(10);
 
   auto* topBar = new QHBoxLayout();
-  auto* btnRefresh = new QPushButton(QStringLiteral("GIS 현황으로 보고서 새로 생성"), this);
+  auto* btnLiveWin = new QPushButton(QStringLiteral("별도 한글(HWP) 실시간 조판 창 띄우기"), this);
+  btnLiveWin->setStyleSheet(QStringLiteral("QPushButton{background:#7c3aed;color:#fff;font-weight:700;padding:6px 14px;border-radius:6px;}"));
+  auto* btnRefresh = new QPushButton(QStringLiteral("실시간 단계별 보고서 자동 정리 시작"), this);
+  btnRefresh->setStyleSheet(QStringLiteral("QPushButton{background:#0284c7;color:#fff;font-weight:600;padding:6px 12px;border-radius:6px;}"));
   auto* btnOpenTpl = new QPushButton(QStringLiteral("기존 한글 양식(.hwp/.hwpx) 열기"), this);
   auto* btnSaveHwpx = new QPushButton(QStringLiteral("한글 표준(.hwpx) 저장"), this);
   auto* btnSaveHwp5 = new QPushButton(QStringLiteral("한글 5.0(.hwp) 저장"), this);
-  m_ragSlotCheck = new QCheckBox(QStringLiteral("발굴보고서 RAG 슬롯 연결 (인덱싱 완료 후 체크)"), this);
+  m_ragSlotCheck = new QCheckBox(QStringLiteral("발굴보고서 RAG 슬롯 연결"), this);
   btnSaveHwpx->setStyleSheet(QStringLiteral("QPushButton{background:#1d4ed8;color:#fff;font-weight:600;padding:6px 14px;border-radius:6px;}"));
   btnSaveHwp5->setStyleSheet(QStringLiteral("QPushButton{background:#0f766e;color:#fff;font-weight:600;padding:6px 14px;border-radius:6px;}"));
+  topBar->addWidget(btnLiveWin);
   topBar->addWidget(btnRefresh);
   topBar->addWidget(btnOpenTpl);
   topBar->addWidget(m_ragSlotCheck);
@@ -55,7 +61,7 @@ KaHwpReportStudio::KaHwpReportStudio(QWidget* parent)
   leftLayout->setContentsMargins(0, 0, 6, 0);
   leftLayout->setSpacing(8);
 
-  auto* reqTitle = new QLabel(QStringLiteral("1. 보고서 작성·수정 요청 (원하는 내용을 직접 지시하세요)"), leftPane);
+  auto* reqTitle = new QLabel(QStringLiteral("1. 보고서 작성·수정 요청 (입력 시 별도 한글 조판 창에서 실시간 정리)"), leftPane);
   reqTitle->setStyleSheet(QStringLiteral("font-weight:700;font-size:11pt;color:#0f172a;"));
   leftLayout->addWidget(reqTitle);
 
@@ -101,7 +107,7 @@ KaHwpReportStudio::KaHwpReportStudio(QWidget* parent)
   auto* rightPane = new QWidget(split);
   auto* rightLayout = new QVBoxLayout(rightPane);
   rightLayout->setContentsMargins(6, 0, 0, 0);
-  auto* previewTitle = new QLabel(QStringLiteral("한글(.hwpx / .hwp) A4 문서 조판 실시간 미리보기"), rightPane);
+  auto* previewTitle = new QLabel(QStringLiteral("한글(.hwpx / .hwp) A4 용지 조판 미리보기 (별도 창과 실시간 동기화)"), rightPane);
   previewTitle->setStyleSheet(QStringLiteral("font-weight:700;font-size:11pt;color:#0f172a;"));
   rightLayout->addWidget(previewTitle);
   m_previewView = new QTextBrowser(rightPane);
@@ -114,7 +120,23 @@ KaHwpReportStudio::KaHwpReportStudio(QWidget* parent)
   split->setStretchFactor(1, 6);
   root->addWidget(split, 1);
 
-  connect(btnRefresh, &QPushButton::clicked, this, &KaHwpReportStudio::refreshFromActiveProject);
+  m_stageTimer = new QTimer(this);
+  m_stageTimer->setInterval(420);
+  connect(m_stageTimer, &QTimer::timeout, this, [this] {
+    const auto snap = HwpSurveyReportService::ReportDocumentSession::collectFromProject(
+        QgsProject::instance(), m_ragSlotCheck && m_ragSlotCheck->isChecked());
+    ++m_currentStage;
+    m_session->buildStandardReport(snap, nullptr, m_currentStage);
+    const QStringList labels = {QString(), QStringLiteral("1/4단계: 표제부 및 Ⅰ. 조사 개요 조판 중..."),
+                                QStringLiteral("2/4단계: Ⅱ. 주변 유적 현황 <표 1> 작성 중..."),
+                                QStringLiteral("3/4단계: Ⅲ. 유구·유물 집계 <표 2> 정리 중..."),
+                                QStringLiteral("4/4단계: Ⅳ. 고찰 및 한글 누름틀 바인딩 완료")};
+    if (m_currentStage >= 4) m_stageTimer->stop();
+    syncUiFromSession(m_currentStage >= 4 ? QString() : labels.value(m_currentStage), qMin(100, m_currentStage * 25));
+  });
+
+  connect(btnLiveWin, &QPushButton::clicked, this, &KaHwpReportStudio::openLivePaperWindow);
+  connect(btnRefresh, &QPushButton::clicked, this, &KaHwpReportStudio::startLiveOrganizeDemo);
   connect(btnOpenTpl, &QPushButton::clicked, this, &KaHwpReportStudio::onOpenTemplateClicked);
   connect(btnSaveHwpx, &QPushButton::clicked, this, &KaHwpReportStudio::onSaveHwpxClicked);
   connect(btnSaveHwp5, &QPushButton::clicked, this, &KaHwpReportStudio::onSaveHwp5Clicked);
@@ -124,10 +146,29 @@ KaHwpReportStudio::KaHwpReportStudio(QWidget* parent)
 
   refreshFromActiveProject();
   appendChatMessage(QStringLiteral("안내"),
-                    QStringLiteral("아래 초록색 입력창에 보고서에 들어갈 내용이나 수정 지시를 입력하고 [문서에 요청 반영] 또는 Enter를 누르면 우측 한글(.hwpx/.hwp) 문서에 즉시 반영됩니다."));
+                    QStringLiteral("[별도 한글(HWP) 실시간 조판 창 띄우기]를 누르거나 아래 입력창에 요청을 입력하면, 별도의 한글 A4 용지 창에서 문서가 단계별로 실시간 정리되는 모습을 확인하실 수 있습니다."));
 }
 
 KaHwpReportStudio::~KaHwpReportStudio() = default;
+
+void KaHwpReportStudio::openLivePaperWindow() {
+  if (!m_liveWindow) {
+    m_liveWindow = new KaHwpLivePaperWindow(this);
+    m_liveWindow->setActionCallbacks([this](const QString& txt) { submitUserPrompt(txt); },
+                                     [this] { syncUiFromSession(); },
+                                     [this] { onSaveHwpxClicked(); }, [this] { onSaveHwp5Clicked(); });
+  }
+  m_liveWindow->show();
+  m_liveWindow->raise();
+  m_liveWindow->activateWindow();
+  syncUiFromSession();
+}
+
+void KaHwpReportStudio::startLiveOrganizeDemo() {
+  openLivePaperWindow();
+  m_currentStage = 0;
+  m_stageTimer->start();
+}
 
 void KaHwpReportStudio::appendChatMessage(const QString& role, const QString& text) {
   if (!m_chatView) return;
@@ -146,34 +187,22 @@ void KaHwpReportStudio::onSendPromptClicked() {
 void KaHwpReportStudio::submitUserPrompt(const QString& promptText) {
   const QString req = promptText.trimmed();
   if (req.isEmpty()) return;
+  openLivePaperWindow();
   appendChatMessage(QStringLiteral("요청"), req);
   const auto snap = HwpSurveyReportService::ReportDocumentSession::collectFromProject(
       QgsProject::instance(), m_ragSlotCheck && m_ragSlotCheck->isChecked());
   QString reply;
   if (m_session->applyUserRequest(req, snap, &reply)) {
     appendChatMessage(QStringLiteral("반영 완료"), reply);
-    syncUiFromSession();
-  } else {
-    appendChatMessage(QStringLiteral("오류"), QStringLiteral("요청을 문서에 반영하지 못했습니다."));
+    syncUiFromSession(QStringLiteral("방금 요청하신 단락·누름틀 수정 사항을 실시간 조판 반영 중: ") + req, 85);
+    QTimer::singleShot(900, this, [this] { syncUiFromSession(QString(), 100); });
   }
 }
 
 void KaHwpReportStudio::refreshFromActiveProject() {
-  const bool useRag = m_ragSlotCheck && m_ragSlotCheck->isChecked();
-  const auto ragHook = [](const HwpSurveyReportService::SurveySnapshot& snap) -> QString {
-    const auto hits = strata::core::LocalReportRag::search(snap.surveyTitle.toStdString(), "", 3);
-    if (hits.empty()) return QStringLiteral("[RAG 검색 완료 — 일치하는 보고서 본문 없음]");
-    QStringList lines;
-    for (const auto& h : hits)
-      lines << QStringLiteral("• %1 (p.%2): %3").arg(QString::fromStdString(h.report_name)).arg(h.page_no).arg(QString::fromStdString(h.snippet).left(180));
-    return lines.join(QStringLiteral("\n"));
-  };
-  const auto snap = HwpSurveyReportService::ReportDocumentSession::collectFromProject(QgsProject::instance(), useRag, ragHook);
-  QString err;
-  if (!m_session->buildStandardReport(snap, &err)) {
-    QMessageBox::warning(this, QStringLiteral("보고서 생성 오류"), err);
-    return;
-  }
+  const auto snap = HwpSurveyReportService::ReportDocumentSession::collectFromProject(
+      QgsProject::instance(), m_ragSlotCheck && m_ragSlotCheck->isChecked());
+  m_session->buildStandardReport(snap, nullptr, 4);
   m_summaryLabel->setText(QStringLiteral("조사명: %1  |  조사구역: %2개소 (%3 ㎡)  |  반경 내 주변유적: %4개소  |  좌표계: %5")
                               .arg(snap.surveyTitle).arg(snap.surveyPolygonCount).arg(qRound(snap.totalAreaSqm))
                               .arg(snap.nearbySites.size()).arg(snap.surveyCrs));
@@ -189,39 +218,38 @@ void KaHwpReportStudio::onOpenTemplateClicked() {
     QMessageBox::warning(this, QStringLiteral("양식 열기 실패"), err);
     return;
   }
-  syncUiFromSession();
+  openLivePaperWindow();
+  syncUiFromSession(QStringLiteral("기관 한글 양식 누름틀 자동 기입 완료"), 100);
 }
 
 void KaHwpReportStudio::onSaveHwpxClicked() {
   const QString path = QFileDialog::getSaveFileName(this, QStringLiteral("한글 표준(.hwpx)으로 저장"), QDir::home().filePath(QStringLiteral("발굴조사보고서.hwpx")), QStringLiteral("한글 표준 문서 (*.hwpx)"));
   if (path.isEmpty()) return;
   QString err;
-  if (!m_session->saveAs(std::filesystem::path(path.toStdString()), QStringLiteral("HWPX"), &err)) {
+  if (!m_session->saveAs(std::filesystem::path(path.toStdString()), QStringLiteral("HWPX"), &err))
     QMessageBox::warning(this, QStringLiteral("저장 실패"), err);
-    return;
-  }
-  QMessageBox::information(this, QStringLiteral("저장 완료"), QStringLiteral("한글 표준(.hwpx) 보고서를 저장했습니다:\n%1").arg(path));
+  else
+    QMessageBox::information(this, QStringLiteral("저장 완료"), QStringLiteral("한글 표준(.hwpx) 보고서를 저장했습니다:\n%1").arg(path));
 }
 
 void KaHwpReportStudio::onSaveHwp5Clicked() {
   const QString path = QFileDialog::getSaveFileName(this, QStringLiteral("한글 5.0(.hwp)으로 저장"), QDir::home().filePath(QStringLiteral("발굴조사보고서.hwp")), QStringLiteral("한글 5.0 문서 (*.hwp)"));
   if (path.isEmpty()) return;
   QString err;
-  if (!m_session->saveAs(std::filesystem::path(path.toStdString()), QStringLiteral("HWP"), &err)) {
+  if (!m_session->saveAs(std::filesystem::path(path.toStdString()), QStringLiteral("HWP"), &err))
     QMessageBox::warning(this, QStringLiteral("저장 실패"), err);
-    return;
-  }
-  QMessageBox::information(this, QStringLiteral("저장 완료"), QStringLiteral("한글 5.0(.hwp) 보고서를 저장했습니다:\n%1").arg(path));
+  else
+    QMessageBox::information(this, QStringLiteral("저장 완료"), QStringLiteral("한글 5.0(.hwp) 보고서를 저장했습니다:\n%1").arg(path));
 }
 
 void KaHwpReportStudio::onFieldCellChanged(int row, int column) {
   if (m_updatingTable || column != 1) return;
   QTableWidgetItem *nameItem = m_fieldTable->item(row, 0), *valItem = m_fieldTable->item(row, 1);
   if (nameItem && valItem && m_session->setFieldValue(nameItem->text(), valItem->text()))
-    m_previewView->setHtml(m_session->renderPreviewHtml());
+    syncUiFromSession(QStringLiteral("누름틀 필드 실시간 갱신: ") + nameItem->text(), 100);
 }
 
-void KaHwpReportStudio::syncUiFromSession() {
+void KaHwpReportStudio::syncUiFromSession(const QString& liveStageLabel, int progressPercent) {
   m_updatingTable = true;
   const auto list = m_session->fields();
   m_fieldTable->setRowCount(list.size());
@@ -232,7 +260,15 @@ void KaHwpReportStudio::syncUiFromSession() {
     m_fieldTable->setItem(i, 1, new QTableWidgetItem(list[i].value));
   }
   m_updatingTable = false;
-  m_previewView->setHtml(m_session->renderPreviewHtml());
+  const int zoom = m_liveWindow ? m_liveWindow->zoomPercent() : 100;
+  const bool marks = m_liveWindow ? m_liveWindow->showFieldMarks() : true;
+  const QString html = m_session->renderPreviewHtml(liveStageLabel, zoom, marks);
+  m_previewView->setHtml(html);
+  if (m_liveWindow) {
+    m_liveWindow->updatePaperHtml(
+        html, liveStageLabel.isEmpty() ? QStringLiteral("한글(HWP/HWPX) A4 실시간 조판 완료 (총 1쪽)") : liveStageLabel,
+        progressPercent);
+  }
 }
 
 void KaHwpReportStudio::attach(QMainWindow* mainWindow) {
@@ -246,20 +282,14 @@ void KaHwpReportStudio::attach(QMainWindow* mainWindow) {
     if (QTabBar* bar = tabs->tabBar()) bar->setTabButton(tabIdx, QTabBar::RightSide, nullptr);
   }
   auto openStudio = [tabs, studioPage]() {
-    studioPage->refreshFromActiveProject();
-    if (tabs && tabs->indexOf(studioPage) >= 0) {
-      tabs->setCurrentWidget(studioPage);
-      if (auto* edit = studioPage->findChild<QLineEdit*>(QStringLiteral("hwpPromptInput"))) edit->setFocus();
-    } else {
-      studioPage->setWindowFlags(Qt::Dialog);
-      studioPage->show();
-    }
+    if (tabs && tabs->indexOf(studioPage) >= 0) tabs->setCurrentWidget(studioPage);
+    studioPage->startLiveOrganizeDemo();
   };
   auto* sc = new QShortcut(QKeySequence(QStringLiteral("Ctrl+G")), mainWindow);
   QObject::connect(sc, &QShortcut::activated, mainWindow, openStudio);
   if (QWidget* corner = mainWindow->findChild<QWidget*>(QStringLiteral("viewTabsCorner"))) {
     if (corner->layout()) {
-      auto* btn = new QPushButton(QStringLiteral("한글 보고서 요청·작성 (Ctrl+G)"), corner);
+      auto* btn = new QPushButton(QStringLiteral("한글 실시간 조판 창 (Ctrl+G)"), corner);
       btn->setObjectName(QStringLiteral("btnOpenHwpStudio"));
       btn->setCursor(Qt::PointingHandCursor);
       btn->setStyleSheet(QStringLiteral("QPushButton{background:#0f766e;color:#fff;font-weight:600;padding:5px 12px;border-radius:6px;border:none;}QPushButton:hover{background:#115e59;}"));

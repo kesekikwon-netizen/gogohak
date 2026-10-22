@@ -28,10 +28,7 @@ void runAction(HWPSDK::Document* doc, const char16_t* id, const std::function<vo
   if (!doc) return;
   if (HWPSDK::Action* act = doc->CreateAction(id)) {
     if (HWPSDK::ParameterSet* set = act->CreateParameterSet()) {
-      act->GetDefault(set);
-      fill(set);
-      act->Execute(set);
-      set->Release();
+      act->GetDefault(set); fill(set); act->Execute(set); set->Release();
     }
     act->Release();
   }
@@ -39,10 +36,7 @@ void runAction(HWPSDK::Document* doc, const char16_t* id, const std::function<vo
 
 void insertStyledParagraph(HWPSDK::Document* doc, const QString& text,
                            unsigned int heightHwpUnit, bool bold, unsigned int alignType) {
-  runAction(doc, u"CharShape", [&](HWPSDK::ParameterSet* s) {
-    s->SetUInt(u"Height", heightHwpUnit);
-    s->SetUInt(u"Bold", bold ? 1U : 0U);
-  });
+  runAction(doc, u"CharShape", [&](HWPSDK::ParameterSet* s) { s->SetUInt(u"Height", heightHwpUnit); s->SetUInt(u"Bold", bold ? 1U : 0U); });
   runAction(doc, u"ParagraphShape", [&](HWPSDK::ParameterSet* s) { s->SetUInt(u"AlignType", alignType); });
   const std::u16string u16 = toU16(text + QStringLiteral("\n"));
   runAction(doc, u"InsertText", [&](HWPSDK::ParameterSet* s) { s->SetString(u"Text", u16.c_str()); });
@@ -51,11 +45,7 @@ void insertStyledParagraph(HWPSDK::Document* doc, const QString& text,
 void appendTableToModel(HWPSDK::Document* doc, const QVector<QStringList>& rows, uint32_t headerBgColor = 0xE8EEF5) {
   if (!doc || rows.isEmpty()) return;
   const int rCount = rows.size(), cCount = rows.first().size();
-  runAction(doc, u"TableCreate", [&](HWPSDK::ParameterSet* s) {
-    s->SetInt(u"Rows", rCount);
-    s->SetInt(u"Cols", cCount);
-    s->SetInt(u"TreatAsChar", 1);
-  });
+  runAction(doc, u"TableCreate", [&](HWPSDK::ParameterSet* s) { s->SetInt(u"Rows", rCount); s->SetInt(u"Cols", cCount); s->SetInt(u"TreatAsChar", 1); });
   auto* impl = dynamic_cast<openhwp::core::DocumentImpl*>(doc->GetImpl());
   if (!impl || impl->Model().tables.empty()) return;
   auto& tbl = impl->Model().tables.back();
@@ -63,31 +53,23 @@ void appendTableToModel(HWPSDK::Document* doc, const QVector<QStringList>& rows,
     for (int c = 0; c < cCount && c < tbl.cols; ++c) {
       auto& cell = tbl.cells[static_cast<size_t>(r)][static_cast<size_t>(c)];
       cell.text_utf8 = rows[r][c].toStdString();
-      if (r == 0) {
-        cell.bg_color = headerBgColor;
-        cell.char_shape.bold = 1;
-        cell.para_shape.align_type = 3;
-      }
+      if (r == 0) { cell.bg_color = headerBgColor; cell.char_shape.bold = 1; cell.para_shape.align_type = 3; }
     }
   }
 }
 
 QString buildDefaultDiscussion(const SurveySnapshot& snap) {
   const QLocale loc(QLocale::Korean);
-  QStringList lines;
-  lines << QStringLiteral("본 조사는 %1 일원(면적 %2㎡, 좌표계 %3)을 대상으로 수행되었다.")
-               .arg(snap.surveyTitle, loc.toString(std::round(snap.totalAreaSqm)), snap.surveyCrs);
-  if (snap.nearbySites.isEmpty()) {
-    lines << QStringLiteral("조사구역 반경 1,000m 이내에서 확인된 기보고 유적 레이어가 없거나 아직 로드되지 않았다.");
-  } else {
-    int in500 = 0;
-    for (const auto& it : snap.nearbySites)
-      if (it.distanceMeters <= 500) ++in500;
-    const auto& n = snap.nearbySites.first();
-    lines << QStringLiteral("주변 유적 공간분석 결과, 반경 1,000m 이내에서 총 %1개소(500m 이내 %2개소)의 유적이 확인되며, 최단거리 유적은 %3(%4m, %5쪽)이다.")
-                 .arg(snap.nearbySites.size()).arg(in500).arg(n.siteName).arg(n.distanceMeters).arg(n.direction);
-  }
-  return lines.join(QStringLiteral(" "));
+  const QString base = QStringLiteral("본 조사는 %1 일원(면적 %2㎡, 좌표계 %3)을 대상으로 수행되었다.")
+                           .arg(snap.surveyTitle, loc.toString(std::round(snap.totalAreaSqm)), snap.surveyCrs);
+  if (snap.nearbySites.isEmpty())
+    return base + QStringLiteral(" 조사구역 반경 1,000m 이내에서 확인된 기보고 유적 레이어가 없거나 아직 로드되지 않았다.");
+  int in500 = 0;
+  for (const auto& it : snap.nearbySites)
+    if (it.distanceMeters <= 500) ++in500;
+  const auto& n = snap.nearbySites.first();
+  return base + QStringLiteral(" 주변 유적 공간분석 결과, 반경 1,000m 이내에서 총 %1개소(500m 이내 %2개소)의 유적이 확인되며, 최단거리 유적은 %3(%4m, %5쪽)이다.")
+                    .arg(snap.nearbySites.size()).arg(in500).arg(n.siteName).arg(n.distanceMeters).arg(n.direction);
 }
 }  // namespace
 
@@ -146,7 +128,7 @@ SurveySnapshot ReportDocumentSession::collectFromProject(QgsProject* project, bo
   return snap;
 }
 
-bool ReportDocumentSession::buildStandardReport(const SurveySnapshot& snap, QString* errorOut) {
+bool ReportDocumentSession::buildStandardReport(const SurveySnapshot& snap, QString* errorOut, int maxStage) {
   if (!m_impl || !m_impl->doc) {
     if (errorOut) *errorOut = QStringLiteral("OpenHwpSDK 문서 엔진을 초기화하지 못했습니다.");
     return false;
@@ -161,6 +143,8 @@ bool ReportDocumentSession::buildStandardReport(const SurveySnapshot& snap, QStr
   bindField(doc, u"조사명", u"SURVEY_NAME", snap.surveyTitle);
   bindField(doc, u"조사면적", u"SURVEY_AREA_M2", areaStr);
   bindField(doc, u"좌표계", u"SURVEY_CRS", snap.surveyCrs);
+  if (maxStage <= 1) return true;
+
   insertStyledParagraph(doc, QStringLiteral("Ⅱ. 주변 유적 현황 (<표 1>)"), 1300, true, 1);
   QVector<QStringList> siteRows = {{QStringLiteral("연번"), QStringLiteral("구분"), QStringLiteral("유적명"), QStringLiteral("거리(m)"), QStringLiteral("방위"), QStringLiteral("반경구분")}};
   int seq = 1;
@@ -171,12 +155,14 @@ bool ReportDocumentSession::buildStandardReport(const SurveySnapshot& snap, QStr
   if (siteRows.size() == 1)
     siteRows.push_back({QStringLiteral("-"), QStringLiteral("-"), QStringLiteral("반경 내 로드된 주변유적 없음"), QStringLiteral("-"), QStringLiteral("-"), QStringLiteral("-")});
   appendTableToModel(doc, siteRows);
+  if (maxStage == 2) return true;
 
   insertStyledParagraph(doc, QStringLiteral("Ⅲ. 조사구역 내 유구·유물 집계 (<표 2>)"), 1300, true, 1);
   QVector<QStringList> domRows = {{QStringLiteral("레이어 구분"), QStringLiteral("식별 키"), QStringLiteral("도형 수(건)")}};
   for (const auto& d : snap.domainCounts)
     domRows.push_back({d.label, d.layerKey, QString::number(d.featureCount)});
   appendTableToModel(doc, domRows);
+  if (maxStage == 3) return true;
 
   insertStyledParagraph(doc, QStringLiteral("Ⅳ. 고찰 및 발굴보고서 RAG 슬롯"), 1300, true, 1);
   insertStyledParagraph(doc, snap.discussionDraft, 1000, false, 0);
@@ -257,41 +243,57 @@ bool ReportDocumentSession::applyUserRequest(const QString& userPrompt, const Su
   return true;
 }
 
-QString ReportDocumentSession::renderPreviewHtml() const {
+QString ReportDocumentSession::renderPreviewHtml(const QString& liveStageLabel, int zoomPercent, bool showFieldMarks) const {
   if (!m_impl || !m_impl->doc) return {};
   auto* impl = dynamic_cast<openhwp::core::DocumentImpl*>(m_impl->doc->GetImpl());
   if (!impl) return {};
   const auto& model = impl->Model();
-  QString html = QStringLiteral("<html><body style='font-family:\"Noto Serif CJK KR\",\"NanumMyeongjo\",serif;background:#fff;color:#18181b;padding:24px;line-height:1.65;'>");
-  for (const auto& p : model.paragraphs) {
+  const int pageW = qBound(420, 680 * zoomPercent / 100, 1300);
+  QString html = QStringLiteral(
+      "<html><body style='background:#525659;margin:0;padding:24px;font-family:\"Noto Serif CJK KR\",\"NanumMyeongjo\",serif;'>"
+      "<table align='center' width='%1' cellspacing='0' cellpadding='0' style='background:#ffffff;border:1px solid #1e293b;'>"
+      "<tr><td style='padding:26px 40px 10px 40px;color:#94a3b8;font-size:8.5pt;border-bottom:1px solid #cbd5e1;'>"
+      "<span>┏ 한글(HWP) A4 조판 규격 (210×297mm · 59528×84188 HWPUnit)</span><span style='float:right;'>┓</span></td></tr>"
+      "<tr><td style='padding:24px 44px;color:#111827;line-height:1.75;'>").arg(pageW);
+  if (!liveStageLabel.isEmpty())
+    html += QStringLiteral("<div style='background:#fef3c7;border:2px solid #f59e0b;color:#92400e;padding:8px 12px;margin-bottom:14px;font-weight:bold;font-size:9.5pt;'>"
+                           "⚡ [실시간 조판 중] %1</div>").arg(liveStageLabel.toHtmlEscaped());
+  for (size_t i = 0; i < model.paragraphs.size(); ++i) {
+    const auto& p = model.paragraphs[i];
     const QString txt = QString::fromStdString(p.text_utf8).trimmed();
-    if (!txt.isEmpty())
-      html += QStringLiteral("<p style='font-size:%1pt;font-weight:%2;text-align:%3;margin:8px 0;'>%4</p>")
-                  .arg(qMax(10, static_cast<int>(p.char_shape.height / 100)))
-                  .arg(p.char_shape.bold ? QStringLiteral("bold") : QStringLiteral("normal"),
-                       p.para_shape.align_type == 3 ? QStringLiteral("center") : QStringLiteral("left"),
-                       txt.toHtmlEscaped().replace(QLatin1Char('\n'), QStringLiteral("<br/>")));
+    if (txt.isEmpty()) continue;
+    const bool isLastLive = !liveStageLabel.isEmpty() && (i + 1 == model.paragraphs.size());
+    const QString hi = isLastLive ? QStringLiteral("background:#ecfdf5;border-left:4px solid #0d9488;padding-left:8px;") : QString();
+    html += QStringLiteral("<p style='font-size:%1pt;font-weight:%2;text-align:%3;margin:9px 0;%4'>%5</p>")
+                .arg(qMax(10, static_cast<int>(p.char_shape.height / 100)))
+                .arg(p.char_shape.bold ? QStringLiteral("bold") : QStringLiteral("normal"),
+                     p.para_shape.align_type == 3 ? QStringLiteral("center") : QStringLiteral("left"),
+                     hi, txt.toHtmlEscaped().replace(QLatin1Char('\n'), QStringLiteral("<br/>")));
   }
   for (const auto& tbl : model.tables) {
-    html += QStringLiteral("<table border='1' cellspacing='0' cellpadding='6' style='border-collapse:collapse;width:100%;margin:14px 0;font-size:9.5pt;border-color:#94a3b8;'>");
+    html += QStringLiteral("<table border='1' cellspacing='0' cellpadding='6' style='border-collapse:collapse;width:100%;margin:16px 0;font-size:9.5pt;border-top:2px solid #0f172a;border-bottom:2px solid #0f172a;border-color:#475569;'>");
     for (int r = 0; r < tbl.rows; ++r) {
       html += QStringLiteral("<tr>");
       for (int c = 0; c < tbl.cols; ++c)
-        html += QStringLiteral("<td style='background:%1;font-weight:%2;'>%3</td>")
-                    .arg(r == 0 ? QStringLiteral("#f1f5f9") : QStringLiteral("#ffffff"),
+        html += QStringLiteral("<td align='%4' style='background:%1;font-weight:%2;'>%3</td>")
+                    .arg(r == 0 ? QStringLiteral("#e2e8f0") : QStringLiteral("#ffffff"),
                          r == 0 ? QStringLiteral("bold") : QStringLiteral("normal"),
-                         QString::fromStdString(tbl.cells[static_cast<size_t>(r)][static_cast<size_t>(c)].text_utf8).toHtmlEscaped());
+                         QString::fromStdString(tbl.cells[static_cast<size_t>(r)][static_cast<size_t>(c)].text_utf8).toHtmlEscaped(),
+                         r == 0 ? QStringLiteral("center") : QStringLiteral("left"));
       html += QStringLiteral("</tr>");
     }
     html += QStringLiteral("</table>");
   }
-  if (!model.fields.empty()) {
-    html += QStringLiteral("<hr style='margin:16px 0;border:0;border-top:1px solid #cbd5e1;'/><div style='font-size:9pt;color:#475569;'><b>[한글 누름틀(Field) 바인딩 현황]</b><ul>");
+  if (showFieldMarks && !model.fields.empty()) {
+    html += QStringLiteral("<div style='margin-top:18px;padding:10px;background:#f8fafc;border:1px dashed #dc2626;font-size:9pt;color:#334155;'>"
+                           "<b style='color:#dc2626;'>⟪한글 누름틀(Field) 실시간 바인딩 표시⟫</b><br/>");
     for (const auto& f : model.fields)
-      html += QStringLiteral("<li><code>{{%1}}</code> = %2</li>")
+      html += QStringLiteral("<span style='color:#dc2626;font-weight:bold;'>⟪%1⟫</span> %2 &nbsp;&nbsp; ")
                   .arg(QString::fromStdString(f.name_utf8).toHtmlEscaped(), QString::fromStdString(f.text_utf8).toHtmlEscaped());
-    html += QStringLiteral("</ul></div>");
+    html += QStringLiteral("</div>");
   }
-  return html + QStringLiteral("</body></html>");
+  html += QStringLiteral("</td></tr><tr><td align='center' style='padding:12px 40px 24px 40px;color:#64748b;font-size:9pt;border-top:1px solid #e2e8f0;'>"
+                         "<span style='float:left;color:#94a3b8;'>┗</span>- 1 -<span style='float:right;color:#94a3b8;'>┛</span></td></tr></table></body></html>");
+  return html;
 }
 }  // namespace HwpSurveyReportService

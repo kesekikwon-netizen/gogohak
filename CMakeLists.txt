@@ -615,6 +615,8 @@ add_executable(ka-hgis
   src/app/KaTilePreview.cpp
   src/app/KaHwpReportStudio.cpp
   src/app/KaHwpReportStudio.h
+  src/app/KaHwpLivePaperWindow.cpp
+  src/app/KaHwpLivePaperWindow.h
   src/app/KaApiKeyDialog.h
   src/app/KaMenuCaption.h
   src/app/KaFormPlate.h

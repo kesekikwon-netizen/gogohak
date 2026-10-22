@@ -53,7 +53,10 @@ public:
                                            const RagSlotCallback& ragSlot = {});
 
   // 수집된 GIS 현황으로 표준 발굴조사보고서 한글 문서(표·누름틀 포함)를 생성한다.
-  bool buildStandardReport(const SurveySnapshot& snapshot, QString* errorOut = nullptr);
+  // maxStage (1~4)를 지정하면 단계별로 실시간 조판되는 모습을 보여줄 수 있다.
+  bool buildStandardReport(const SurveySnapshot& snapshot,
+                           QString* errorOut = nullptr,
+                           int maxStage = 4);
 
   // 기존 한글 양식(.hwp / .hwpx)을 열고 누름틀 필드에 GIS 데이터를 자동으로 채운다.
   bool openTemplateAndFill(const std::filesystem::path& templatePath,
@@ -74,8 +77,10 @@ public:
                         const SurveySnapshot& snapshot,
                         QString* assistantReplyOut = nullptr);
 
-  // 내장 Qt6 A4 미리보기용 HTML 렌더링
-  QString renderPreviewHtml() const;
+  // 실제 한글(HWP) A4 용지 조판 미리보기용 HTML 렌더링 (다중 쪽·여백 마크·실시간 하이라이트 지원)
+  QString renderPreviewHtml(const QString& liveStageLabel = {},
+                            int zoomPercent = 100,
+                            bool showFieldMarks = true) const;
 
 private:
   struct Impl;
