@@ -251,7 +251,10 @@ add_library(ka_core STATIC
   src/core/SurveySchema.cpp
   src/core/BufferAnalysis.cpp
   src/core/NearbyHeritageExport.cpp
+  src/core/GisFactHarness.cpp
+  src/core/GeminiCommandRouter.cpp
   src/core/HwpSurveyReportService.cpp
+  src/core/HwpAcademicVisuals.cpp
   src/core/LocalReportRag.cpp
   ${KA_PLATFORM_SOURCES}
   ${KA_OPENHWP_SOURCES}
@@ -349,7 +352,10 @@ add_library(ka_core STATIC
   src/core/ControlPointCsv.h
   src/core/BufferAnalysis.h
   src/core/NearbyHeritageExport.h
+  src/core/GisFactHarness.h
+  src/core/GeminiCommandRouter.h
   src/core/HwpSurveyReportService.h
+  src/core/HwpAcademicVisuals.h
   src/core/LocalReportRag.h
   src/platform/IPlatformService.h
   src/core/RecentSurveys.h
@@ -617,6 +623,8 @@ add_executable(ka-hgis
   src/app/KaHwpReportStudio.h
   src/app/KaHwpLivePaperWindow.cpp
   src/app/KaHwpLivePaperWindow.h
+  src/app/KaGeminiBridgeClient.cpp
+  src/app/KaGeminiBridgeClient.h
   src/app/KaApiKeyDialog.h
   src/app/KaMenuCaption.h
   src/app/KaFormPlate.h

@@ -201,18 +201,14 @@ bool ReportDocumentSession::saveAs(const std::filesystem::path& outputPath, cons
 
 QVector<FieldEntry> ReportDocumentSession::fields() const {
   QVector<FieldEntry> out;
-  if (!m_impl || !m_impl->doc) return out;
-  auto* impl = dynamic_cast<openhwp::core::DocumentImpl*>(m_impl->doc->GetImpl());
-  if (!impl) return out;
-  for (const auto& f : impl->Model().fields)
-    out.push_back({QString::fromStdString(f.name_utf8), QString::fromStdString(f.text_utf8)});
+  auto* impl = (m_impl && m_impl->doc) ? dynamic_cast<openhwp::core::DocumentImpl*>(m_impl->doc->GetImpl()) : nullptr;
+  if (impl) for (const auto& f : impl->Model().fields) out.push_back({QString::fromStdString(f.name_utf8), QString::fromStdString(f.text_utf8)});
   return out;
 }
 
 bool ReportDocumentSession::setFieldValue(const QString& fieldName, const QString& value) {
-  if (!m_impl || !m_impl->doc) return false;
   const std::u16string nameU16 = toU16(fieldName);
-  if (!m_impl->doc->FieldExist(nameU16.c_str())) return false;
+  if (!m_impl || !m_impl->doc || !m_impl->doc->FieldExist(nameU16.c_str())) return false;
   m_impl->doc->PutFieldText(nameU16.c_str(), toU16(value).c_str());
   return true;
 }
@@ -243,7 +239,8 @@ bool ReportDocumentSession::applyUserRequest(const QString& userPrompt, const Su
   return true;
 }
 
-QString ReportDocumentSession::renderPreviewHtml(const QString& liveStageLabel, int zoomPercent, bool showFieldMarks) const {
+QString ReportDocumentSession::renderPreviewHtml(const QString& liveStageLabel, int zoomPercent,
+                                                 bool showFieldMarks, const QString& extraVisualsHtml) const {
   if (!m_impl || !m_impl->doc) return {};
   auto* impl = dynamic_cast<openhwp::core::DocumentImpl*>(m_impl->doc->GetImpl());
   if (!impl) return {};
@@ -284,6 +281,7 @@ QString ReportDocumentSession::renderPreviewHtml(const QString& liveStageLabel, 
     }
     html += QStringLiteral("</table>");
   }
+  if (!extraVisualsHtml.isEmpty()) html += extraVisualsHtml;
   if (showFieldMarks && !model.fields.empty()) {
     html += QStringLiteral("<div style='margin-top:18px;padding:10px;background:#f8fafc;border:1px dashed #dc2626;font-size:9pt;color:#334155;'>"
                            "<b style='color:#dc2626;'>⟪한글 누름틀(Field) 실시간 바인딩 표시⟫</b><br/>");

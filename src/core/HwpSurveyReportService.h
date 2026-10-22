@@ -77,10 +77,11 @@ public:
                         const SurveySnapshot& snapshot,
                         QString* assistantReplyOut = nullptr);
 
-  // 실제 한글(HWP) A4 용지 조판 미리보기용 HTML 렌더링 (다중 쪽·여백 마크·실시간 하이라이트 지원)
+  // 실제 한글(HWP) A4 용지 조판 미리보기용 HTML 렌더링 (다중 쪽·여백 마크·모식도/차트·실시간 하이라이트 지원)
   QString renderPreviewHtml(const QString& liveStageLabel = {},
                             int zoomPercent = 100,
-                            bool showFieldMarks = true) const;
+                            bool showFieldMarks = true,
+                            const QString& extraVisualsHtml = {}) const;
 
 private:
   struct Impl;

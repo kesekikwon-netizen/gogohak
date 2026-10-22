@@ -1,8 +1,11 @@
 #pragma once
 
+#include "core/HwpAcademicVisuals.h"
+
 #include <QDialog>
 #include <memory>
 
+class KaGeminiBridgeClient;
 class KaHwpLivePaperWindow;
 class QCheckBox;
 class QLabel;
@@ -26,6 +29,7 @@ public:
 
   void refreshFromActiveProject();
   void startLiveOrganizeDemo();
+  void startDbpiaResearch(const QString& customTopic = {});
   void openLivePaperWindow();
   void submitUserPrompt(const QString& promptText);
 
@@ -41,6 +45,8 @@ private:
   void appendChatMessage(const QString& role, const QString& text);
 
   std::unique_ptr<HwpSurveyReportService::ReportDocumentSession> m_session;
+  KaGeminiBridgeClient* m_dbpiaBridge = nullptr;
+  HwpAcademicVisuals::DbpiaSummary m_dbpiaSummary;
   KaHwpLivePaperWindow* m_liveWindow = nullptr;
   QTimer* m_stageTimer = nullptr;
   int m_currentStage = 4;
