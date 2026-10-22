@@ -281,6 +281,10 @@ void KaHwpReportStudio::attach(QMainWindow* mainWindow) {
     tabs->setCurrentWidget(studioPage);
     studioPage->refreshFromActiveProject(true);
   };
+  if (tabs)
+    QObject::connect(tabs, &QTabWidget::currentChanged, studioPage, [tabs, studioPage](int) {
+      if (tabs->currentWidget() == studioPage) studioPage->refreshFromActiveProject(true);
+    });
   auto* actReport = new QAction(KaIcons::icon(QStringLiteral("note")), QStringLiteral("보고서 작성 (Ctrl+G)"), mainWindow);
   actReport->setObjectName(QStringLiteral("actionReportStudio"));
   actReport->setShortcut(QKeySequence(QStringLiteral("Ctrl+G")));

@@ -63,9 +63,9 @@ std::string buildFtsQuery(std::string_view raw, bool strictAnd) {
   std::vector<std::string> rawToks, archToks;
   std::string cur, out;
   for (char c : raw)
-    if (c == ' ' || c == '\t' || c == '\n' || c == '\r' || c == ',' || c == '/') {
+    if (c == ' ' || c == '\t' || c == '\n' || c == '\r' || c == ',' || c == '/' || c == '(' || c == ')') {
       if (!cur.empty()) rawToks.push_back(std::exchange(cur, {}));
-    } else if (c != '"' && c != '\'' && c != '(' && c != ')' && c != '*' && c != '^' && c != ':') cur.push_back(c);
+    } else if (c != '"' && c != '\'' && c != '*' && c != '^' && c != ':') cur.push_back(c);
   if (!cur.empty()) rawToks.push_back(cur);
   if (strictAnd) {
     for (const auto& t : rawToks) out += (out.empty() ? "\"" : " AND \"") + t + "\"";
@@ -73,9 +73,7 @@ std::string buildFtsQuery(std::string_view raw, bool strictAnd) {
   }
   for (const auto& rt : rawToks) {
     const std::string t = stripParticles(rt);
-    if (!t.empty() && !hasAny(t, {"전국", "전체", "전남", "전북", "호남", "경북", "경남", "영남", "충남", "충북",
-                                  "강원", "경기", "현황", "분포", "변화", "크기", "규모", "비교", "양상", "구조",
-                                  "특징", "검토", "분석", "정리", "고찰", "추가해줘", "알려줘", "바꿔줘", "지역별", "시대별"}))
+    if (!t.empty() && !hasAny(t, {"전국", "전체", "전남", "전북", "호남", "경북", "경남", "영남", "충남", "충북", "강원", "경기", "경상북도", "경상남도", "전라남도", "전라북도", "충청남도", "충청북도", "단독주택", "신축부지", "개설구간", "공사구간", "국비", "일원", "현황", "분포", "변화", "크기", "규모", "비교", "양상", "구조", "특징", "검토", "분석", "정리", "고찰", "추가해줘", "알려줘", "바꿔줘", "지역별", "시대별"}) && t != "유적" && t != "내" && t != "외")
       archToks.push_back(t);
   }
   if (archToks.empty()) archToks = rawToks;
@@ -271,7 +269,8 @@ SiteRagEvidence LocalReportRag::inspectSiteEvidence(std::string_view site_name_u
     ::sqlite3_close(db);
     if (ev.status == "◌") return ev;
   }
-  const auto hits = search(site_name_utf8, region_utf8, 4, -2);
+  auto hits = search(site_name_utf8, region_utf8, 4, -2);
+  if (hits.empty()) hits = search(site_name_utf8, region_utf8, 4, 2);
   if (!hits.empty()) {
     ev.status = ev.feature_status = "✓", ev.report_name = hits.front().report_name, ev.page_no = hits.front().page_no;
     ev.feature_summary = cleanOneLine(hits.front().snippet.empty() ? hits.front().content : hits.front().snippet);

@@ -6,6 +6,9 @@
 #include "core/GisFactHarness.h"
 #include "core/LocalReportRag.h"
 #include <QtWidgets>
+#include <QWebEnginePage>
+#include <QWebEngineProfile>
+#include <QWebEngineView>
 #include <qgsproject.h>
 
 namespace {
@@ -85,10 +88,12 @@ KaHwpReportStudio::KaHwpReportStudio(QWidget* parent)
   auto* btnViewPaper = makeCheckBtn(centerPane, QStringLiteral("용지"), true);
   auto* btnViewVerify = makeCheckBtn(centerPane, QStringLiteral("검수"), false);
   auto* btnViewCompare = makeCheckBtn(centerPane, QStringLiteral("비교"), false);
+  auto* btnViewDbpia = makeCheckBtn(centerPane, QStringLiteral("DBpia 로그인"), false);
   auto* viewGrp = new QButtonGroup(this);
   viewGrp->addButton(btnViewPaper, 0);
   viewGrp->addButton(btnViewVerify, 1);
   viewGrp->addButton(btnViewCompare, 2);
+  viewGrp->addButton(btnViewDbpia, 3);
 
   m_regionCombo = new QComboBox(centerPane);
   m_regionCombo->addItem(QStringLiteral("지역: 자동(조사지역)"), QString());
@@ -112,7 +117,8 @@ KaHwpReportStudio::KaHwpReportStudio(QWidget* parent)
   btnSaveMenu->setMenu(saveMenu);
 
   for (QWidget* w : {static_cast<QWidget*>(btnDocReport), static_cast<QWidget*>(btnDocThesis),
-                     static_cast<QWidget*>(btnViewPaper), static_cast<QWidget*>(btnViewVerify), static_cast<QWidget*>(btnViewCompare)})
+                     static_cast<QWidget*>(btnViewPaper), static_cast<QWidget*>(btnViewVerify),
+                     static_cast<QWidget*>(btnViewCompare), static_cast<QWidget*>(btnViewDbpia)})
     centerBar->addWidget(w);
   centerBar->addStretch(1);
   centerBar->addWidget(m_regionCombo);
@@ -124,9 +130,37 @@ KaHwpReportStudio::KaHwpReportStudio(QWidget* parent)
   m_previewView = new QTextBrowser(m_centerStack);
   m_verifyView = new QTextBrowser(m_centerStack);
   m_compareView = new QTextBrowser(m_centerStack);
+  auto* dbpiaPane = new QWidget(m_centerStack);
+  auto* dbpiaL = new QVBoxLayout(dbpiaPane);
+  dbpiaL->setContentsMargins(0, 0, 0, 0);
+  auto* dbpiaBar = new QHBoxLayout();
+  auto* btnLogin = new QPushButton(QStringLiteral("개인 로그인"), dbpiaPane);
+  auto* btnOrgLogin = new QPushButton(QStringLiteral("기관 로그인"), dbpiaPane);
+  auto* btnDbpiaAi = new QPushButton(QStringLiteral("DBpia AI"), dbpiaPane);
+  auto* btnHarvest = new QPushButton(QStringLiteral("자동 문헌수집 실행"), dbpiaPane);
+  for (QWidget* w : {static_cast<QWidget*>(btnLogin), static_cast<QWidget*>(btnOrgLogin), static_cast<QWidget*>(btnDbpiaAi), static_cast<QWidget*>(btnHarvest)})
+    dbpiaBar->addWidget(w);
+  dbpiaBar->addStretch(1);
+  dbpiaL->addLayout(dbpiaBar);
+  auto ensureDbpiaWeb = [dbpiaPane, dbpiaL](const QString& url) {
+    auto* web = dbpiaPane->findChild<QWebEngineView*>();
+    if (!web) {
+      static QWebEngineProfile* s_prof = nullptr;
+      if (!s_prof) { s_prof = new QWebEngineProfile(QStringLiteral("ka-hgis-gemini-auth-v2"), qApp); s_prof->setPersistentCookiesPolicy(QWebEngineProfile::ForcePersistentCookies); }
+      web = new QWebEngineView(dbpiaPane);
+      web->setPage(new QWebEnginePage(s_prof, web));
+      dbpiaL->addWidget(web, 1);
+    }
+    if (!url.isEmpty()) web->setUrl(QUrl(url));
+  };
+  connect(btnLogin, &QPushButton::clicked, this, [ensureDbpiaWeb] { ensureDbpiaWeb(QStringLiteral("https://www.dbpia.co.kr/member/login")); });
+  connect(btnOrgLogin, &QPushButton::clicked, this, [ensureDbpiaWeb] { ensureDbpiaWeb(QStringLiteral("https://www.dbpia.co.kr/member/b2bLogin")); });
+  connect(btnDbpiaAi, &QPushButton::clicked, this, [ensureDbpiaWeb] { ensureDbpiaWeb(QStringLiteral("https://ai.dbpia.co.kr/ko/search")); });
+  connect(btnHarvest, &QPushButton::clicked, this, [this] { startDbpiaResearch(m_promptEdit ? m_promptEdit->text() : QString()); });
   m_centerStack->addWidget(m_previewView);
   m_centerStack->addWidget(m_verifyView);
   m_centerStack->addWidget(m_compareView);
+  m_centerStack->addWidget(dbpiaPane);
   centerL->addWidget(m_centerStack, 1);
 
   auto* rightPane = new QFrame(split);
@@ -187,7 +221,10 @@ KaHwpReportStudio::KaHwpReportStudio(QWidget* parent)
   connect(m_btnRadius1000, &QToolButton::clicked, this, [this] { m_btnRadius1000->setChecked(true); m_btnRadius500->setChecked(false); m_radiusMeters = 1000.0; refreshFromActiveProject(true); });
   connect(m_ragSlotCheck, &QCheckBox::toggled, this, [this] { refreshFromActiveProject(true); });
   connect(m_evidenceTable, &QTableWidget::currentCellChanged, this, [this](int r, int, int, int) { onSiteRowSelected(r); });
-  connect(viewGrp, &QButtonGroup::idClicked, m_centerStack, &QStackedWidget::setCurrentIndex);
+  connect(viewGrp, &QButtonGroup::idClicked, this, [this, dbpiaPane, ensureDbpiaWeb](int id) {
+    m_centerStack->setCurrentIndex(id);
+    if (id == 3 && !dbpiaPane->findChild<QWebEngineView*>()) ensureDbpiaWeb(QStringLiteral("https://www.dbpia.co.kr/member/login"));
+  });
   connect(docGrp, &QButtonGroup::idClicked, this, [this](int id) { m_isThesisMode = (id == 1); syncUiFromSession(); });
   connect(m_regionCombo, &QComboBox::currentIndexChanged, this, [this] { refreshFromActiveProject(true); });
   connect(m_zoomCombo, &QComboBox::currentIndexChanged, this, [this] { syncUiFromSession(); });

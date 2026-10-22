@@ -52,9 +52,8 @@ void appendTableToModel(HWPSDK::Document* doc, const QVector<QStringList>& rows,
 }
 QString detectRegionName(const SurveySnapshot& snap) {
   const QString s = snap.surveyTitle + QLatin1Char(' ') + (snap.nearbySites.isEmpty() ? QString() : snap.nearbySites.first().siteName);
-  const std::string sc = strata::core::LocalReportRag::extractRegionScope(s.toStdString(), "경주시");
-  const QString q = QString::fromStdString(sc).section(QLatin1Char(','), 0, 0);
-  return (q.endsWith(QStringLiteral("시")) || q.endsWith(QStringLiteral("군")) || q.endsWith(QStringLiteral("도"))) ? q : (q + QStringLiteral("시"));
+  const QString q = QString::fromStdString(strata::core::LocalReportRag::extractRegionScope(s.toStdString(), "경주시")).section(QLatin1Char(','), 0, 0);
+  return q == QStringLiteral("경주") ? QStringLiteral("경주시") : q;
 }
 QString buildDefaultDiscussion(const SurveySnapshot& snap) {
   const QString base = QStringLiteral("본 조사는 %1 일원(면적 %2㎡, 좌표계 %3)을 대상으로 수행되었다.")
@@ -107,6 +106,12 @@ void ReportDocumentSession::populateRagEvidence(SurveySnapshot* snap, bool query
                                                             : QStringLiteral("원문 미확보로 유구 연장 단정 유보(확인 필요).")));
     snap->siteEntries.push_back(std::move(row));
   }
+  if (snap->siteEntries.isEmpty() && queryRagDb) {
+    for (const auto& h : strata::core::LocalReportRag::search("주거지 수혈 건물지 고분 석곽묘 토기 기와", snap->regionName.toStdString(), 10, 1)) {
+      const QString rpt = QString::fromStdString(h.report_name), snip = QString::fromStdString(h.snippet.empty() ? h.content : h.snippet).simplified().left(95);
+      snap->siteEntries.push_back({QStringLiteral("지역 보고서 RAG"), QStringLiteral("[%1] %2").arg(QString::fromStdString(h.sigungu), QFileInfo(rpt).completeBaseName()), 0, QStringLiteral("권역"), QStringLiteral("✓"), QStringLiteral("✓"), QStringLiteral("✓"), QStringLiteral("✓"), rpt, h.page_no, h.page_no, QStringLiteral("원문 수록"), snip, snip, QStringLiteral("동일 권역(%1) 발굴조사보고서 원문 대조 대상.").arg(QString::fromStdString(h.sigungu))});
+    }
+  }
   snap->discussionDraft = buildDefaultDiscussion(*snap);
   if (queryRagDb && snap->regionTotalReports > 0)
     snap->ragCitationSlotText = QStringLiteral("[로컬 발굴조사보고서 RAG 연동] %1 총 %2권(본문 %3권 · 스캔 %4권).").arg(snap->regionName).arg(snap->regionTotalReports).arg(snap->regionTextReports).arg(snap->regionScanReports);
@@ -118,11 +123,14 @@ SurveySnapshot ReportDocumentSession::collectFromProject(QgsProject* project, bo
   snap.surveyCrs = QStringLiteral("EPSG:5187");
   snap.radiusMeters = radiusMeters > 0.0 ? radiusMeters : 500.0;
   if (project) {
+    const QString fBase = QFileInfo(project->fileName()).completeBaseName();
     if (!project->title().trimmed().isEmpty()) snap.surveyTitle = project->title().trimmed();
-    else if (!project->fileName().isEmpty()) snap.surveyTitle = QFileInfo(project->fileName()).completeBaseName();
+    else if (!fBase.isEmpty() && !fBase.startsWith(QStringLiteral("ka-hgis"))) snap.surveyTitle = fBase;
     if (project->crs().isValid()) snap.surveyCrs = project->crs().authid();
     for (QgsVectorLayer* al : LayerOps::findAllByLayerKey(project, QStringLiteral("survey_area"))) {
       if (!al || !al->isValid()) continue;
+      const QString gBase = QFileInfo(al->source().section(QLatin1Char('|'), 0, 0)).completeBaseName();
+      if (!gBase.isEmpty() && !gBase.startsWith(QStringLiteral("ka-hgis")) && snap.surveyTitle.startsWith(QStringLiteral("경주 지역"))) snap.surveyTitle = gBase;
       QgsFeatureIterator it = al->getFeatures(); QgsFeature f;
       while (it.nextFeature(f)) if (f.hasGeometry()) snap.totalAreaSqm += std::abs(f.geometry().area()), ++snap.surveyPolygonCount;
     }
@@ -145,21 +153,15 @@ SurveySnapshot ReportDocumentSession::collectFromProject(QgsProject* project, bo
 bool ReportDocumentSession::buildStandardReport(const SurveySnapshot& snap, QString* errorOut, int maxStage) {
   if (!m_impl || !m_impl->doc) return errorOut ? (*errorOut = QStringLiteral("OpenHwpSDK 초기화 실패"), false) : false;
   SurveySnapshot s = snap;
-  if (s.siteEntries.size() != s.nearbySites.size()) populateRagEvidence(&s, false);
+  if (s.siteEntries.isEmpty() && !s.nearbySites.isEmpty()) populateRagEvidence(&s, false);
   HWPSDK::Document* doc = m_impl->doc;
   doc->Clear(), doc->SetEditMode(1);
   const QString areaStr = QLocale(QLocale::Korean).toString(std::round(s.totalAreaSqm)) + QStringLiteral(" ㎡");
   insertStyledParagraph(doc, QStringLiteral("%1 문화재 발굴(시굴)조사 보고서").arg(s.surveyTitle), 1800, true, 3);
-  insertStyledParagraph(doc, QStringLiteral("〈일러두기〉 (동국문화재연구원 보고서 작성 기준)\n"
-                                            "1. 도면 방위는 조사 당시 자북(磁北) 기준이며, 토층·단면 수치는 해발고도(m)를 나타낸다.\n"
-                                            "2. 도면 축소비율은 유구배치도 1/200, 수혈·건물지 평단면도 1/20·1/40(구상유구 1/80), 유물 실측도 1/3을 기본으로 한다.\n"
-                                            "3. 유물 일련번호는 유구별 토기류→기와류→기타 순으로 부여하고 토색·색조는 『新版 標準土色帖』(2007판)을 기준으로 한다."), 920, false, 0);
+  insertStyledParagraph(doc, QStringLiteral("〈일러두기〉 (동국문화재연구원 보고서 작성 기준)\n1. 도면 방위는 조사 당시 자북(磁北) 기준이며, 토층·단면 수치는 해발고도(m)를 나타낸다.\n2. 도면 축소비율은 유구배치도 1/200, 수혈·건물지 평단면도 1/20·1/40(구상유구 1/80), 유물 실측도 1/3을 기본으로 한다.\n3. 유물 일련번호는 유구별 토기류→기와류→기타 순으로 부여하고 토색·색조는 『新版 標準土色帖』(2007판)을 기준으로 한다."), 920, false, 0);
   insertStyledParagraph(doc, QStringLiteral("Ⅰ. 머리말 (조사경위·조사단 구성·발굴조사 요약)"), 1300, true, 1);
-  insertStyledParagraph(doc, QStringLiteral("1. 조사명: %1\n2. 조사면적: %2 (%3개 구역)\n3. 작업좌표계: %4\n4. 지역 보고서 RAG: %5 %6권(본문 %7 · 스캔 %8)")
-                                 .arg(s.surveyTitle, areaStr).arg(s.surveyPolygonCount).arg(s.surveyCrs, s.regionName).arg(s.regionTotalReports).arg(s.regionTextReports).arg(s.regionScanReports), 1000, false, 0);
-  bindField(doc, u"조사명", u"SURVEY_NAME", s.surveyTitle);
-  bindField(doc, u"조사면적", u"SURVEY_AREA_M2", areaStr);
-  bindField(doc, u"좌표계", u"SURVEY_CRS", s.surveyCrs);
+  insertStyledParagraph(doc, QStringLiteral("1. 조사명: %1\n2. 조사면적: %2 (%3개 구역)\n3. 작업좌표계: %4\n4. 지역 보고서 RAG: %5 %6권(본문 %7 · 스캔 %8)").arg(s.surveyTitle, areaStr).arg(s.surveyPolygonCount).arg(s.surveyCrs, s.regionName).arg(s.regionTotalReports).arg(s.regionTextReports).arg(s.regionScanReports), 1000, false, 0);
+  bindField(doc, u"조사명", u"SURVEY_NAME", s.surveyTitle), bindField(doc, u"조사면적", u"SURVEY_AREA_M2", areaStr), bindField(doc, u"좌표계", u"SURVEY_CRS", s.surveyCrs);
   if (maxStage <= 1) return true;
 
   insertStyledParagraph(doc, QStringLiteral("Ⅱ. 유적의 위치와 환경 — 2. 역사·고고 환경 (<표 1>)"), 1300, true, 1);
