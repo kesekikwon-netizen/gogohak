@@ -2,7 +2,9 @@
 #include "KaPortableRuntime.h"
 
 #include <QSettings>
+#include <cstring>
 
+#ifdef Q_OS_WIN
 #ifndef NOMINMAX
 #define NOMINMAX
 #endif
@@ -11,8 +13,19 @@
 #endif
 #include <windows.h>
 #include <wincrypt.h>
+#endif
 
 namespace {
+
+void secureWipe(void* ptr, size_t len) {
+  if (!ptr || len == 0) return;
+#ifdef Q_OS_WIN
+  SecureZeroMemory(ptr, len);
+#else
+  volatile unsigned char* p = static_cast<volatile unsigned char*>(ptr);
+  while (len--) *p++ = 0;
+#endif
+}
 
 int g_portableOverride = -1;
 
@@ -34,6 +47,7 @@ QByteArray xorEntropy(QByteArray data) {
 bool protectBytes(const QByteArray& plain, QByteArray* out) {
   if (!out) return false;
   out->clear();
+#ifdef Q_OS_WIN
   DATA_BLOB input;
   input.pbData = reinterpret_cast<BYTE*>(const_cast<char*>(plain.constData()));
   input.cbData = static_cast<DWORD>(plain.size());
@@ -47,6 +61,10 @@ bool protectBytes(const QByteArray& plain, QByteArray* out) {
   *out = QByteArray(reinterpret_cast<const char*>(output.pbData), static_cast<int>(output.cbData)).toBase64();
   LocalFree(output.pbData);
   return !out->isEmpty();
+#else
+  *out = xorEntropy(plain).toBase64();
+  return !out->isEmpty();
+#endif
 }
 
 bool unprotectBytes(const QByteArray& base64, QByteArray* out) {
@@ -54,6 +72,7 @@ bool unprotectBytes(const QByteArray& base64, QByteArray* out) {
   out->clear();
   const QByteArray blob = QByteArray::fromBase64(base64);
   if (blob.isEmpty()) return false;
+#ifdef Q_OS_WIN
   DATA_BLOB input;
   input.pbData = reinterpret_cast<BYTE*>(const_cast<char*>(blob.constData()));
   input.cbData = static_cast<DWORD>(blob.size());
@@ -65,9 +84,13 @@ bool unprotectBytes(const QByteArray& base64, QByteArray* out) {
                                      CRYPTPROTECT_UI_FORBIDDEN, &output);
   if (!ok || !output.pbData) return false;
   *out = QByteArray(reinterpret_cast<const char*>(output.pbData), static_cast<int>(output.cbData));
-  SecureZeroMemory(output.pbData, output.cbData);
+  secureWipe(output.pbData, output.cbData);
   LocalFree(output.pbData);
   return true;
+#else
+  *out = xorEntropy(blob);
+  return !out->isEmpty();
+#endif
 }
 
 void clearSecretKeys(QSettings& settings, const QString& group) {
@@ -79,7 +102,7 @@ void clearSecretKeys(QSettings& settings, const QString& group) {
 bool writePortable(QSettings& settings, const QString& group, const QString& password) {
   QByteArray utf8 = password.toUtf8();
   const QByteArray wrapped = xorEntropy(utf8).toBase64();
-  SecureZeroMemory(utf8.data(), static_cast<size_t>(utf8.size()));
+  secureWipe(utf8.data(), static_cast<size_t>(utf8.size()));
   if (wrapped.isEmpty()) return false;
   settings.setValue(portableKey(group), QString::fromLatin1(wrapped));
   settings.remove(plainKey(group));
@@ -93,7 +116,7 @@ QString unwrapPortable(const QString& stored) {
   if (raw.isEmpty()) return {};
   raw = xorEntropy(raw);
   const QString secret = QString::fromUtf8(raw);
-  SecureZeroMemory(raw.data(), static_cast<size_t>(raw.size()));
+  secureWipe(raw.data(), static_cast<size_t>(raw.size()));
   return secret;
 }
 
@@ -129,7 +152,7 @@ bool KaSecretStore::writePassword(QSettings& settings, const QString& group, con
   QByteArray utf8 = password.toUtf8();
   QByteArray blob;
   const bool ok = protectBytes(utf8, &blob);
-  SecureZeroMemory(utf8.data(), static_cast<size_t>(utf8.size()));
+  secureWipe(utf8.data(), static_cast<size_t>(utf8.size()));
   if (!ok) {
     if (error) *error = QStringLiteral("비밀번호를 암호화하지 못했습니다. 평문으로는 저장하지 않습니다.");
     return false;
@@ -149,7 +172,7 @@ QString KaSecretStore::readPassword(QSettings& settings, const QString& group, b
     QByteArray plain;
     if (unprotectBytes(stored.toLatin1(), &plain)) {
       const QString secret = QString::fromUtf8(plain);
-      SecureZeroMemory(plain.data(), static_cast<size_t>(plain.size()));
+      secureWipe(plain.data(), static_cast<size_t>(plain.size()));
       // Reading never lowers the storage form. A DPAPI value stays DPAPI even in the
       // portable build; only an explicit save (writePassword) or the personal-package
       // script turns it into the travelling form.
@@ -180,7 +203,7 @@ bool KaSecretStore::hasUndecryptablePassword(QSettings& settings, const QString&
   if (stored.isEmpty()) return false;
   QByteArray plain;
   if (unprotectBytes(stored.toLatin1(), &plain)) {
-    SecureZeroMemory(plain.data(), static_cast<size_t>(plain.size()));
+    secureWipe(plain.data(), static_cast<size_t>(plain.size()));
     return false;
   }
   return true;

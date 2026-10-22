@@ -190,7 +190,14 @@ bool verifyWritten(const QString& shpPath, long long expectedFeatures, QString* 
     is5179 = auth && code && QString::fromLatin1(auth) == QLatin1String("EPSG") &&
              QString::fromLatin1(code) == QLatin1String("5179");
     // Same identification the QGIS OGR provider uses for an ESRI .prj.
+#ifdef Q_OS_WIN
     if (!is5179) is5179 = QgsOgrUtils::OGRSpatialReferenceToCrs(srs).authid() == QLatin1String("EPSG:5179");
+#else
+    if (!is5179) {
+      QgsVectorLayer probe(shpPath, QStringLiteral("probe"), QStringLiteral("ogr"));
+      is5179 = probe.isValid() && probe.crs().authid() == QLatin1String("EPSG:5179");
+    }
+#endif
   }
   GDALClose(ds);
   if (!is5179) {

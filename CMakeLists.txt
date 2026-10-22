@@ -78,34 +78,56 @@ else()
   endif()
 endif()
 
-option(KA_HGIS_BUILD_TESTS "Build tests" ON)
-if (EXISTS "C:/OSGeo4W")
-  set(OSGEO4W_ROOT_DEFAULT "C:/OSGeo4W")
-elseif (EXISTS "D:/OSGeo4W")
-  set(OSGEO4W_ROOT_DEFAULT "D:/OSGeo4W")
-elseif (EXISTS "A:/OSGeo4W")
-  set(OSGEO4W_ROOT_DEFAULT "A:/OSGeo4W")
+if(WIN32)
+  set(KA_PLATFORM_SOURCES src/platform/PlatformService_win32.cpp)
+else()
+  set(KA_PLATFORM_SOURCES src/platform/PlatformService_linux.cpp)
 endif()
-set(OSGEO4W_ROOT "${OSGEO4W_ROOT_DEFAULT}" CACHE PATH "OSGeo4W root")
-# Keep the prefix under the selected root. A stale cache still pointed tests
-# at another PC's qgis-dev, so the WMS provider never loaded.
-set(QGIS_PREFIX_PATH "${OSGEO4W_ROOT}/apps/qgis-dev" CACHE PATH "QGIS prefix" FORCE)
-list(PREPEND CMAKE_PREFIX_PATH "${OSGEO4W_ROOT}/apps/Qt6" "${OSGEO4W_ROOT}/apps/Qt6/lib/cmake")
+
+option(KA_HGIS_BUILD_TESTS "Build tests" ON)
+if (WIN32)
+  if (EXISTS "C:/OSGeo4W")
+    set(OSGEO4W_ROOT_DEFAULT "C:/OSGeo4W")
+  elseif (EXISTS "D:/OSGeo4W")
+    set(OSGEO4W_ROOT_DEFAULT "D:/OSGeo4W")
+  elseif (EXISTS "A:/OSGeo4W")
+    set(OSGEO4W_ROOT_DEFAULT "A:/OSGeo4W")
+  endif()
+  set(OSGEO4W_ROOT "${OSGEO4W_ROOT_DEFAULT}" CACHE PATH "OSGeo4W root")
+  # Keep the prefix under the selected root. A stale cache still pointed tests
+  # at another PC's qgis-dev, so the WMS provider never loaded.
+  set(QGIS_PREFIX_PATH "${OSGEO4W_ROOT}/apps/qgis-dev" CACHE PATH "QGIS prefix" FORCE)
+  list(PREPEND CMAKE_PREFIX_PATH "${OSGEO4W_ROOT}/apps/Qt6" "${OSGEO4W_ROOT}/apps/Qt6/lib/cmake")
+  set(KA_INCLUDES
+    ${CMAKE_SOURCE_DIR}/src
+    ${QGIS_PREFIX_PATH}/include
+    ${OSGEO4W_ROOT}/apps/gdal-dev/include
+    ${OSGEO4W_ROOT}/include
+  )
+  set(KA_LIBDIRS
+    ${QGIS_PREFIX_PATH}/lib
+    ${OSGEO4W_ROOT}/apps/gdal-dev/lib
+    ${OSGEO4W_ROOT}/lib
+  )
+  set(KA_GDAL_LIB gdal_i)
+  set(KA_EXPORT_DEFS "CORE_EXPORT=__declspec(dllimport)" "GUI_EXPORT=__declspec(dllimport)")
+else()
+  set(QGIS_PREFIX_PATH "/usr" CACHE PATH "QGIS prefix")
+  set(KA_INCLUDES
+    ${CMAKE_SOURCE_DIR}/src
+    /usr/include/qgis
+    /usr/include/gdal
+  )
+  set(KA_LIBDIRS
+    /usr/lib
+    /usr/lib/x86_64-linux-gnu
+  )
+  set(KA_GDAL_LIB gdal)
+  set(KA_EXPORT_DEFS "CORE_EXPORT=" "GUI_EXPORT=")
+endif()
 # Pdf: 인쇄는 저장한 도면 PDF를 잘라 찍는다(TilePrint). Qt6Pdf.dll 은 OSGeo4W Qt 에 이미 있다.
 find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets Xml PrintSupport Pdf Network Svg Test Multimedia MultimediaWidgets)
 find_package(Qt6 REQUIRED COMPONENTS WebEngineWidgets)
-
-set(KA_INCLUDES
-  ${CMAKE_SOURCE_DIR}/src
-  ${QGIS_PREFIX_PATH}/include
-  ${OSGEO4W_ROOT}/apps/gdal-dev/include
-  ${OSGEO4W_ROOT}/include
-)
-set(KA_LIBDIRS
-  ${QGIS_PREFIX_PATH}/lib
-  ${OSGEO4W_ROOT}/apps/gdal-dev/lib
-  ${OSGEO4W_ROOT}/lib
-)
 
 add_library(ka_core STATIC
   ${KA_HGIS_GIT_HASH_CPP}
@@ -209,6 +231,8 @@ add_library(ka_core STATIC
   src/core/SurveySchema.cpp
   src/core/BufferAnalysis.cpp
   src/core/NearbyHeritageExport.cpp
+  src/core/LocalReportRag.cpp
+  ${KA_PLATFORM_SOURCES}
   src/core/RecentSurveys.cpp
   src/core/KaSafeQgis.cpp
   src/core/MeasureOps.cpp
@@ -303,6 +327,8 @@ add_library(ka_core STATIC
   src/core/ControlPointCsv.h
   src/core/BufferAnalysis.h
   src/core/NearbyHeritageExport.h
+  src/core/LocalReportRag.h
+  src/platform/IPlatformService.h
   src/core/RecentSurveys.h
   src/core/KaSafeQgis.h
   src/core/MeasureOps.h
@@ -345,17 +371,18 @@ if(KA_NODE_EXECUTABLE)
 endif()
 target_include_directories(ka_core PUBLIC ${KA_INCLUDES})
 target_link_directories(ka_core PUBLIC ${KA_LIBDIRS})
-target_link_libraries(ka_core PUBLIC Qt6::Core Qt6::Gui Qt6::Widgets Qt6::Xml Qt6::PrintSupport Qt6::Pdf Qt6::Network Qt6::Svg qgis_core qgis_gui gdal_i)
+target_link_libraries(ka_core PUBLIC Qt6::Core Qt6::Gui Qt6::Widgets Qt6::Xml Qt6::PrintSupport Qt6::Pdf Qt6::Network Qt6::Svg qgis_core qgis_gui ${KA_GDAL_LIB})
 if (WIN32)
   target_link_libraries(ka_core PUBLIC crypt32)
+else()
+  target_link_libraries(ka_core PUBLIC sqlite3)
 endif()
 if (MSVC)
   target_compile_options(ka_core PRIVATE /openmp /utf-8)
 endif()
 target_compile_definitions(ka_core PUBLIC
   KA_HGIS_HAS_QGIS=1
-  "CORE_EXPORT=__declspec(dllimport)"
-  "GUI_EXPORT=__declspec(dllimport)"
+  ${KA_EXPORT_DEFS}
   "KA_HGIS_VERSION=\"${PROJECT_VERSION}\"")
 
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
@@ -650,8 +677,7 @@ target_link_directories(ka-hgis PRIVATE ${KA_LIBDIRS})
 target_link_libraries(ka-hgis PRIVATE ka_core Qt6::Core Qt6::Gui Qt6::Widgets Qt6::Xml Qt6::PrintSupport Qt6::Network Qt6::Svg Qt6::WebEngineWidgets Qt6::Multimedia Qt6::MultimediaWidgets qgis_core qgis_gui)
 target_compile_definitions(ka-hgis PRIVATE
   KA_HGIS_HAS_QGIS=1
-  "CORE_EXPORT=__declspec(dllimport)"
-  "GUI_EXPORT=__declspec(dllimport)"
+  ${KA_EXPORT_DEFS}
   "KA_HGIS_VERSION=\"${PROJECT_VERSION}\"")
 # Desktop GUI. QGIS/Qt debug text must not open a console behind the window.
 set_target_properties(ka-hgis PROPERTIES WIN32_EXECUTABLE TRUE)
@@ -731,7 +757,7 @@ if(KA_HGIS_BUILD_TESTS)
       -P ${CMAKE_SOURCE_DIR}/cmake/run_qtest.cmake
       WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
   endfunction()
-  set(KA_TEST_DEFS KA_HGIS_HAS_QGIS=1 "CORE_EXPORT=__declspec(dllimport)" "GUI_EXPORT=__declspec(dllimport)")
+  set(KA_TEST_DEFS KA_HGIS_HAS_QGIS=1 ${KA_EXPORT_DEFS})
   set(KA_TEST_LIBS ka_core Qt6::Test Qt6::Core Qt6::Xml Qt6::Gui Qt6::Widgets Qt6::PrintSupport qgis_core qgis_gui)
 
   add_executable(ka_hgis_tests tests/test_checklist.cpp)

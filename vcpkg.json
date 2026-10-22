@@ -1,0 +1,9 @@
+{
+  "$schema": "https://raw.githubusercontent.com/microsoft/vcpkg-tool/main/docs/vcpkg.schema.json",
+  "name": "ka-hgis",
+  "version-string": "0.8.0",
+  "description": "Strata (ka-hgis) Cross-Platform Archaeological GIS & Excavation Report Workstation",
+  "dependencies": [
+    "sqlite3"
+  ]
+}

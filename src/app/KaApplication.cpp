@@ -282,6 +282,7 @@ QString KaApplication::resolvePrefixPath() {
       if (QDir(c).exists()) return c;
     }
   }
+  if (QDir(QStringLiteral("/usr/lib/qgis/plugins")).exists()) return QStringLiteral("/usr");
   return QString();
 }
 
@@ -786,8 +787,10 @@ int KaApplication::run(int argc, char** argv) {
     return 2;
   }
   QgsApplication::setPrefixPath(prefix, true);
-  QgsApplication::setPluginPath(prefix + QStringLiteral("/plugins"));
-  QgsApplication::setPkgDataPath(prefix);
+  if (QDir(prefix + QStringLiteral("/plugins")).exists()) {
+    QgsApplication::setPluginPath(prefix + QStringLiteral("/plugins"));
+    QgsApplication::setPkgDataPath(prefix);
+  }
   QgsApplication::initQgis();
   installQtKoreanTranslator(app, prefix);
   // GDAL failures reach the session log too; a desktop launch has no console.

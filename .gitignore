@@ -1,6 +1,9 @@
-﻿# Build
+# Build
 build/
+build-linux/
 build-clangd/
+rag_reports_pdf
+rag_reports_txt
 out/
 cmake-build-*/
 CMakeCache.txt
