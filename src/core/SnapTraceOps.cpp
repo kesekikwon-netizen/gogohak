@@ -47,17 +47,19 @@ QVector<QgsPointXY> nearbyVertices(QgsMapCanvas* canvas, const QgsPointXY& curso
 }
 
 void clearPreviewMarkers(QList<QgsVertexMarker*>& markers) {
-  qDeleteAll(markers);
+  for (QgsVertexMarker* m : markers) {
+    if (m) m->hide();
+    delete m;
+  }
   markers.clear();
 }
 
 void syncPreviewMarkers(QgsMapCanvas* canvas, QList<QgsVertexMarker*>& markers, const QVector<QgsPointXY>& points) {
   if (!canvas || points.isEmpty()) {
-    clearPreviewMarkers(markers);
+    for (QgsVertexMarker* m : markers)
+      if (m) m->hide();
     return;
   }
-  while (markers.size() > points.size())
-    delete markers.takeLast();
   while (markers.size() < points.size()) {
     auto* m = new QgsVertexMarker(canvas);
     m->setIconType(QgsVertexMarker::ICON_CIRCLE);
@@ -67,9 +69,13 @@ void syncPreviewMarkers(QgsMapCanvas* canvas, QList<QgsVertexMarker*>& markers, 
     m->setFillColor(QColor(255, 251, 235, 210));
     markers.append(m);
   }
-  for (int i = 0; i < points.size(); ++i) {
-    markers[i]->setCenter(points[i]);
-    markers[i]->show();
+  for (int i = 0; i < markers.size(); ++i) {
+    if (i < points.size()) {
+      markers[i]->setCenter(points[i]);
+      markers[i]->show();
+    } else if (markers[i]) {
+      markers[i]->hide();
+    }
   }
 }
 

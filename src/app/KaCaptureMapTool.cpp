@@ -114,7 +114,7 @@ void KaCaptureMapTool::destroySnapMarker() {
 void KaCaptureMapTool::updateSnapMarker(const QgsPointXY& mapPt, bool snapped, bool isIntersection) {
   QgsMapCanvas* c = canvas();
   if (!c || !m_snapEnabled || !snapped) {
-    destroySnapMarker();
+    if (m_snapMark) m_snapMark->hide();
     return;
   }
   if (!m_snapMark) m_snapMark = new QgsVertexMarker(c);
