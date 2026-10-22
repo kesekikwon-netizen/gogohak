@@ -2254,10 +2254,7 @@ int LayerOps::reviveInvalidLayers(QgsProject* project, QStringList* revived,
 
 void LayerOps::applyWheelZoomFactor(QgsMapCanvas* canvas) {
   QgsSettings().setValue(QStringLiteral("qgis/zoom_factor"), kWheelZoomFactor);
-  if (canvas) {
-    canvas->setWheelFactor(kWheelZoomFactor);
-    if (canvas->scene()) canvas->scene()->setItemIndexMethod(QGraphicsScene::NoIndex);
-  }
+  if (canvas) { canvas->setWheelFactor(kWheelZoomFactor); if (canvas->scene()) canvas->scene()->setItemIndexMethod(QGraphicsScene::NoIndex); }
 }
 
 void LayerOps::syncMapCanvas(QgsProject* project, QgsMapCanvas* canvas, bool zoomKorea) {

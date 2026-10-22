@@ -71,3 +71,14 @@
 - 원격 저장소는 `https://github.com/kesekikwon-netizen/hgis.git` (`origin/main`)이며 로컬 `D:\hgis` 클론과 동일하다.
 - 검증된 커밋은 `git push origin HEAD:main`으로 푸시하고 `git -C D:/hgis pull --ff-only origin main`으로 `D:\hgis`까지 동기화한다.
 - 바탕화면에 개인용 포터블 폴더(`Strata-포터블-개인용-*`)가 있을 때 앱 변경 후 최신 `build/Release/ka-hgis.exe`를 포터블 폴더에도 복사하고 포터블 폴더 기준 `--smoke-quit`으로 검증한다.
+
+## 6. Strata UI 세부 규칙 (전역 「UI·버튼 디자인」 원칙의 앱 적용)
+- 진입점은 하나: 리본 묶음(조사/기록/자료 받기/배경 지도/정합/내보내기/기타) 중 목적에 맞는 곳 또는 기존 우클릭 메뉴. 탭 모서리(`viewTabsCorner`)는 상태 표시(조사 배지·테마) 자리이며 실행 버튼을 두지 않는다.
+- 새 화면은 별도 창보다 **탭**(도면·3D와 같은 `○○ ✕` 탭)을 우선한다.
+- 색·모양은 `KaTheme` 토큰과 `data/theme/ka-hgis.qss`만 쓴다. `setStyleSheet("#2563eb…")` 같은 위젯 고정 색 금지.
+- 「새 모양」 규칙(`KaThemePaper.cpp`): 한 화면에 채운 단추는 `@primary@` 하나 · 선택 칸은 `@chosenFill@` + 먹 테두리 · 현재 탭은 먹 밑줄 · 진행 단계는 홈 「작업 순서」 모양 · 연결 상태는 홈 「연결 상태」 모양 · 아이콘은 `KaIcons` 선 아이콘.
+
+## 7. 보고서·논문 기능 역할 분담
+- AI 처리(발굴조사보고서 RAG·DBpia 수집, 추출·교차검증·집필, 나노바나나 프로 그림, HWPX 작성)는 Antigravity SDK(파이썬)가 맡는다. RAG MCP는 SDK가 쓰며 앱에 붙이지 않는다.
+- 이 앱 작업자는 사용자가 지정한 범위(현재: 보고서 탭 화면 디자인 설계)만 맡는다. 앱 내부 AI 하네스(`GisFactHarness`)·WordCraft(`KaWordCraftLiveSync`)를 보고서 기능 설계에 끌어들이지 않는다.
+- 앱이 SDK에 주는 것은 GIS 계산값(이격거리·방위·해발·유구 실측)이며, 읽기 전용으로 제공한다(제안: strata-gis MCP 서버).

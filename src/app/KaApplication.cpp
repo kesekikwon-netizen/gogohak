@@ -272,12 +272,7 @@ QString KaApplication::resolvePrefixPath() {
   }
   if (const char* o = std::getenv("OSGEO4W_ROOT")) {
     const QString root = QString::fromLocal8Bit(o);
-    const QStringList cands = {
-      root + "/apps/qgis-ltr-dev",
-      root + "/apps/qgis-ltr",
-      root + "/apps/qgis-dev",
-      root + "/apps/qgis"
-    };
+    const QStringList cands = {root + "/apps/qgis-ltr-dev", root + "/apps/qgis-ltr", root + "/apps/qgis-dev", root + "/apps/qgis"};
     for (const QString& c : cands) {
       if (QDir(c).exists()) return c;
     }

@@ -1,297 +1,298 @@
 #include "HwpSurveyReportService.h"
 #include "LayerFeatures.h"
 #include "LayerOps.h"
+#include "LocalReportRag.h"
+#include "core/document_engine.hpp"
+#include "core/utf_conv.hpp"
+#include "hwpsdk_include.h"
+#include <cmath>
 #include <QFileInfo>
 #include <QLocale>
 #include <QRegularExpression>
-#include <cmath>
 #include <qgsfeature.h>
 #include <qgsfeatureiterator.h>
 #include <qgsgeometry.h>
 #include <qgsproject.h>
 #include <qgsvectorlayer.h>
-#include "core/document_engine.hpp"
-#include "core/utf_conv.hpp"
-#include "hwpsdk_include.h"
 
 namespace HwpSurveyReportService {
 namespace {
 std::u16string toU16(const QString& s) { return openhwp::core::Utf8ToUtf16(s.toStdString()); }
-
 void bindField(HWPSDK::Document* doc, const char16_t* label, const char16_t* name, const QString& val) {
-  if (!doc) return;
-  doc->CreateField(label, label, name);
-  doc->PutFieldText(name, toU16(val).c_str());
+  auto* impl = doc ? dynamic_cast<openhwp::core::DocumentImpl*>(doc->GetImpl()) : nullptr;
+  if (!impl) return;
+  const std::string nameUtf8 = openhwp::core::Utf16ToUtf8(name ? name : u""), lblUtf8 = openhwp::core::Utf16ToUtf8(label ? label : u"");
+  for (auto& f : impl->Model().fields)
+    if (f.name_utf8 == nameUtf8) { f.text_utf8 = val.toStdString(); return; }
+  openhwp::core::FieldNode fn;
+  fn.name_utf8 = nameUtf8, fn.direction_utf8 = lblUtf8, fn.memo_utf8 = lblUtf8, fn.text_utf8 = val.toStdString();
+  fn.para_index = static_cast<int>(impl->Model().paragraphs.size()), impl->Model().fields.push_back(std::move(fn));
 }
-
-void runAction(HWPSDK::Document* doc, const char16_t* id, const std::function<void(HWPSDK::ParameterSet*)>& fill) {
-  if (!doc) return;
-  if (HWPSDK::Action* act = doc->CreateAction(id)) {
-    if (HWPSDK::ParameterSet* set = act->CreateParameterSet()) {
-      act->GetDefault(set); fill(set); act->Execute(set); set->Release();
-    }
-    act->Release();
-  }
+void insertStyledParagraph(HWPSDK::Document* doc, const QString& text, unsigned int heightHwpUnit, bool bold, unsigned int alignType) {
+  auto* impl = doc ? dynamic_cast<openhwp::core::DocumentImpl*>(doc->GetImpl()) : nullptr;
+  if (!impl) return;
+  openhwp::core::ParagraphNode p;
+  p.text_utf8 = text.toStdString(), p.char_shape.height = heightHwpUnit, p.char_shape.bold = bold ? 1U : 0U, p.para_shape.align_type = alignType;
+  impl->Model().paragraphs.push_back(std::move(p));
 }
-
-void insertStyledParagraph(HWPSDK::Document* doc, const QString& text,
-                           unsigned int heightHwpUnit, bool bold, unsigned int alignType) {
-  runAction(doc, u"CharShape", [&](HWPSDK::ParameterSet* s) { s->SetUInt(u"Height", heightHwpUnit); s->SetUInt(u"Bold", bold ? 1U : 0U); });
-  runAction(doc, u"ParagraphShape", [&](HWPSDK::ParameterSet* s) { s->SetUInt(u"AlignType", alignType); });
-  const std::u16string u16 = toU16(text + QStringLiteral("\n"));
-  runAction(doc, u"InsertText", [&](HWPSDK::ParameterSet* s) { s->SetString(u"Text", u16.c_str()); });
-}
-
-void appendTableToModel(HWPSDK::Document* doc, const QVector<QStringList>& rows, uint32_t headerBgColor = 0xE8EEF5) {
-  if (!doc || rows.isEmpty()) return;
+void appendTableToModel(HWPSDK::Document* doc, const QVector<QStringList>& rows, uint32_t headerBgColor = 0xE3DACC) {
+  auto* impl = (doc && !rows.isEmpty()) ? dynamic_cast<openhwp::core::DocumentImpl*>(doc->GetImpl()) : nullptr;
+  if (!impl) return;
   const int rCount = rows.size(), cCount = rows.first().size();
-  runAction(doc, u"TableCreate", [&](HWPSDK::ParameterSet* s) { s->SetInt(u"Rows", rCount); s->SetInt(u"Cols", cCount); s->SetInt(u"TreatAsChar", 1); });
-  auto* impl = dynamic_cast<openhwp::core::DocumentImpl*>(doc->GetImpl());
-  if (!impl || impl->Model().tables.empty()) return;
-  auto& tbl = impl->Model().tables.back();
-  for (int r = 0; r < rCount && r < tbl.rows; ++r) {
-    for (int c = 0; c < cCount && c < tbl.cols; ++c) {
+  openhwp::core::TableNode tbl;
+  tbl.InitializeGrid(rCount, cCount);
+  tbl.treat_as_char = true, tbl.anchor_para = static_cast<int>(impl->Model().paragraphs.size()) - 1;
+  for (int r = 0; r < rCount; ++r)
+    for (int c = 0; c < cCount && c < rows[r].size(); ++c) {
       auto& cell = tbl.cells[static_cast<size_t>(r)][static_cast<size_t>(c)];
       cell.text_utf8 = rows[r][c].toStdString();
-      if (r == 0) { cell.bg_color = headerBgColor; cell.char_shape.bold = 1; cell.para_shape.align_type = 3; }
+      if (r == 0) cell.bg_color = headerBgColor, cell.char_shape.bold = 1, cell.para_shape.align_type = 3;
     }
-  }
+  impl->Model().tables.push_back(std::move(tbl));
 }
-
+QString detectRegionName(const SurveySnapshot& snap) {
+  const QString s = snap.surveyTitle + QLatin1Char(' ') + (snap.nearbySites.isEmpty() ? QString() : snap.nearbySites.first().siteName);
+  const std::string sc = strata::core::LocalReportRag::extractRegionScope(s.toStdString(), "경주시");
+  const QString q = QString::fromStdString(sc).section(QLatin1Char(','), 0, 0);
+  return (q.endsWith(QStringLiteral("시")) || q.endsWith(QStringLiteral("군")) || q.endsWith(QStringLiteral("도"))) ? q : (q + QStringLiteral("시"));
+}
 QString buildDefaultDiscussion(const SurveySnapshot& snap) {
-  const QLocale loc(QLocale::Korean);
   const QString base = QStringLiteral("본 조사는 %1 일원(면적 %2㎡, 좌표계 %3)을 대상으로 수행되었다.")
-                           .arg(snap.surveyTitle, loc.toString(std::round(snap.totalAreaSqm)), snap.surveyCrs);
+                           .arg(snap.surveyTitle, QLocale(QLocale::Korean).toString(std::round(snap.totalAreaSqm)), snap.surveyCrs);
   if (snap.nearbySites.isEmpty())
-    return base + QStringLiteral(" 조사구역 반경 1,000m 이내에서 확인된 기보고 유적 레이어가 없거나 아직 로드되지 않았다.");
-  int in500 = 0;
-  for (const auto& it : snap.nearbySites)
-    if (it.distanceMeters <= 500) ++in500;
+    return base + QStringLiteral(" 로드된 주변유적 레이어가 없으며 지역 보고서 RAG(%1 %2권)를 기준으로 검토한다.").arg(snap.regionName).arg(snap.regionTotalReports);
   const auto& n = snap.nearbySites.first();
-  return base + QStringLiteral(" 주변 유적 공간분석 결과, 반경 1,000m 이내에서 총 %1개소(500m 이내 %2개소)의 유적이 확인되며, 최단거리 유적은 %3(%4m, %5쪽)이다.")
-                    .arg(snap.nearbySites.size()).arg(in500).arg(n.siteName).arg(n.distanceMeters).arg(n.direction);
+  return base + QStringLiteral(" GIS 최단거리 측정 결과, 반경 %1m 내 총 %2개소 유적이 분포하며 최단거리 유적은 %3(경계 기준 %4 %5m)이다.")
+                    .arg(qRound(snap.radiusMeters)).arg(snap.nearbySites.size()).arg(n.siteName, n.direction).arg(n.distanceMeters);
 }
 }  // namespace
-
 struct ReportDocumentSession::Impl {
   HWPSDK::Application app;
   HWPSDK::HwpObject* hwpObj = nullptr;
   HWPSDK::Document* doc = nullptr;
-  Impl() {
-    app.SetLicensePath(nullptr);
-    app.InitInstance();
-    if ((hwpObj = app.GetHwpObject()) && (doc = hwpObj->CreateDocument())) doc->SetEditMode(1);
-  }
-  ~Impl() {
-    if (hwpObj && doc) hwpObj->ReleaseDocument(doc);
-    app.ExitInstance();
-  }
+  Impl() { app.SetLicensePath(nullptr); app.InitInstance(); if ((hwpObj = app.GetHwpObject()) && (doc = hwpObj->CreateDocument())) doc->SetEditMode(1); }
+  ~Impl() { if (hwpObj && doc) hwpObj->ReleaseDocument(doc); app.ExitInstance(); }
 };
-
 ReportDocumentSession::ReportDocumentSession() : m_impl(new Impl()) {}
 ReportDocumentSession::~ReportDocumentSession() { delete m_impl; }
 
-SurveySnapshot ReportDocumentSession::collectFromProject(QgsProject* project, bool enableRagSlot,
-                                                         const RagSlotCallback& ragSlot) {
+void ReportDocumentSession::populateRagEvidence(SurveySnapshot* snap, bool queryRagDb) {
+  if (!snap) return;
+  if (snap->regionName.isEmpty()) snap->regionName = detectRegionName(*snap);
+  if (queryRagDb) {
+    const auto rs = strata::core::LocalReportRag::queryRegionStats(snap->regionName.toStdString());
+    snap->regionTotalReports = rs.total_reports, snap->regionTextReports = rs.text_reports, snap->regionScanReports = rs.scan_reports;
+  }
+  snap->siteEntries.clear();
+  for (int i = 0; i < snap->nearbySites.size(); ++i) {
+    const auto& s = snap->nearbySites[i];
+    SiteEvidenceRow row{s.datasetName, s.siteName, s.distanceMeters, s.direction.isEmpty() ? QStringLiteral("인접") : s.direction};
+    if (queryRagDb && i < 15) {
+      const auto ev = strata::core::LocalReportRag::inspectSiteEvidence(s.siteName.toStdString(), snap->regionName.toStdString());
+      row.reportStatus = QString::fromStdString(ev.status), row.eraStatus = QString::fromStdString(ev.era_status);
+      row.featureStatus = QString::fromStdString(ev.feature_status), row.strataStatus = QString::fromStdString(ev.strata_status);
+      row.reportName = QString::fromStdString(ev.report_name), row.pageNo = ev.page_no;
+      row.strataPageNo = ev.strata_page_no > 0 ? ev.strata_page_no : ev.page_no;
+      row.eraSummary = ev.era_summary.empty() ? QStringLiteral("근거 없음·확인 필요") : QString::fromStdString(ev.era_summary);
+      row.featureSummary = ev.feature_summary.empty() ? QStringLiteral("원문 미기재·확인 필요") : QString::fromStdString(ev.feature_summary);
+      row.strataSummary = ev.strata_summary.empty() ? QStringLiteral("토층 미기재·확인 필요") : QString::fromStdString(ev.strata_summary);
+    } else {
+      row.eraSummary = QStringLiteral("근거 없음·확인 필요"), row.featureSummary = QStringLiteral("원문 미확보"), row.strataSummary = QStringLiteral("토층 미확보");
+    }
+    row.relationToSurvey = QStringLiteral("조사구역 경계 기준 %1 %2m(GIS 최단거리) 이격. %3")
+        .arg(row.direction).arg(row.distanceMeters)
+        .arg(row.reportStatus == QStringLiteral("✓")
+                 ? QStringLiteral("『%1』(p.%2) 확인 유구·문화층 동일 지형면 연장 가능성 검토 대상.").arg(row.reportName).arg(row.pageNo)
+                 : (row.reportStatus == QStringLiteral("◌") ? QStringLiteral("스캔본(『%1』) 도면·토층 수동 대조 필요.").arg(row.reportName)
+                                                            : QStringLiteral("원문 미확보로 유구 연장 단정 유보(확인 필요).")));
+    snap->siteEntries.push_back(std::move(row));
+  }
+  snap->discussionDraft = buildDefaultDiscussion(*snap);
+  if (queryRagDb && snap->regionTotalReports > 0)
+    snap->ragCitationSlotText = QStringLiteral("[로컬 발굴조사보고서 RAG 연동] %1 총 %2권(본문 %3권 · 스캔 %4권).").arg(snap->regionName).arg(snap->regionTotalReports).arg(snap->regionTextReports).arg(snap->regionScanReports);
+}
+
+SurveySnapshot ReportDocumentSession::collectFromProject(QgsProject* project, bool enableRagSlot, const RagSlotCallback& ragSlot, double radiusMeters) {
   SurveySnapshot snap;
-  snap.surveyTitle = QStringLiteral("신규 고고학 지표·시굴조사");
-  snap.surveyCrs = QStringLiteral("EPSG:5186");
+  snap.surveyTitle = QStringLiteral("경주 지역 유적 발굴(시굴)조사");
+  snap.surveyCrs = QStringLiteral("EPSG:5187");
+  snap.radiusMeters = radiusMeters > 0.0 ? radiusMeters : 500.0;
   if (project) {
     if (!project->title().trimmed().isEmpty()) snap.surveyTitle = project->title().trimmed();
     else if (!project->fileName().isEmpty()) snap.surveyTitle = QFileInfo(project->fileName()).completeBaseName();
     if (project->crs().isValid()) snap.surveyCrs = project->crs().authid();
-    for (QgsVectorLayer* areaLayer : LayerOps::findAllByLayerKey(project, QStringLiteral("survey_area"))) {
-      if (!areaLayer || !areaLayer->isValid()) continue;
-      QgsFeatureIterator it = areaLayer->getFeatures();
-      QgsFeature f;
-      while (it.nextFeature(f))
-        if (f.hasGeometry()) { snap.totalAreaSqm += std::abs(f.geometry().area()); ++snap.surveyPolygonCount; }
+    for (QgsVectorLayer* al : LayerOps::findAllByLayerKey(project, QStringLiteral("survey_area"))) {
+      if (!al || !al->isValid()) continue;
+      QgsFeatureIterator it = al->getFeatures(); QgsFeature f;
+      while (it.nextFeature(f)) if (f.hasGeometry()) snap.totalAreaSqm += std::abs(f.geometry().area()), ++snap.surveyPolygonCount;
     }
-    const QList<QPair<QString, QString>> defs = {
-        {QStringLiteral("survey_area"), QStringLiteral("조사구역")}, {QStringLiteral("trial_trench"), QStringLiteral("트렌치")},
-        {QStringLiteral("feature_poly"), QStringLiteral("유구(면)")}, {QStringLiteral("feature_line"), QStringLiteral("유구(선)")},
-        {QStringLiteral("artifact_point"), QStringLiteral("유물(점)")}, {QStringLiteral("section_line"), QStringLiteral("단면선")},
-        {QStringLiteral("control_points"), QStringLiteral("기준점")}};
-    for (const auto& def : defs) {
+    for (const auto& def : QList<QPair<QString, QString>>{{QStringLiteral("survey_area"), QStringLiteral("조사구역")}, {QStringLiteral("trial_trench"), QStringLiteral("트렌치")},
+                                                          {QStringLiteral("feature_poly"), QStringLiteral("유구(면)")}, {QStringLiteral("feature_line"), QStringLiteral("유구(선)")},
+                                                          {QStringLiteral("artifact_point"), QStringLiteral("유물(점)")}, {QStringLiteral("section_line"), QStringLiteral("단면선")},
+                                                          {QStringLiteral("control_points"), QStringLiteral("기준점")}}) {
       int cnt = 0;
-      for (QgsVectorLayer* vl : LayerOps::findAllByLayerKey(project, def.first))
-        if (vl && vl->isValid()) cnt += static_cast<int>(LayerFeatures::count(vl));
+      for (QgsVectorLayer* vl : LayerOps::findAllByLayerKey(project, def.first)) if (vl && vl->isValid()) cnt += static_cast<int>(LayerFeatures::count(vl));
       snap.domainCounts.push_back({def.first, def.second, cnt});
     }
-    const NearbyHeritageExport::Result nearby = NearbyHeritageExport::collect(project);
-    if (nearby.ok()) snap.nearbySites = nearby.items;
+    if (const auto nearby = NearbyHeritageExport::collect(project, nullptr, snap.radiusMeters); nearby.ok()) snap.nearbySites = nearby.items;
   }
-  snap.discussionDraft = buildDefaultDiscussion(snap);
-  snap.ragCitationSlotText = (enableRagSlot && ragSlot)
-      ? ragSlot(snap)
-      : QStringLiteral("[RAG 연결 슬롯 대기 중 — 로컬 발굴조사보고서 인덱싱 완료 후 자동 인용 연결]");
+  populateRagEvidence(&snap, enableRagSlot);
+  if (enableRagSlot && ragSlot) snap.ragCitationSlotText = ragSlot(snap);
+  else if (!enableRagSlot) snap.ragCitationSlotText = QStringLiteral("[RAG 연결 슬롯 대기 중 — 로컬 발굴조사보고서 인덱싱 완료 후 자동 인용 연결]");
   return snap;
 }
 
 bool ReportDocumentSession::buildStandardReport(const SurveySnapshot& snap, QString* errorOut, int maxStage) {
-  if (!m_impl || !m_impl->doc) {
-    if (errorOut) *errorOut = QStringLiteral("OpenHwpSDK 문서 엔진을 초기화하지 못했습니다.");
-    return false;
-  }
+  if (!m_impl || !m_impl->doc) return errorOut ? (*errorOut = QStringLiteral("OpenHwpSDK 초기화 실패"), false) : false;
+  SurveySnapshot s = snap;
+  if (s.siteEntries.size() != s.nearbySites.size()) populateRagEvidence(&s, false);
   HWPSDK::Document* doc = m_impl->doc;
-  doc->Clear();
-  doc->SetEditMode(1);
-  const QString areaStr = QLocale(QLocale::Korean).toString(std::round(snap.totalAreaSqm)) + QStringLiteral(" ㎡");
-  insertStyledParagraph(doc, QStringLiteral("%1 발굴(시굴)조사 보고서").arg(snap.surveyTitle), 1800, true, 3);
-  insertStyledParagraph(doc, QStringLiteral("Ⅰ. 조사 개요"), 1300, true, 1);
-  insertStyledParagraph(doc, QStringLiteral("1. 조사명: %1\n2. 조사면적: %2 (%3개 구역)\n3. 작업좌표계: %4").arg(snap.surveyTitle, areaStr).arg(snap.surveyPolygonCount).arg(snap.surveyCrs), 1000, false, 0);
-  bindField(doc, u"조사명", u"SURVEY_NAME", snap.surveyTitle);
+  doc->Clear(), doc->SetEditMode(1);
+  const QString areaStr = QLocale(QLocale::Korean).toString(std::round(s.totalAreaSqm)) + QStringLiteral(" ㎡");
+  insertStyledParagraph(doc, QStringLiteral("%1 문화재 발굴(시굴)조사 보고서").arg(s.surveyTitle), 1800, true, 3);
+  insertStyledParagraph(doc, QStringLiteral("〈일러두기〉 (동국문화재연구원 보고서 작성 기준)\n"
+                                            "1. 도면 방위는 조사 당시 자북(磁北) 기준이며, 토층·단면 수치는 해발고도(m)를 나타낸다.\n"
+                                            "2. 도면 축소비율은 유구배치도 1/200, 수혈·건물지 평단면도 1/20·1/40(구상유구 1/80), 유물 실측도 1/3을 기본으로 한다.\n"
+                                            "3. 유물 일련번호는 유구별 토기류→기와류→기타 순으로 부여하고 토색·색조는 『新版 標準土色帖』(2007판)을 기준으로 한다."), 920, false, 0);
+  insertStyledParagraph(doc, QStringLiteral("Ⅰ. 머리말 (조사경위·조사단 구성·발굴조사 요약)"), 1300, true, 1);
+  insertStyledParagraph(doc, QStringLiteral("1. 조사명: %1\n2. 조사면적: %2 (%3개 구역)\n3. 작업좌표계: %4\n4. 지역 보고서 RAG: %5 %6권(본문 %7 · 스캔 %8)")
+                                 .arg(s.surveyTitle, areaStr).arg(s.surveyPolygonCount).arg(s.surveyCrs, s.regionName).arg(s.regionTotalReports).arg(s.regionTextReports).arg(s.regionScanReports), 1000, false, 0);
+  bindField(doc, u"조사명", u"SURVEY_NAME", s.surveyTitle);
   bindField(doc, u"조사면적", u"SURVEY_AREA_M2", areaStr);
-  bindField(doc, u"좌표계", u"SURVEY_CRS", snap.surveyCrs);
+  bindField(doc, u"좌표계", u"SURVEY_CRS", s.surveyCrs);
   if (maxStage <= 1) return true;
 
-  insertStyledParagraph(doc, QStringLiteral("Ⅱ. 주변 유적 현황 (<표 1>)"), 1300, true, 1);
-  QVector<QStringList> siteRows = {{QStringLiteral("연번"), QStringLiteral("구분"), QStringLiteral("유적명"), QStringLiteral("거리(m)"), QStringLiteral("방위"), QStringLiteral("반경구분")}};
-  int seq = 1;
-  for (const auto& item : snap.nearbySites) {
-    siteRows.push_back({QString::number(seq++), item.datasetName, item.siteName, QString::number(item.distanceMeters), item.direction, item.radiusLabel});
-    if (seq > 40) break;
+  insertStyledParagraph(doc, QStringLiteral("Ⅱ. 유적의 위치와 환경 — 2. 역사·고고 환경 (<표 1>)"), 1300, true, 1);
+  QVector<QStringList> siteRows = {{QStringLiteral("연번"), QStringLiteral("유적명"), QStringLiteral("최단거리·방위(G)"), QStringLiteral("시대(R)"), QStringLiteral("유구·층위(R)"), QStringLiteral("보고서 출처")}};
+  for (int i = 0; i < s.siteEntries.size() && i < 30; ++i) {
+    const auto& e = s.siteEntries[i];
+    const QString src = e.reportStatus == QStringLiteral("✓") ? QStringLiteral("✓ %1 (p.%2)").arg(e.reportName).arg(e.pageNo)
+                        : (e.reportStatus == QStringLiteral("◌") ? QStringLiteral("◌ 스캔 (%1)").arg(e.reportName) : QStringLiteral("○ 없음"));
+    siteRows.push_back({QString::number(i + 1), e.siteName, QStringLiteral("%1 %2m").arg(e.direction).arg(e.distanceMeters), e.eraSummary, e.featureSummary, src});
   }
-  if (siteRows.size() == 1)
-    siteRows.push_back({QStringLiteral("-"), QStringLiteral("-"), QStringLiteral("반경 내 로드된 주변유적 없음"), QStringLiteral("-"), QStringLiteral("-"), QStringLiteral("-")});
+  if (siteRows.size() == 1) siteRows.push_back({QStringLiteral("-"), QStringLiteral("반경 내 주변유적 없음"), QStringLiteral("-"), QStringLiteral("-"), QStringLiteral("-"), QStringLiteral("-")});
   appendTableToModel(doc, siteRows);
+  for (int i = 0; i < s.siteEntries.size() && i < 4; ++i) {
+    const auto& e = s.siteEntries[i];
+    insertStyledParagraph(doc, QStringLiteral("(%1) %2 [조사구역 경계 기준 %3 %4m]\n  • 층위·유구: %5 / %6\n  • ⑤ 조사구역과의 연관성: %7")
+                                   .arg(i + 1).arg(e.siteName, e.direction).arg(e.distanceMeters).arg(e.strataSummary, e.featureSummary, e.relationToSurvey), 950, false, 0);
+  }
   if (maxStage == 2) return true;
 
-  insertStyledParagraph(doc, QStringLiteral("Ⅲ. 조사구역 내 유구·유물 집계 (<표 2>)"), 1300, true, 1);
+  insertStyledParagraph(doc, QStringLiteral("Ⅲ. 조사 범위와 방법 및 층위 / Ⅳ. 조사 내용 (<표 2>)"), 1300, true, 1);
   QVector<QStringList> domRows = {{QStringLiteral("레이어 구분"), QStringLiteral("식별 키"), QStringLiteral("도형 수(건)")}};
-  for (const auto& d : snap.domainCounts)
-    domRows.push_back({d.label, d.layerKey, QString::number(d.featureCount)});
+  for (const auto& d : s.domainCounts) domRows.push_back({d.label, d.layerKey, QString::number(d.featureCount)});
   appendTableToModel(doc, domRows);
   if (maxStage == 3) return true;
 
-  insertStyledParagraph(doc, QStringLiteral("Ⅳ. 고찰 및 발굴보고서 RAG 슬롯"), 1300, true, 1);
-  insertStyledParagraph(doc, snap.discussionDraft, 1000, false, 0);
-  insertStyledParagraph(doc, snap.ragCitationSlotText, 1000, false, 0);
-  bindField(doc, u"고찰본문", u"DISCUSSION_BODY", snap.discussionDraft);
-  bindField(doc, u"RAG인용슬롯", u"RAG_CITATION_SLOT", snap.ragCitationSlotText);
+  insertStyledParagraph(doc, QStringLiteral("Ⅴ. 고찰 (1. 유구 · 2. 유물) 및 Ⅵ. 맺음말"), 1300, true, 1);
+  insertStyledParagraph(doc, s.discussionDraft, 1000, false, 0);
+  insertStyledParagraph(doc, s.ragCitationSlotText, 1000, false, 0);
+  bindField(doc, u"고찰본문", u"DISCUSSION_BODY", s.discussionDraft);
+  bindField(doc, u"RAG인용슬롯", u"RAG_CITATION_SLOT", s.ragCitationSlotText);
   return true;
 }
 
-bool ReportDocumentSession::openTemplateAndFill(const std::filesystem::path& templatePath,
-                                                const SurveySnapshot& snap, QString* errorOut) {
-  if (!m_impl || !m_impl->doc) return false;
-  if (!m_impl->doc->Open(openhwp::core::PathToUtf16(templatePath).c_str())) {
-    if (errorOut) *errorOut = QStringLiteral("한글 양식 파일을 열지 못했습니다.");
-    return false;
-  }
+bool ReportDocumentSession::openTemplateAndFill(const std::filesystem::path& templatePath, const SurveySnapshot& snap, QString* errorOut) {
+  if (!m_impl || !m_impl->doc || !m_impl->doc->Open(openhwp::core::PathToUtf16(templatePath).c_str()))
+    return errorOut ? (*errorOut = QStringLiteral("한글 양식 파일을 열지 못했습니다."), false) : false;
   const QString areaStr = QLocale(QLocale::Korean).toString(std::round(snap.totalAreaSqm)) + QStringLiteral(" ㎡");
-  for (const auto& kv : QList<QPair<QString, QString>>{
-           {QStringLiteral("SURVEY_NAME"), snap.surveyTitle}, {QStringLiteral("사업명"), snap.surveyTitle},
-           {QStringLiteral("SURVEY_AREA_M2"), areaStr}, {QStringLiteral("조사면적"), areaStr},
-           {QStringLiteral("SURVEY_CRS"), snap.surveyCrs}, {QStringLiteral("DISCUSSION_BODY"), snap.discussionDraft},
-           {QStringLiteral("고찰본문"), snap.discussionDraft}, {QStringLiteral("RAG_CITATION_SLOT"), snap.ragCitationSlotText}})
+  for (const auto& kv : QList<QPair<QString, QString>>{{QStringLiteral("SURVEY_NAME"), snap.surveyTitle}, {QStringLiteral("사업명"), snap.surveyTitle},
+                                                       {QStringLiteral("SURVEY_AREA_M2"), areaStr}, {QStringLiteral("SURVEY_CRS"), snap.surveyCrs},
+                                                       {QStringLiteral("DISCUSSION_BODY"), snap.discussionDraft}, {QStringLiteral("RAG_CITATION_SLOT"), snap.ragCitationSlotText}})
     setFieldValue(kv.first, kv.second);
   return true;
 }
-
 bool ReportDocumentSession::saveAs(const std::filesystem::path& outputPath, const QString& format, QString* errorOut) {
-  if (!m_impl || !m_impl->doc) return false;
   const std::u16string fmtU16 = toU16(format.trimmed().isEmpty() ? QStringLiteral("HWPX") : format.toUpper());
-  if (!m_impl->doc->SaveAs(openhwp::core::PathToUtf16(outputPath).c_str(), fmtU16.c_str())) {
-    if (errorOut) *errorOut = QStringLiteral("한글 문서(%1) 저장에 실패했습니다.").arg(format);
-    return false;
-  }
-  return true;
+  if (m_impl && m_impl->doc && m_impl->doc->SaveAs(openhwp::core::PathToUtf16(outputPath).c_str(), fmtU16.c_str())) return true;
+  return errorOut ? (*errorOut = QStringLiteral("저장 실패"), false) : false;
 }
-
 QVector<FieldEntry> ReportDocumentSession::fields() const {
   QVector<FieldEntry> out;
-  auto* impl = (m_impl && m_impl->doc) ? dynamic_cast<openhwp::core::DocumentImpl*>(m_impl->doc->GetImpl()) : nullptr;
-  if (impl) for (const auto& f : impl->Model().fields) out.push_back({QString::fromStdString(f.name_utf8), QString::fromStdString(f.text_utf8)});
+  if (auto* impl = (m_impl && m_impl->doc) ? dynamic_cast<openhwp::core::DocumentImpl*>(m_impl->doc->GetImpl()) : nullptr)
+    for (const auto& f : impl->Model().fields) out.push_back({QString::fromStdString(f.name_utf8), QString::fromStdString(f.text_utf8)});
   return out;
 }
-
 bool ReportDocumentSession::setFieldValue(const QString& fieldName, const QString& value) {
   const std::u16string nameU16 = toU16(fieldName);
-  if (!m_impl || !m_impl->doc || !m_impl->doc->FieldExist(nameU16.c_str())) return false;
-  m_impl->doc->PutFieldText(nameU16.c_str(), toU16(value).c_str());
-  return true;
+  return m_impl && m_impl->doc && m_impl->doc->FieldExist(nameU16.c_str()) && (m_impl->doc->PutFieldText(nameU16.c_str(), toU16(value).c_str()), true);
 }
 
 bool ReportDocumentSession::applyUserRequest(const QString& userPrompt, const SurveySnapshot& snap, QString* replyOut) {
   const QString req = userPrompt.trimmed();
-  if (req.isEmpty() || !m_impl || !m_impl->doc) return false;
-  HWPSDK::Document* doc = m_impl->doc;
+  auto* impl = (!req.isEmpty() && m_impl && m_impl->doc) ? dynamic_cast<openhwp::core::DocumentImpl*>(m_impl->doc->GetImpl()) : nullptr;
+  if (!impl) return false;
   const QRegularExpression rx(QStringLiteral("['\"]([^'\"]+)['\"]\\s*(?:을|를)?\\s*['\"]([^'\"]+)['\"]\\s*(?:으로|로)?\\s*(?:바꿔|변경|치환)"));
-  const QRegularExpressionMatch m = rx.match(req);
-  if (m.hasMatch()) {
-    const std::u16string fromU16 = toU16(m.captured(1)), toStrU16 = toU16(m.captured(2));
-    runAction(doc, u"AllReplace", [&](HWPSDK::ParameterSet* s) {
-      s->SetString(u"FindString", fromU16.c_str());
-      s->SetString(u"ReplaceString", toStrU16.c_str());
-    });
-    if (replyOut) *replyOut = QStringLiteral("문서 내 '%1' 문구를 '%2'(으)로 일괄 치환했습니다.").arg(m.captured(1), m.captured(2));
+  if (const QRegularExpressionMatch m = rx.match(req); m.hasMatch()) {
+    const std::string fromStr = m.captured(1).toStdString(), toStr = m.captured(2).toStdString();
+    auto replaceAll = [&](std::string& s) {
+      for (std::size_t p = 0; (p = s.find(fromStr, p)) != std::string::npos; p += toStr.size()) s.replace(p, fromStr.size(), toStr);
+    };
+    for (auto& p : impl->Model().paragraphs) replaceAll(p.text_utf8);
+    for (auto& f : impl->Model().fields) replaceAll(f.text_utf8);
+    if (replyOut) *replyOut = QStringLiteral("'%1' → '%2' 치환 완료").arg(m.captured(1), m.captured(2));
     return true;
   }
-  const QString areaStr = QLocale(QLocale::Korean).toString(std::round(snap.totalAreaSqm)) + QStringLiteral(" ㎡");
-  const QString generated = req.contains(QStringLiteral("입지"))
-      ? QStringLiteral("[입지 및 고고학적 배경] %1 조사지역(%2, %3)은 반경 1km 내 유적(%4개소)과 지형적 맥락을 공유하며, %5")
-            .arg(snap.surveyTitle, areaStr, snap.surveyCrs).arg(snap.nearbySites.size()).arg(req)
-      : QStringLiteral("[작성·보완 단락] %1 (%2 · %3 기준)").arg(req, snap.surveyTitle, areaStr);
-  insertStyledParagraph(doc, generated, 1000, false, 0);
-  setFieldValue(QStringLiteral("DISCUSSION_BODY"), snap.discussionDraft + QStringLiteral("\n") + generated);
-  if (replyOut) *replyOut = QStringLiteral("요청 내용을 한글 본문 및 누름틀에 반영했습니다:\n\"%1\"").arg(generated);
+  const std::string defReg = (snap.regionName.isEmpty() ? detectRegionName(snap) : snap.regionName).toStdString();
+  const std::string regScope = strata::core::LocalReportRag::extractRegionScope(req.toStdString(), defReg);
+  const auto hits = strata::core::LocalReportRag::search(req.toStdString(), regScope, 8, 2);
+  QString gen = QStringLiteral("[다차원 고찰 보완 · 지역범위: %1] %2").arg(QString::fromStdString(regScope), req);
+  QVector<QStringList> rows = {{QStringLiteral("기호"), QStringLiteral("권역·시군구"), QStringLiteral("보고서명(쪽)"), QStringLiteral("핵심 원문 발췌")}};
+  for (std::size_t i = 0; i < hits.size(); ++i) {
+    const auto& h = hits[i];
+    const QString snip = QString::fromStdString(h.snippet.empty() ? h.content : h.snippet).simplified().left(110);
+    gen += QStringLiteral("\n  • [R%1: %2 『%3』 p.%4] %5").arg(i + 1).arg(QString::fromStdString(h.sigungu), QString::fromStdString(h.report_name)).arg(h.page_no).arg(snip);
+    rows.push_back({QStringLiteral("R%1").arg(i + 1), QString::fromStdString(h.macro_region + " · " + h.sigungu), QStringLiteral("%1 (p.%2)").arg(QString::fromStdString(h.report_name)).arg(h.page_no), snip});
+  }
+  insertStyledParagraph(m_impl->doc, gen, 1000, false, 0);
+  if (rows.size() > 1) appendTableToModel(m_impl->doc, rows);
+  setFieldValue(QStringLiteral("DISCUSSION_BODY"), snap.discussionDraft + QStringLiteral("\n") + gen);
+  if (replyOut) *replyOut = QStringLiteral("지역(%1) 기준 RAG 원문 %2건을 분류·반영했습니다.").arg(QString::fromStdString(regScope)).arg(hits.size());
   return true;
 }
 
-QString ReportDocumentSession::renderPreviewHtml(const QString& liveStageLabel, int zoomPercent,
-                                                 bool showFieldMarks, const QString& extraVisualsHtml) const {
-  if (!m_impl || !m_impl->doc) return {};
-  auto* impl = dynamic_cast<openhwp::core::DocumentImpl*>(m_impl->doc->GetImpl());
+QString ReportDocumentSession::renderPreviewHtml(const QString& liveStageLabel, int zoomPercent, bool showFieldMarks, const QString& extraVisualsHtml) const {
+  auto* impl = (m_impl && m_impl->doc) ? dynamic_cast<openhwp::core::DocumentImpl*>(m_impl->doc->GetImpl()) : nullptr;
   if (!impl) return {};
   const auto& model = impl->Model();
   const int pageW = qBound(420, 680 * zoomPercent / 100, 1300);
   QString html = QStringLiteral(
-      "<html><body style='background:#525659;margin:0;padding:24px;font-family:\"Noto Serif CJK KR\",\"NanumMyeongjo\",serif;'>"
-      "<table align='center' width='%1' cellspacing='0' cellpadding='0' style='background:#ffffff;border:1px solid #1e293b;'>"
-      "<tr><td style='padding:26px 40px 10px 40px;color:#94a3b8;font-size:8.5pt;border-bottom:1px solid #cbd5e1;'>"
-      "<span>┏ 한글(HWP) A4 조판 규격 (210×297mm · 59528×84188 HWPUnit)</span><span style='float:right;'>┓</span></td></tr>"
-      "<tr><td style='padding:24px 44px;color:#111827;line-height:1.75;'>").arg(pageW);
+      "<html><body style='background:#EAE6DF;margin:0;padding:18px;font-family:\"Noto Serif CJK KR\",\"NanumMyeongjo\",serif;'>"
+      "<table align='center' width='%1' cellspacing='0' cellpadding='0' style='background:#FAF8F5;border:1px solid #C8C1B4;'>"
+      "<tr><td style='padding:20px 38px 8px 38px;color:#6E6A63;font-size:8.5pt;border-bottom:1px solid #DDD6C9;'>"
+      "<span>┏ 한글(HWPX/HWP) A4 조판 (210×297mm)</span><span style='float:right;'>┓</span></td></tr>"
+      "<tr><td style='padding:20px 40px;color:#1F1E1B;line-height:1.72;'>").arg(pageW);
   if (!liveStageLabel.isEmpty())
-    html += QStringLiteral("<div style='background:#fef3c7;border:2px solid #f59e0b;color:#92400e;padding:8px 12px;margin-bottom:14px;font-weight:bold;font-size:9.5pt;'>"
-                           "⚡ [실시간 조판 중] %1</div>").arg(liveStageLabel.toHtmlEscaped());
+    html += QStringLiteral("<div style='background:#F3ECE2;border:1px solid #B5573A;color:#1F1E1B;padding:6px 10px;margin-bottom:10px;font-weight:bold;font-size:9pt;'>[진행 단계] %1</div>").arg(liveStageLabel.toHtmlEscaped());
+  auto renderTableHtml = [](const openhwp::core::TableNode& tbl) {
+    QString t = QStringLiteral("<table border='1' cellspacing='0' cellpadding='5' style='border-collapse:collapse;width:100%;margin:10px 0;font-size:8.6pt;border-top:2px solid #1F1E1B;border-bottom:2px solid #1F1E1B;border-color:#A8A196;'>");
+    for (int r = 0; r < tbl.rows; ++r) {
+      t += QStringLiteral("<tr>");
+      for (int c = 0; c < tbl.cols; ++c)
+        t += QStringLiteral("<td align='%4' style='background:%1;font-weight:%2;'>%3</td>")
+                 .arg(r == 0 ? QStringLiteral("#E3DACC") : QStringLiteral("#FAF8F5"), r == 0 ? QStringLiteral("bold") : QStringLiteral("normal"),
+                      QString::fromStdString(tbl.cells[static_cast<size_t>(r)][static_cast<size_t>(c)].text_utf8).toHtmlEscaped(), r == 0 ? QStringLiteral("center") : QStringLiteral("left"));
+      t += QStringLiteral("</tr>");
+    }
+    return t + QStringLiteral("</table>");
+  };
   for (size_t i = 0; i < model.paragraphs.size(); ++i) {
     const auto& p = model.paragraphs[i];
     const QString txt = QString::fromStdString(p.text_utf8).trimmed();
-    if (txt.isEmpty()) continue;
-    const bool isLastLive = !liveStageLabel.isEmpty() && (i + 1 == model.paragraphs.size());
-    const QString hi = isLastLive ? QStringLiteral("background:#ecfdf5;border-left:4px solid #0d9488;padding-left:8px;") : QString();
-    html += QStringLiteral("<p style='font-size:%1pt;font-weight:%2;text-align:%3;margin:9px 0;%4'>%5</p>")
-                .arg(qMax(10, static_cast<int>(p.char_shape.height / 100)))
-                .arg(p.char_shape.bold ? QStringLiteral("bold") : QStringLiteral("normal"),
-                     p.para_shape.align_type == 3 ? QStringLiteral("center") : QStringLiteral("left"),
-                     hi, txt.toHtmlEscaped().replace(QLatin1Char('\n'), QStringLiteral("<br/>")));
+    if (!txt.isEmpty())
+      html += QStringLiteral("<p style='font-size:%1pt;font-weight:%2;text-align:%3;margin:7px 0;'>%4</p>")
+                  .arg(qMax(10, static_cast<int>(p.char_shape.height / 100))).arg(p.char_shape.bold ? QStringLiteral("bold") : QStringLiteral("normal"),
+                       p.para_shape.align_type == 3 ? QStringLiteral("center") : QStringLiteral("left"), txt.toHtmlEscaped().replace(QLatin1Char('\n'), QStringLiteral("<br/>")));
+    for (const auto& tbl : model.tables) if (tbl.anchor_para == static_cast<int>(i)) html += renderTableHtml(tbl);
   }
-  for (const auto& tbl : model.tables) {
-    html += QStringLiteral("<table border='1' cellspacing='0' cellpadding='6' style='border-collapse:collapse;width:100%;margin:16px 0;font-size:9.5pt;border-top:2px solid #0f172a;border-bottom:2px solid #0f172a;border-color:#475569;'>");
-    for (int r = 0; r < tbl.rows; ++r) {
-      html += QStringLiteral("<tr>");
-      for (int c = 0; c < tbl.cols; ++c)
-        html += QStringLiteral("<td align='%4' style='background:%1;font-weight:%2;'>%3</td>")
-                    .arg(r == 0 ? QStringLiteral("#e2e8f0") : QStringLiteral("#ffffff"),
-                         r == 0 ? QStringLiteral("bold") : QStringLiteral("normal"),
-                         QString::fromStdString(tbl.cells[static_cast<size_t>(r)][static_cast<size_t>(c)].text_utf8).toHtmlEscaped(),
-                         r == 0 ? QStringLiteral("center") : QStringLiteral("left"));
-      html += QStringLiteral("</tr>");
-    }
-    html += QStringLiteral("</table>");
-  }
+  for (const auto& tbl : model.tables) if (tbl.anchor_para < 0 || tbl.anchor_para >= static_cast<int>(model.paragraphs.size())) html += renderTableHtml(tbl);
   if (!extraVisualsHtml.isEmpty()) html += extraVisualsHtml;
   if (showFieldMarks && !model.fields.empty()) {
-    html += QStringLiteral("<div style='margin-top:18px;padding:10px;background:#f8fafc;border:1px dashed #dc2626;font-size:9pt;color:#334155;'>"
-                           "<b style='color:#dc2626;'>⟪한글 누름틀(Field) 실시간 바인딩 표시⟫</b><br/>");
-    for (const auto& f : model.fields)
-      html += QStringLiteral("<span style='color:#dc2626;font-weight:bold;'>⟪%1⟫</span> %2 &nbsp;&nbsp; ")
-                  .arg(QString::fromStdString(f.name_utf8).toHtmlEscaped(), QString::fromStdString(f.text_utf8).toHtmlEscaped());
+    html += QStringLiteral("<div style='margin-top:14px;padding:8px;background:#F3EFE8;border:1px dashed #B5573A;font-size:8.4pt;color:#4B4842;'><b style='color:#B5573A;'>⟪누름틀⟫</b> ");
+    for (const auto& f : model.fields) html += QStringLiteral("<b>⟪%1⟫</b> %2 &nbsp; ").arg(QString::fromStdString(f.name_utf8).toHtmlEscaped(), QString::fromStdString(f.text_utf8).toHtmlEscaped());
     html += QStringLiteral("</div>");
   }
-  html += QStringLiteral("</td></tr><tr><td align='center' style='padding:12px 40px 24px 40px;color:#64748b;font-size:9pt;border-top:1px solid #e2e8f0;'>"
-                         "<span style='float:left;color:#94a3b8;'>┗</span>- 1 -<span style='float:right;color:#94a3b8;'>┛</span></td></tr></table></body></html>");
-  return html;
+  return html + QStringLiteral("</td></tr><tr><td align='center' style='padding:10px 38px 18px 38px;color:#6E6A63;font-size:8.4pt;border-top:1px solid #DDD6C9;'>┗ - 1 - ┛</td></tr></table></body></html>");
 }
 }  // namespace HwpSurveyReportService

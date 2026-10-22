@@ -1,187 +1,257 @@
 #include "HwpAcademicVisuals.h"
+#include "LocalReportRag.h"
 
 #include <QJsonObject>
 #include <QLocale>
+#include <QMap>
+#include <QRegularExpression>
 #include <cmath>
 
 namespace HwpAcademicVisuals {
 namespace {
 
-struct RingBins {
-  int d0 = 0;
-  int d100 = 0;
-  int d300 = 0;
-  int d500 = 0;
-  int d1000 = 0;
-  int maxCount() const { return qMax(1, qMax(qMax(d0, d100), qMax(d300, qMax(d500, d1000)))); }
+struct ParsedFeatureRecord {
+  QString macroRegion;
+  QString sigungu;
+  QString period;
+  QString featureType;
+  QString planShape;
+  QString scaleText;
+  double lengthM = 0.0;
+  double widthM = 0.0;
+  double areaSqm = 0.0;
+  QString facilityAndArtifact;
+  QString reportName;
+  int pageNo = 0;
 };
 
-RingBins computeRingBins(const HwpSurveyReportService::SurveySnapshot& snap) {
-  RingBins b;
-  for (const auto& s : snap.nearbySites) {
-    if (s.distanceMeters <= 0) ++b.d0;
-    else if (s.distanceMeters <= 100) ++b.d100;
-    else if (s.distanceMeters <= 300) ++b.d300;
-    else if (s.distanceMeters <= 500) ++b.d500;
-    else ++b.d1000;
+QString matchFirst(const QString& txt, std::initializer_list<const char*> words, const QString& fallback) {
+  for (const char* w : words) {
+    const QString qw = QString::fromUtf8(w);
+    if (txt.contains(qw)) return qw;
   }
-  return b;
+  return fallback;
 }
 
-QString renderBarRow(const QString& label, int count, int total, int maxVal, const QString& barColor) {
-  const int pctWidth = qBound(4, count * 100 / qMax(1, maxVal), 100);
-  const double ratio = total > 0 ? (count * 100.0 / total) : 0.0;
+ParsedFeatureRecord parseHitToRecord(const strata::core::LocalReportHit& h) {
+  ParsedFeatureRecord r;
+  r.sigungu = QString::fromStdString(h.sigungu);
+  r.macroRegion = QString::fromStdString(h.macro_region);
+  r.reportName = QString::fromStdString(h.report_name);
+  r.pageNo = h.page_no;
+  const QString txt = QString::fromStdString(h.content + " " + h.report_name);
+  r.period = matchFirst(txt, {"후기구석기", "중기구석기", "전기구석기", "구석기", "신석기", "청동기", "원삼국", "통일신라", "신라", "백제", "가야", "고구려", "삼국", "고려", "조선"}, QStringLiteral("시대미상"));
+  r.featureType = matchFirst(txt, {"적석목곽묘", "굴립주건물지", "적심건물지", "초석건물지", "건물지", "수혈주거지", "주거지", "수혈유구", "수혈", "구상유구", "기와가마", "토기가마", "가마", "석곽묘", "석실묘", "옹관묘", "목관묘", "목곽묘", "토광묘", "구석기문화층", "문화층"}, QStringLiteral("기타유구"));
+  r.planShape = matchFirst(txt, {"세장방형", "장방형", "말각방형", "방형", "타원형", "원형", "부정형"}, QStringLiteral("-"));
+  static const QRegularExpression dimRx(QStringLiteral("(?:길이|장축)?\\s*(\\d{2,4}(?:\\.\\d+)?)\\s*(?:[×xX*]|(?:cm|㎝|m)?[^0-9]{1,10}(?:너비|폭|단축)\\s*)(\\d{2,4}(?:\\.\\d+)?)\\s*(cm|㎝|m|M)?"));
+  static const QRegularExpression diaRx(QStringLiteral("직경\\s*(\\d{2,4}(?:\\.\\d+)?)\\s*(cm|㎝|m|M)?"));
+  static const QRegularExpression kanRx(QStringLiteral("정면\\s*(\\d+)칸\\s*[×xX·,]*\\s*측면\\s*(\\d+)칸"));
+  static const QRegularExpression axisRx(QStringLiteral("(N-\\d{1,2}°-[EW])"));
+  if (const auto m = dimRx.match(txt); m.hasMatch()) {
+    double v1 = m.captured(1).toDouble(), v2 = m.captured(2).toDouble();
+    const QString unit = m.captured(3);
+    if (unit.contains(QLatin1Char('c')) || unit == QStringLiteral("㎝") || v1 >= 40.0) { v1 /= 100.0; v2 /= 100.0; }
+    r.lengthM = qMax(v1, v2); r.widthM = qMin(v1, v2); r.areaSqm = r.lengthM * r.widthM;
+    r.scaleText = QStringLiteral("%1×%2m (%3㎡)").arg(QString::number(r.lengthM, 'f', 1), QString::number(r.widthM, 'f', 1), QString::number(r.areaSqm, 'f', 1));
+  } else if (const auto dm = diaRx.match(txt); dm.hasMatch()) {
+    double d = dm.captured(1).toDouble();
+    if (d >= 40.0) d /= 100.0;
+    r.lengthM = r.widthM = d; r.areaSqm = 3.14159 * (d * 0.5) * (d * 0.5);
+    r.scaleText = QStringLiteral("직경 %1m (%2㎡)").arg(QString::number(d, 'f', 1), QString::number(r.areaSqm, 'f', 1));
+  }
+  if (const auto km = kanRx.match(txt); km.hasMatch()) {
+    const QString kan = QStringLiteral("정면%1×측면%2칸").arg(km.captured(1), km.captured(2));
+    r.scaleText = r.scaleText.isEmpty() ? kan : (kan + QStringLiteral(" · ") + r.scaleText);
+  }
+  if (const auto am = axisRx.match(txt); am.hasMatch())
+    r.scaleText = r.scaleText.isEmpty() ? am.captured(1) : (r.scaleText + QStringLiteral(" · ") + am.captured(1));
+  if (r.scaleText.isEmpty()) r.scaleText = QStringLiteral("본문참조");
+  QStringList fac;
+  for (const char* f : {"노지", "부뚜막", "구들", "벽구", "배수", "주공", "저장공", "시상대", "슴베찌르개", "좀돌날", "찍개", "AT화산재", "토양쐐기", "무문토기", "타날문", "수막새"})
+    if (txt.contains(QString::fromUtf8(f))) fac << QString::fromUtf8(f);
+  r.facilityAndArtifact = fac.isEmpty() ? QString::fromStdString(h.snippet).simplified().left(55) : fac.join(QStringLiteral(", "));
+  return r;
+}
+
+QString renderStrataColumnCell(const QString& title, const QString& distDir, const QString& strataText,
+                               const QString& featText, const QString& citeText, bool isExpectedTarget = false) {
+  const QString border = isExpectedTarget ? QStringLiteral("2px dashed #B5573A") : QStringLiteral("1px solid #A8A196");
+  const QString headBg = isExpectedTarget ? QStringLiteral("#B5573A") : QStringLiteral("#E3DACC");
+  const QString headFg = isExpectedTarget ? QStringLiteral("#FAF8F5") : QStringLiteral("#1F1E1B");
   return QStringLiteral(
-      "<tr><td width='140' style='font-size:9pt;font-weight:bold;color:#1e293b;padding:4px 6px;'>%1</td>"
-      "<td style='padding:4px 8px;background:#f8fafc;'>"
-      "<table width='%2%' cellspacing='0' cellpadding='0'><tr>"
-      "<td style='background:%3;height:14px;border-radius:2px;'>&nbsp;</td></tr></table></td>"
-      "<td width='95' align='right' style='font-size:9pt;font-weight:bold;color:#0f172a;padding:4px 6px;'>"
-      "%4건 (%5%)</td></tr>")
-      .arg(label.toHtmlEscaped())
-      .arg(pctWidth)
-      .arg(barColor)
-      .arg(count)
-      .arg(QString::number(ratio, 'f', 1));
+      "<td width='25%' valign='top' style='border:%1;background:#FAF8F5;padding:0;'>"
+      "<div style='background:%2;color:%3;padding:6px;font-size:8.5pt;font-weight:bold;text-align:center;'>%4<br/>"
+      "<span style='font-size:7.8pt;font-weight:normal;'>%5</span></div>"
+      "<div style='padding:6px;font-size:8pt;background:#EFECE6;border-bottom:1px solid #D5CEC2;'><b>Ⅰ. 표토·복토층</b></div>"
+      "<div style='padding:8px 6px;font-size:8pt;background:#E6DEC8;border-bottom:1px solid #D5CEC2;'><b>Ⅱ. 퇴적·토층 양상</b><br/>%6</div>"
+      "<div style='padding:10px 6px;font-size:8pt;background:#F3ECE2;border-bottom:1px solid #B5573A;color:#1F1E1B;'>"
+      "<b style='color:#B5573A;'>Ⅲ. 문화층·확인유구</b><br/>%7</div>"
+      "<div style='padding:6px;font-size:7.8pt;background:#DDD6C9;color:#4B4842;'><b>Ⅳ. 기반풍화토(생토)</b><br/>출처: %8</div></td>")
+      .arg(border, headBg, headFg, title.toHtmlEscaped(), distDir.toHtmlEscaped(),
+           strataText.toHtmlEscaped(), featText.toHtmlEscaped(), citeText.toHtmlEscaped());
 }
-
 }  // namespace
 
-QString renderVisualsAndDbpiaSectionHtml(const HwpSurveyReportService::SurveySnapshot& snap,
-                                         const DbpiaSummary& dbpia) {
-  const RingBins bins = computeRingBins(snap);
-  const int totalSites = snap.nearbySites.size();
-  int cJournal = 0, cThesis = 0, cConf = 0, cReport = 0;
-  for (const QJsonValue& v : dbpia.collectedPapers) {
-    const QString tp = v.toObject().value(QStringLiteral("nodeType")).toString();
-    if (tp.contains(QStringLiteral("저널")) || tp.contains(QStringLiteral("학술지"))) ++cJournal;
-    else if (tp.contains(QStringLiteral("학위"))) ++cThesis;
-    else if (tp.contains(QStringLiteral("학술대회"))) ++cConf;
-    else ++cReport;
+QString renderVisualsAndDbpiaSectionHtml(const HwpSurveyReportService::SurveySnapshot& snap, const DbpiaSummary& dbpia) {
+  QString html = QStringLiteral(
+      "<div style='margin:16px 0;padding:12px;border:1px solid #A8A196;background:#FAF8F5;'>"
+      "<div style='font-size:9.8pt;font-weight:bold;color:#1F1E1B;text-align:center;margin-bottom:8px;'>"
+      "&lt;그림 1&gt; 주변유적 층위 대비도 및 조사구역 예상 양상 (동국문화재연구원 해발·토층 기준)</div>"
+      "<table width='100%' cellspacing='6' cellpadding='0' style='border-collapse:separate;'><tr>");
+  int colCount = 0;
+  for (const auto& e : snap.siteEntries) {
+    if (colCount >= 3) break;
+    const QString cite = e.reportStatus == QStringLiteral("✓")
+                             ? QStringLiteral("✓ 『%1』 p.%2").arg(e.reportName).arg(e.strataPageNo > 0 ? e.strataPageNo : e.pageNo)
+                             : (e.reportStatus == QStringLiteral("◌") ? QStringLiteral("◌ 스캔본(『%1』)").arg(e.reportName) : QStringLiteral("○ 원문 없음"));
+    html += renderStrataColumnCell(e.siteName.left(14), QStringLiteral("경계 기준 %1 %2m").arg(e.direction).arg(e.distanceMeters),
+                                   e.strataSummary.left(56), QStringLiteral("[%1] %2").arg(e.eraSummary, e.featureSummary.left(50)), cite, false);
+    ++colCount;
   }
-  const int totalPapers = dbpia.collectedPapers.size();
-  const int maxPaperBin = qMax(1, qMax(qMax(cJournal, cThesis), qMax(cConf, cReport)));
-
-  QString html;
-  // 1. 전문 모식도 1: 고고학 고찰·논문 논증 구조 모식도 (SmartArt Process Diagram)
-  html += QStringLiteral(
-      "<div style='margin:18px 0;padding:12px;border:2px solid #1e3a8a;background:#f8fafc;'>"
-      "<div style='font-size:10pt;font-weight:bold;color:#1e3a8a;text-align:center;margin-bottom:10px;'>"
-      "&lt;모식도 1&gt; 발굴조사보고서 고찰 및 학술논문 다중 근거 교차검증 모식도 (GIS × DBpia AI)</div>"
-      "<table width='100%' cellspacing='4' cellpadding='8' style='border-collapse:separate;'><tr>"
-      "<td width='23%' align='center' style='background:#dbeafe;border:1px solid #1d4ed8;font-size:8.5pt;'>"
-      "<b>[1단계] GIS 실측 원장</b><br/>조사구역(%1㎡)<br/>주변유적 <b>%2개소</b></td>"
-      "<td width='3%' align='center' style='font-size:12pt;font-weight:bold;color:#1e3a8a;'>➔</td>"
-      "<td width='23%' align='center' style='background:#e0f2fe;border:1px solid #0284c7;font-size:8.5pt;'>"
-      "<b>[2단계] DBpia 문헌 집성</b><br/>학술지·학위논문<br/>총 <b>%3편</b> 수렴</td>"
-      "<td width='3%' align='center' style='font-size:12pt;font-weight:bold;color:#0f766e;'>➔</td>"
-      "<td width='23%' align='center' style='background:#ccfbf1;border:1px solid #0f766e;font-size:8.5pt;'>"
-      "<b>[3단계] DBpia AI 분석</b><br/>유구·유물·편년 질의<br/>총 <b>%4회</b> 교차검증</td>"
-      "<td width='3%' align='center' style='font-size:12pt;font-weight:bold;color:#4f46e5;'>➔</td>"
-      "<td width='22%' align='center' style='background:#ede9fe;border:1px solid #6d28d9;font-size:8.5pt;'>"
-      "<b>[4단계] 고찰·논문 도출</b><br/>공간위계·성격 규명<br/>한글(.hwpx/.hwp) 조판</td>"
-      "</tr></table></div>")
-              .arg(QLocale(QLocale::Korean).toString(std::round(snap.totalAreaSqm)))
-              .arg(totalSites)
-              .arg(totalPapers)
-              .arg(dbpia.dbpiaAiTurns.size());
-
-  // 2. 전문 모식도 2: 조사구역 중심 8방위·거리권역 공간배치 모식도
-  QMap<QString, QStringList> dirMap;
-  for (const auto& s : snap.nearbySites) {
-    const QString d = s.direction.isEmpty() ? QStringLiteral("인접") : s.direction;
-    if (dirMap[d].size() < 2)
-      dirMap[d] << QStringLiteral("%1(%2m)").arg(s.siteName.left(10)).arg(s.distanceMeters);
+  while (colCount < 3) {
+    html += renderStrataColumnCell(QStringLiteral("인접 대조유적 미상"), QStringLiteral("추가 레이어 로드 필요"),
+                                   QStringLiteral("원문 미확보(확인 필요)"), QStringLiteral("원문 미확보"), QStringLiteral("○ 없음"), false);
+    ++colCount;
   }
-  auto cellForDir = [&](const QString& dir) {
-    const QString items = dirMap.value(dir).isEmpty() ? QStringLiteral("분포 유적 없음") : dirMap.value(dir).join(QStringLiteral("<br/>"));
-    return QStringLiteral("<td width='33%' align='center' style='background:#ffffff;border:1px solid #94a3b8;padding:6px;font-size:8.5pt;'>"
-                          "<b style='color:#0f766e;'>[%1쪽 권역]</b><br/>%2</td>").arg(dir, items);
-  };
-  html += QStringLiteral(
-      "<div style='margin:16px 0;padding:12px;border:1px solid #475569;background:#f1f5f9;'>"
-      "<div style='font-size:10pt;font-weight:bold;color:#0f172a;text-align:center;margin-bottom:8px;'>"
-      "&lt;모식도 2&gt; 조사구역 중심 8방위 주변유적 공간배치 모식도 (반경 500m~1,000m)</div>"
-      "<table width='100%' cellspacing='3' cellpadding='4'>")
-      + QStringLiteral("<tr>") + cellForDir(QStringLiteral("북서")) + cellForDir(QStringLiteral("북")) + cellForDir(QStringLiteral("북동")) + QStringLiteral("</tr>")
-      + QStringLiteral("<tr>") + cellForDir(QStringLiteral("서"))
-      + QStringLiteral("<td width='34%' align='center' style='background:#fef3c7;border:2px solid #d97706;padding:8px;font-size:9pt;'>"
-                       "<b style='color:#92400e;'>★ 기준 조사구역 (G1)</b><br/>%1<br/>(%2 ㎡ · %3)</td>")
-            .arg(snap.surveyTitle.toHtmlEscaped(), QLocale(QLocale::Korean).toString(std::round(snap.totalAreaSqm)), snap.surveyCrs)
-      + cellForDir(QStringLiteral("동")) + QStringLiteral("</tr>")
-      + QStringLiteral("<tr>") + cellForDir(QStringLiteral("남서")) + cellForDir(QStringLiteral("남")) + cellForDir(QStringLiteral("남동")) + QStringLiteral("</tr>")
-      + QStringLiteral("</table></div>");
-
-  // 3. 전문 차트·그래프 1: 이격거리 구간별 주변유적 분포 막대 그래프
-  html += QStringLiteral(
-      "<div style='margin:16px 0;padding:12px;border:1px solid #cbd5e1;background:#ffffff;'>"
-      "<div style='font-size:10pt;font-weight:bold;color:#0f172a;margin-bottom:8px;'>"
-      "&lt;그림 1&gt; 이격거리 구간별 주변유적 분포 현황 그래프 (총 %1개소)</div>"
-      "<table width='100%' cellspacing='0' cellpadding='2' style='border-top:2px solid #0f172a;border-bottom:2px solid #0f172a;'>")
-              .arg(totalSites)
-      + renderBarRow(QStringLiteral("조사구역 내 (0m)"), bins.d0, totalSites, bins.maxCount(), QStringLiteral("#dc2626"))
-      + renderBarRow(QStringLiteral("최인접 (1~100m)"), bins.d100, totalSites, bins.maxCount(), QStringLiteral("#ea580c"))
-      + renderBarRow(QStringLiteral("인접권 (101~300m)"), bins.d300, totalSites, bins.maxCount(), QStringLiteral("#0284c7"))
-      + renderBarRow(QStringLiteral("주변권 (301~500m)"), bins.d500, totalSites, bins.maxCount(), QStringLiteral("#0d9488"))
-      + renderBarRow(QStringLiteral("광역권 (500m 초과)"), bins.d1000, totalSites, bins.maxCount(), QStringLiteral("#64748b"))
-      + QStringLiteral("</table></div>");
-
-  // 4. 전문 차트·그래프 2: DBpia 발행유형별 학술문헌 분포 차트
-  html += QStringLiteral(
-      "<div style='margin:16px 0;padding:12px;border:1px solid #cbd5e1;background:#ffffff;'>"
-      "<div style='font-size:10pt;font-weight:bold;color:#0f172a;margin-bottom:8px;'>"
-      "&lt;그림 2&gt; DBpia AI · 학술문헌 발행유형별 수집 현황 차트 (총 %1편 · 라운드 %2)</div>"
-      "<table width='100%' cellspacing='0' cellpadding='2' style='border-top:2px solid #0f172a;border-bottom:2px solid #0f172a;'>")
-              .arg(totalPapers)
-              .arg(dbpia.roundNumber)
-      + renderBarRow(QStringLiteral("학술지 논문"), cJournal, totalPapers, maxPaperBin, QStringLiteral("#1d4ed8"))
-      + renderBarRow(QStringLiteral("학위 논문(석·박사)"), cThesis, totalPapers, maxPaperBin, QStringLiteral("#7c3aed"))
-      + renderBarRow(QStringLiteral("학술대회 발표논문"), cConf, totalPapers, maxPaperBin, QStringLiteral("#0f766e"))
-      + renderBarRow(QStringLiteral("발굴보고서·단행본"), cReport, totalPapers, maxPaperBin, QStringLiteral("#b45309"))
-      + QStringLiteral("</table></div>");
-
-  // 5. DBpia 수집 학술논문 표 (<표 3>) 및 고찰·논문 종합 서술
+  const QString expStrata = !snap.siteEntries.isEmpty() && snap.siteEntries.front().reportStatus == QStringLiteral("✓")
+      ? QStringLiteral("최단거리 유적(%1m) 토층 기준 동일 지형면 연장 예상").arg(snap.siteEntries.front().distanceMeters)
+      : QStringLiteral("시굴 트렌치 굴착을 통한 기준 토층 확인 필요");
+  const QString expFeat = !snap.siteEntries.isEmpty()
+      ? QStringLiteral("인접 %1(%2 %3m) 연관 유구 분포 가능성 검토").arg(snap.siteEntries.front().siteName.left(10), snap.siteEntries.front().direction).arg(snap.siteEntries.front().distanceMeters)
+      : QStringLiteral("조사구역(%1㎡) 내 유구 분포 확인 예정").arg(qRound(snap.totalAreaSqm));
+  html += renderStrataColumnCell(QStringLiteral("조사구역 (예상)"), QStringLiteral("%1 (%2㎡)").arg(snap.surveyTitle.left(12)).arg(qRound(snap.totalAreaSqm)),
+                                 expStrata, expFeat, QStringLiteral("[G] GIS 측정 + [R] 원문 대조"), true);
+  html += QStringLiteral("</tr></table></div><div style='margin:14px 0;padding:12px;border:1px solid #A8A196;background:#FAF8F5;'>"
+                         "<div style='font-size:9.8pt;font-weight:bold;color:#1F1E1B;margin-bottom:8px;'>"
+                         "&lt;그림 2&gt; 조사구역 경계 기준 주변유적 실제 최단거리(m) 및 원문 검증 현황 (반경 %1m 내 %2개소)</div>"
+                         "<table width='100%' cellspacing='0' cellpadding='3' style='border-top:2px solid #1F1E1B;border-bottom:2px solid #1F1E1B;font-size:8.5pt;'>")
+              .arg(qRound(snap.radiusMeters)).arg(snap.siteEntries.size());
+  const int maxDist = qMax(100, qRound(snap.radiusMeters));
+  for (int i = 0; i < snap.siteEntries.size() && i < 10; ++i) {
+    const auto& e = snap.siteEntries[i];
+    const int barPct = qBound(4, e.distanceMeters * 100 / maxDist, 100);
+    const QString barColor = e.reportStatus == QStringLiteral("✓") ? QStringLiteral("#B5573A") : (e.reportStatus == QStringLiteral("◌") ? QStringLiteral("#8C7A6B") : QStringLiteral("#B8B2A6"));
+    html += QStringLiteral("<tr><td width='165' style='padding:3px 5px;'><b>%1. %2</b></td><td width='65' align='center'>%3 %4m</td>"
+                           "<td style='padding:3px 6px;background:#F3EFE8;'><table width='%5%' cellspacing='0' cellpadding='0'><tr><td style='background:%6;height:12px;'>&nbsp;</td></tr></table></td>"
+                           "<td width='140' align='right' style='padding:3px 5px;'>%7 %8</td></tr>")
+                .arg(i + 1).arg(e.siteName.left(14).toHtmlEscaped(), e.direction.toHtmlEscaped()).arg(e.distanceMeters).arg(barPct)
+                .arg(barColor, e.reportStatus, e.pageNo > 0 ? QStringLiteral("p.%1").arg(e.pageNo) : (e.reportStatus == QStringLiteral("◌") ? QStringLiteral("스캔본") : QStringLiteral("미확보")));
+  }
+  html += QStringLiteral("</table></div>");
   if (!dbpia.collectedPapers.isEmpty()) {
-    html += QStringLiteral(
-        "<div style='font-size:11pt;font-weight:bold;color:#0f172a;margin-top:16px;'>"
-        "Ⅴ. DBpia 학술문헌 및 DBpia AI 교차검증 고찰 (&lt;표 3&gt;)</div>"
-        "<table border='1' cellspacing='0' cellpadding='5' style='border-collapse:collapse;width:100%;margin:10px 0;font-size:8.5pt;border-top:2px solid #0f172a;border-bottom:2px solid #0f172a;border-color:#475569;'>"
-        "<tr style='background:#e2e8f0;font-weight:bold;text-align:center;'>"
-        "<td width='40'>번호</td><td width='70'>유형</td><td width='95'>저자(연도)</td><td>논문명 / 수록 학술지</td></tr>");
-    const int limit = qMin<int>(15, dbpia.collectedPapers.size());
-    for (int i = 0; i < limit; ++i) {
+    html += QStringLiteral("<div style='font-size:10pt;font-weight:bold;margin-top:14px;'>Ⅵ. 참고 학술문헌 (&lt;표 3&gt; · %1편)</div>"
+                           "<table border='1' cellspacing='0' cellpadding='4' style='border-collapse:collapse;width:100%;margin:8px 0;font-size:8.4pt;border-top:2px solid #1F1E1B;border-bottom:2px solid #1F1E1B;border-color:#A8A196;'>"
+                           "<tr style='background:#E3DACC;font-weight:bold;text-align:center;'><td width='40'>기호</td><td width='75'>구분</td><td width='100'>저자(연도)</td><td>논문명 / 학술지</td></tr>")
+                .arg(dbpia.collectedPapers.size());
+    for (int i = 0; i < qMin<int>(12, dbpia.collectedPapers.size()); ++i) {
       const QJsonObject p = dbpia.collectedPapers[i].toObject();
-      html += QStringLiteral("<tr><td align='center'>L%1</td><td align='center'>%2</td><td>%3 (%4)</td><td><b>%5</b>, 『%6』</td></tr>")
-                  .arg(i + 1)
-                  .arg(p.value(QStringLiteral("nodeType")).toString().toHtmlEscaped(),
-                       p.value(QStringLiteral("authors")).toString().toHtmlEscaped(),
-                       p.value(QStringLiteral("year")).toString().toHtmlEscaped(),
-                       p.value(QStringLiteral("title")).toString().toHtmlEscaped(),
-                       p.value(QStringLiteral("journal")).toString().toHtmlEscaped());
+      html += QStringLiteral("<tr><td align='center'>L%1</td><td align='center'>%2</td><td>%3 (%4)</td><td>%5, 『%6』</td></tr>")
+                  .arg(i + 1).arg(p.value(QStringLiteral("nodeType")).toString().toHtmlEscaped(), p.value(QStringLiteral("authors")).toString().toHtmlEscaped(),
+                                  p.value(QStringLiteral("year")).toString().toHtmlEscaped(), p.value(QStringLiteral("title")).toString().toHtmlEscaped(), p.value(QStringLiteral("journal")).toString().toHtmlEscaped());
     }
     html += QStringLiteral("</table>");
-  }
-  if (!dbpia.synthesizedDiscussion.trimmed().isEmpty()) {
-    html += QStringLiteral("<div style='margin:12px 0;padding:12px;background:#f8fafc;border-left:4px solid #1d4ed8;font-size:9.5pt;line-height:1.7;'>"
-                           "<b>[DBpia AI × GIS 실측 고찰·논문 종합]</b><br/>%1</div>")
-                .arg(dbpia.synthesizedDiscussion.toHtmlEscaped().replace(QLatin1Char('\n'), QStringLiteral("<br/>")));
   }
   return html;
 }
 
-void appendDbpiaAndVisualSummaryToDoc(const HwpSurveyReportService::SurveySnapshot& snap,
-                                      const DbpiaSummary& dbpia,
-                                      HwpSurveyReportService::ReportDocumentSession* session) {
-  if (!session) return;
-  const RingBins bins = computeRingBins(snap);
-  const QString chartSummary = QStringLiteral(
-      "\n[모식도 및 차트·그래프 분석 요약]\n"
-      "• <모식도 1~2> GIS 실측 원장(%1개소) × DBpia 학술문헌(%2편) × DBpia AI 교차검증(%3회) 4단계 논증 구조 및 8방위 공간배치\n"
-      "• <그림 1> 거리 구간별 주변유적 분포: 조사구역 내(0m) %4개소, 1~100m %5개소, 101~300m %6개소, 301~500m %7개소, 500m 초과 %8개소\n")
-      .arg(snap.nearbySites.size()).arg(dbpia.collectedPapers.size()).arg(dbpia.dbpiaAiTurns.size())
-      .arg(bins.d0).arg(bins.d100).arg(bins.d300).arg(bins.d500).arg(bins.d1000);
-  session->setFieldValue(QStringLiteral("DISCUSSION_BODY"),
-                         snap.discussionDraft + chartSummary + dbpia.synthesizedDiscussion);
+QString renderVerificationReportHtml(const HwpSurveyReportService::SurveySnapshot& snap, const DbpiaSummary& dbpia) {
+  int cVerified = 0, cScan = 0, cMissing = 0;
+  for (const auto& e : snap.siteEntries) {
+    if (e.reportStatus == QStringLiteral("✓")) ++cVerified;
+    else if (e.reportStatus == QStringLiteral("◌")) ++cScan;
+    else ++cMissing;
+  }
+  QString html = QStringLiteral(
+      "<html><body style='background:#FAF8F5;margin:0;padding:18px;font-family:\"Pretendard\",\"Noto Sans CJK KR\",sans-serif;color:#1F1E1B;'>"
+      "<div style='padding:10px 14px;background:#E3DACC;border:1px solid #1F1E1B;margin-bottom:14px;font-size:9.5pt;'>"
+      "<b>[검수 보고 · 사실근거 대조표]</b> &nbsp; GIS 측정(G): <b>%1건</b> &nbsp;|&nbsp; 원문 확인(✓): <b>%2건</b> &nbsp;|&nbsp; 스캔본(◌): <b>%3건</b> &nbsp;|&nbsp; 미기재(○): <b>%4건</b> &nbsp;|&nbsp; 문헌(L): <b>%5편</b></div>"
+      "<table border='1' cellspacing='0' cellpadding='6' style='border-collapse:collapse;width:100%;font-size:8.8pt;border-top:2px solid #1F1E1B;border-bottom:2px solid #1F1E1B;border-color:#A8A196;'>"
+      "<tr style='background:#E3DACC;font-weight:bold;text-align:center;'><td width='70'>장·절</td><td>본문 서술 및 수치 항목</td><td width='55'>구분</td><td width='210'>검증 출처</td><td width='65'>판정</td></tr>")
+      .arg(snap.siteEntries.size() + 1).arg(cVerified).arg(cScan).arg(cMissing).arg(dbpia.collectedPapers.size());
+  html += QStringLiteral("<tr><td align='center'>Ⅰ. 머리말</td><td>조사면적 %1㎡ (%2개 구역, 좌표계 %3)</td><td align='center'>G</td><td>QGIS 도메인 레이어(survey_area) 실측</td><td align='center'><b>✓ 확인</b></td></tr>")
+              .arg(qRound(snap.totalAreaSqm)).arg(snap.surveyPolygonCount).arg(snap.surveyCrs.toHtmlEscaped());
+  for (int i = 0; i < snap.siteEntries.size(); ++i) {
+    const auto& e = snap.siteEntries[i];
+    const QString cite = e.reportStatus == QStringLiteral("✓") ? QStringLiteral("『%1』 p.%2").arg(e.reportName).arg(e.pageNo)
+                         : (e.reportStatus == QStringLiteral("◌") ? QStringLiteral("스캔본 『%1』").arg(e.reportName) : QStringLiteral("원문 없음"));
+    const QString badge = e.reportStatus == QStringLiteral("✓") ? QStringLiteral("<b>✓ 확인</b>") : (e.reportStatus == QStringLiteral("◌") ? QStringLiteral("◌ 스캔본") : QStringLiteral("○ 미기재"));
+    html += QStringLiteral("<tr><td align='center'>Ⅱ-%1</td><td><b>%2</b> (경계 기준 %3 %4m) · %5</td><td align='center'>G+R</td><td>%6</td><td align='center'>%7</td></tr>")
+                .arg(i + 1).arg(e.siteName.toHtmlEscaped(), e.direction.toHtmlEscaped()).arg(e.distanceMeters).arg(e.featureSummary.left(65).toHtmlEscaped(), cite.toHtmlEscaped(), badge);
+  }
+  return html + QStringLiteral("</table></body></html>");
 }
 
+QString renderFeatureComparisonHtml(const HwpSurveyReportService::SurveySnapshot& snap, const QString& featureKeyword) {
+  const QString kw = featureKeyword.trimmed().isEmpty() ? QStringLiteral("주거지 건물지 가마 고분 유구 일람표") : featureKeyword.trimmed();
+  const QString regionExpr = QString::fromStdString(strata::core::LocalReportRag::extractRegionScope(kw.toStdString(), snap.regionName.toStdString()));
+  const auto hits = strata::core::LocalReportRag::search(kw.toStdString(), regionExpr.toStdString(), 18, 2);
+
+  QVector<ParsedFeatureRecord> recs;
+  QMap<QString, int> byRegion, byPeriodPlan;
+  QMap<QString, QPair<double, int>> areaByRegion, areaByPeriodPlan;
+  double sumArea = 0.0; int areaCnt = 0;
+  for (const auto& h : hits) {
+    ParsedFeatureRecord r = parseHitToRecord(h);
+    const QString regKey = r.macroRegion + QStringLiteral(" · ") + r.sigungu;
+    const QString ppKey = r.period + QStringLiteral(" | ") + r.featureType + (r.planShape != QLatin1String("-") ? (QStringLiteral("(") + r.planShape + QStringLiteral(")")) : QString());
+    byRegion[regKey]++;
+    byPeriodPlan[ppKey]++;
+    if (r.areaSqm > 0.1) {
+      sumArea += r.areaSqm; ++areaCnt;
+      areaByRegion[regKey].first += r.areaSqm; areaByRegion[regKey].second++;
+      areaByPeriodPlan[ppKey].first += r.areaSqm; areaByPeriodPlan[ppKey].second++;
+    }
+    recs.push_back(std::move(r));
+  }
+  QString html = QStringLiteral(
+      "<html><body style='background:#FAF8F5;margin:0;padding:18px;font-family:\"Pretendard\",\"Noto Sans CJK KR\",sans-serif;color:#1F1E1B;'>"
+      "<div style='padding:10px 14px;background:#E3DACC;border:1px solid #1F1E1B;margin-bottom:12px;font-size:9.4pt;'>"
+      "<b>[단일 유구 비교 및 다차원(지역×시대×유구×평면×규모) 분류·집계]</b> &nbsp; 지역 변수: <b>%1</b> &nbsp;|&nbsp; 주제: <b>%2</b> (추출 %3건%4)</div>")
+      .arg(regionExpr.toHtmlEscaped(), kw.toHtmlEscaped()).arg(recs.size())
+      .arg(areaCnt > 0 ? QStringLiteral(" · 평균 면적 %1㎡").arg(QString::number(sumArea / areaCnt, 'f', 1)) : QString());
+
+  html += QStringLiteral("<table width='100%' cellspacing='8' cellpadding='0'><tr><td width='48%' valign='top'>"
+                         "<div style='font-size:9pt;font-weight:bold;margin-bottom:4px;'>1. 지역별(권역·시군구) 분포 및 규모 집계</div>"
+                         "<table border='1' cellspacing='0' cellpadding='4' style='border-collapse:collapse;width:100%;font-size:8.4pt;border-color:#A8A196;'>"
+                         "<tr style='background:#E3DACC;font-weight:bold;'><td>권역 · 시군구</td><td width='45' align='center'>건수</td><td width='75' align='center'>평균 면적</td></tr>");
+  for (auto it = byRegion.begin(); it != byRegion.end(); ++it) {
+    const auto ap = areaByRegion.value(it.key());
+    const QString avgStr = ap.second > 0 ? (QString::number(ap.first / ap.second, 'f', 1) + QStringLiteral("㎡")) : QStringLiteral("-");
+    html += QStringLiteral("<tr><td>%1</td><td align='center'><b>%2</b></td><td align='center'>%3</td></tr>").arg(it.key().toHtmlEscaped()).arg(it.value()).arg(avgStr);
+  }
+  html += QStringLiteral("</table></td><td width='52%' valign='top'>"
+                         "<div style='font-size:9pt;font-weight:bold;margin-bottom:4px;'>2. 시대별 × 유구·평면형태별 교차 집계 (크기 변화)</div>"
+                         "<table border='1' cellspacing='0' cellpadding='4' style='border-collapse:collapse;width:100%;font-size:8.4pt;border-color:#A8A196;'>"
+                         "<tr style='background:#E3DACC;font-weight:bold;'><td>시대 | 유구 (평면형태)</td><td width='45' align='center'>건수</td><td width='75' align='center'>평균 면적</td></tr>");
+  for (auto it = byPeriodPlan.begin(); it != byPeriodPlan.end(); ++it) {
+    const auto ap = areaByPeriodPlan.value(it.key());
+    const QString avgStr = ap.second > 0 ? (QString::number(ap.first / ap.second, 'f', 1) + QStringLiteral("㎡")) : QStringLiteral("-");
+    html += QStringLiteral("<tr><td>%1</td><td align='center'><b>%2</b></td><td align='center'>%3</td></tr>").arg(it.key().toHtmlEscaped()).arg(it.value()).arg(avgStr);
+  }
+  html += QStringLiteral("</table></td></tr></table>");
+
+  html += QStringLiteral("<div style='font-size:9.2pt;font-weight:bold;margin:10px 0 5px 0;'>3. 고고학 변수별(지역·시대·유구·평면·규모·내부시설) 원문 대조 일람표 (R)</div>"
+                         "<table border='1' cellspacing='0' cellpadding='5' style='border-collapse:collapse;width:100%;font-size:8.4pt;border-top:2px solid #1F1E1B;border-bottom:2px solid #1F1E1B;border-color:#A8A196;'>"
+                         "<tr style='background:#E3DACC;font-weight:bold;text-align:center;'>"
+                         "<td width='38'>기호</td><td width='105'>권역·시군구</td><td width='65'>시대</td><td width='95'>유구(평면)</td><td width='105'>규모·칸수·장축</td><td>내부시설·유물·원문</td><td width='165'>보고서명·쪽</td></tr>");
+  for (int i = 0; i < recs.size(); ++i) {
+    const auto& r = recs[i];
+    html += QStringLiteral("<tr><td align='center'><b>R%1</b></td><td>%2<br/><span style='color:#6E6A63;'>%3</span></td><td align='center'>%4</td>"
+                           "<td align='center'><b>%5</b><br/>(%6)</td><td align='center'>%7</td><td>%8</td><td>%9 (p.%10)</td></tr>")
+                .arg(i + 1).arg(r.sigungu.toHtmlEscaped(), r.macroRegion.toHtmlEscaped(), r.period.toHtmlEscaped(),
+                                r.featureType.toHtmlEscaped(), r.planShape.toHtmlEscaped(), r.scaleText.toHtmlEscaped(),
+                                r.facilityAndArtifact.toHtmlEscaped(), r.reportName.left(22).toHtmlEscaped()).arg(r.pageNo);
+  }
+  return html + QStringLiteral("</table></body></html>");
+}
+
+void appendDbpiaAndVisualSummaryToDoc(const HwpSurveyReportService::SurveySnapshot& snap, const DbpiaSummary& dbpia,
+                                      HwpSurveyReportService::ReportDocumentSession* session) {
+  if (!session) return;
+  int cVerified = 0;
+  for (const auto& e : snap.siteEntries) if (e.reportStatus == QStringLiteral("✓")) ++cVerified;
+  const QString summary = QStringLiteral("\n[동국문화재연구원 양식 · 사실근거 종합]\n• <그림 1~2> 주변유적(%1개소, 원문확인 %2개소) 층위 대비도 및 최단거리 분포\n• 학술문헌(DBpia): %3편\n")
+                              .arg(snap.siteEntries.size()).arg(cVerified).arg(dbpia.collectedPapers.size());
+  session->setFieldValue(QStringLiteral("DISCUSSION_BODY"), snap.discussionDraft + summary + dbpia.synthesizedDiscussion);
+}
 }  // namespace HwpAcademicVisuals

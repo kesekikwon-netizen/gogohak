@@ -1,7 +1,7 @@
 #pragma once
 // 로컬 발굴조사보고서 RAG 검색·인용 클라이언트 (순수 표준 C++20)
 // - 표준 경로: /home/kwon/Disks/report1/report/_rag_index_and_search.py 및 report_text/_rag_index.db
-// - OS 종속 호출 없이 strata::platform::IPlatformService 와 std::filesystem::path 만 사용한다.
+// - 광역권역(전남·경북·전국 등) 및 복수 지역 병합·분할 검색 지원
 #include <filesystem>
 #include <span>
 #include <string>
@@ -12,6 +12,7 @@ namespace strata::core {
 
 struct LocalReportHit {
   std::string sigungu;
+  std::string macro_region;
   std::string report_name;
   int page_no = 0;
   double score = 0.0;
@@ -29,28 +30,56 @@ struct LocalReportStats {
   std::string summary_utf8;
 };
 
+struct RegionReportStats {
+  std::string region_utf8;
+  int total_reports = 0;
+  int text_reports = 0;
+  int scan_reports = 0;
+  int chunk_count = 0;
+};
+
+struct SiteRagEvidence {
+  std::string status = "○";        // "✓" (원문 확인), "◌" (스캔본 미추출), "○" (원문 없음)
+  std::string era_status = "○";
+  std::string feature_status = "○";
+  std::string strata_status = "○";
+  std::string report_name;
+  int page_no = 0;
+  int strata_page_no = 0;
+  int total_pages = 0;
+  std::string era_summary;
+  std::string feature_summary;
+  std::string strata_summary;
+};
+
 class LocalReportRag {
  public:
-  // 표준 스크립트 및 DB 경로 반환 (std::filesystem::path)
   static std::filesystem::path ragScriptPath();
   static std::filesystem::path pipelineScriptPath();
   static std::filesystem::path ragDbPath();
 
-  // RAG 인덱스 통계 조회 (python3 _rag_index_and_search.py stats)
-  static LocalReportStats queryStats();
+  // 시군구명을 광역권역(전남·전북·경북·경남·충남·충북·경기·강원·제주)으로 매핑
+  static std::string classifyMacroRegion(std::string_view sigungu_utf8);
+  // 자연어 질의에서 지역 범위(전국·전남·경북·복수지역 등)를 추출한다 (없으면 default_region_utf8)
+  static std::string extractRegionScope(std::string_view prompt_utf8,
+                                        std::string_view default_region_utf8 = "경주시");
+  // 광역권역("전남", "경북", "전국") 또는 복수 지역("경주·경산")을 SQLite sigungu 필터 목록으로 확장
+  static std::vector<std::string> expandRegionFilters(std::string_view region_expr_utf8);
 
-  // 키워드 + 지역(--region) 기반 보고서 본문 검색 (--json 출력 파싱)
+  static LocalReportStats queryStats();
+  static RegionReportStats queryRegionStats(std::string_view region_utf8);
+
+  // 키워드 + 지역(단일·광역·복수·전국) 기반 보고서 본문 검색 (권당 최대 max_per_report건 제한, 스캔본 제외)
   static std::vector<LocalReportHit> search(std::string_view query_utf8,
                                             std::string_view region_utf8 = {},
-                                            int top_k = 10);
+                                            int top_k = 10,
+                                            int max_per_report = 2);
 
-  // _rag_index_and_search.py --json 출력을 파싱하는 순수 함수 (단위 테스트용)
+  static SiteRagEvidence inspectSiteEvidence(std::string_view site_name_utf8,
+                                             std::string_view region_utf8 = {});
+
   static std::vector<LocalReportHit> parseSearchJson(std::string_view json_utf8);
-
-  // 보고서 작성 프롬프트 주입용 마크다운 블록 생성 (정확한 보고서명, p.페이지번호, txt_path, 본문 발췌 포함)
   static std::string formatPromptContext(std::span<const LocalReportHit> hits);
-
-  // 원클릭 전체 파이프라인 백그라운드 실행 (/home/kwon/Disks/report1/report/run_pipeline.sh)
   static bool startPipelineDetached();
 };
 
