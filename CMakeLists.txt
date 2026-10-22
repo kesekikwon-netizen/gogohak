@@ -128,6 +128,26 @@ endif()
 # Pdf: 인쇄는 저장한 도면 PDF를 잘라 찍는다(TilePrint). Qt6Pdf.dll 은 OSGeo4W Qt 에 이미 있다.
 find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets Xml PrintSupport Pdf Network Svg Test Multimedia MultimediaWidgets)
 find_package(Qt6 REQUIRED COMPONENTS WebEngineWidgets)
+find_package(ZLIB REQUIRED)
+set(OPENHWP_SDK_ROOT "/home/kwon/Disks/han/OpenHwpSDK" CACHE PATH "OpenHwpSDK root")
+list(APPEND KA_INCLUDES "${OPENHWP_SDK_ROOT}/include" "${OPENHWP_SDK_ROOT}/src")
+if(EXISTS "${OPENHWP_SDK_ROOT}/build/libhwpsdk.a" AND NOT WIN32)
+  set(KA_OPENHWP_LIBS "${OPENHWP_SDK_ROOT}/build/libhwpsdk.a" ZLIB::ZLIB)
+else()
+  set(KA_OPENHWP_SOURCES
+    "${OPENHWP_SDK_ROOT}/src/core/utf_conv.cpp"
+    "${OPENHWP_SDK_ROOT}/src/core/document_engine.cpp"
+    "${OPENHWP_SDK_ROOT}/src/core/sdk_api_exports.cpp"
+    "${OPENHWP_SDK_ROOT}/src/formats/hwpx_format.cpp"
+    "${OPENHWP_SDK_ROOT}/src/formats/hwp5_format.cpp")
+  if(WIN32)
+    list(APPEND KA_OPENHWP_SOURCES "${OPENHWP_SDK_ROOT}/src/platform/platform_win32.cpp")
+    set(KA_OPENHWP_LIBS ZLIB::ZLIB ole32 oleaut32 user32 gdi32)
+  else()
+    list(APPEND KA_OPENHWP_SOURCES "${OPENHWP_SDK_ROOT}/src/platform/platform_linux.cpp")
+    set(KA_OPENHWP_LIBS ZLIB::ZLIB)
+  endif()
+endif()
 
 add_library(ka_core STATIC
   ${KA_HGIS_GIT_HASH_CPP}
@@ -231,8 +251,10 @@ add_library(ka_core STATIC
   src/core/SurveySchema.cpp
   src/core/BufferAnalysis.cpp
   src/core/NearbyHeritageExport.cpp
+  src/core/HwpSurveyReportService.cpp
   src/core/LocalReportRag.cpp
   ${KA_PLATFORM_SOURCES}
+  ${KA_OPENHWP_SOURCES}
   src/core/RecentSurveys.cpp
   src/core/KaSafeQgis.cpp
   src/core/MeasureOps.cpp
@@ -327,6 +349,7 @@ add_library(ka_core STATIC
   src/core/ControlPointCsv.h
   src/core/BufferAnalysis.h
   src/core/NearbyHeritageExport.h
+  src/core/HwpSurveyReportService.h
   src/core/LocalReportRag.h
   src/platform/IPlatformService.h
   src/core/RecentSurveys.h
@@ -371,7 +394,7 @@ if(KA_NODE_EXECUTABLE)
 endif()
 target_include_directories(ka_core PUBLIC ${KA_INCLUDES})
 target_link_directories(ka_core PUBLIC ${KA_LIBDIRS})
-target_link_libraries(ka_core PUBLIC Qt6::Core Qt6::Gui Qt6::Widgets Qt6::Xml Qt6::PrintSupport Qt6::Pdf Qt6::Network Qt6::Svg qgis_core qgis_gui ${KA_GDAL_LIB})
+target_link_libraries(ka_core PUBLIC Qt6::Core Qt6::Gui Qt6::Widgets Qt6::Xml Qt6::PrintSupport Qt6::Pdf Qt6::Network Qt6::Svg qgis_core qgis_gui ${KA_GDAL_LIB} ${KA_OPENHWP_LIBS})
 if (WIN32)
   target_link_libraries(ka_core PUBLIC crypt32)
 else()
@@ -590,6 +613,8 @@ add_executable(ka-hgis
   src/app/KaPrintDialog.cpp
   src/app/KaPrintDialogPlate.cpp
   src/app/KaTilePreview.cpp
+  src/app/KaHwpReportStudio.cpp
+  src/app/KaHwpReportStudio.h
   src/app/KaApiKeyDialog.h
   src/app/KaMenuCaption.h
   src/app/KaFormPlate.h
@@ -2479,6 +2504,15 @@ if(KA_HGIS_BUILD_TESTS)
   set_target_properties(ka_edit_buffer_summary_tests PROPERTIES WIN32_EXECUTABLE FALSE)
   ka_add_qtest(edit_buffer_summary ka_edit_buffer_summary_tests)
   set_tests_properties(edit_buffer_summary PROPERTIES
+    ENVIRONMENT "GDAL_DATA=${OSGEO4W_ROOT}/apps/gdal-dev/share/gdal;PATH=${_ka_path_esc};QGIS_PREFIX_PATH=${QGIS_PREFIX_PATH};QT_QPA_PLATFORM=offscreen" TIMEOUT 90)
+  add_executable(ka_hwp_survey_report_tests tests/test_hwp_survey_report.cpp)
+  target_link_libraries(ka_hwp_survey_report_tests PRIVATE ${KA_TEST_LIBS})
+  target_include_directories(ka_hwp_survey_report_tests PRIVATE ${KA_INCLUDES} ${CMAKE_SOURCE_DIR}/src)
+  target_link_directories(ka_hwp_survey_report_tests PRIVATE ${KA_LIBDIRS})
+  target_compile_definitions(ka_hwp_survey_report_tests PRIVATE ${KA_TEST_DEFS})
+  set_target_properties(ka_hwp_survey_report_tests PROPERTIES WIN32_EXECUTABLE FALSE)
+  ka_add_qtest(hwp_survey_report ka_hwp_survey_report_tests)
+  set_tests_properties(hwp_survey_report PROPERTIES
     ENVIRONMENT "GDAL_DATA=${OSGEO4W_ROOT}/apps/gdal-dev/share/gdal;PATH=${_ka_path_esc};QGIS_PREFIX_PATH=${QGIS_PREFIX_PATH};QT_QPA_PLATFORM=offscreen" TIMEOUT 90)
 endif()
 

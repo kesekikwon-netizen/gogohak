@@ -9,6 +9,7 @@
 #include "KaDrawGuideBand.h"
 #include "KaDrawingStudio.h"
 #include "KaFeatureCard.h"  // KaInspectorPanel.h's inline featureCard() needs the complete type
+#include "KaHwpReportStudio.h"
 #include "KaIcons.h"
 #include "KaInspectorPanel.h"
 #include "KaInspectorStyle.h"
@@ -208,6 +209,7 @@ void MainWindow::setupStrataShell() {
   };
   connect(QgsProject::instance(), &QgsProject::layersAdded, this, watch);
   watch(QgsProject::instance()->mapLayers().values());
+  KaHwpReportStudio::attach(this);
   syncShellChips();
   syncBasemapCard();
 #endif
